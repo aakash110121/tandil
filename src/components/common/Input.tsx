@@ -1,0 +1,199 @@
+import React, { useState } from 'react';
+import {
+  View,
+  TextInput,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { I18nManager } from 'react-native';
+
+interface InputProps {
+  label?: string;
+  placeholder?: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  secureTextEntry?: boolean;
+  keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoCorrect?: boolean;
+  multiline?: boolean;
+  numberOfLines?: number;
+  error?: string;
+  disabled?: boolean;
+  leftIcon?: string;
+  rightIcon?: string;
+  onRightIconPress?: () => void;
+  style?: ViewStyle;
+  inputStyle?: TextStyle;
+  maxLength?: number;
+}
+
+export const Input: React.FC<InputProps> = ({
+  label,
+  placeholder,
+  value,
+  onChangeText,
+  secureTextEntry = false,
+  keyboardType = 'default',
+  autoCapitalize = 'none',
+  autoCorrect = false,
+  multiline = false,
+  numberOfLines = 1,
+  error,
+  disabled = false,
+  leftIcon,
+  rightIcon,
+  onRightIconPress,
+  style,
+  inputStyle,
+  maxLength,
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  const inputContainerStyle = [
+    styles.container,
+    isFocused && styles.focused,
+    error && styles.error,
+    disabled && styles.disabled,
+    style,
+  ];
+
+  const inputStyleCombined = [
+    styles.input,
+    leftIcon && styles.inputWithLeftIcon,
+    (rightIcon || secureTextEntry) && styles.inputWithRightIcon,
+    multiline && styles.multilineInput,
+    disabled && styles.disabledInput,
+    I18nManager.isRTL && { textAlign: 'right' as const },
+    inputStyle,
+  ];
+
+  const handleRightIconPress = () => {
+    if (secureTextEntry) {
+      setShowPassword(!showPassword);
+    } else if (onRightIconPress) {
+      onRightIconPress();
+    }
+  };
+
+  return (
+    <View style={styles.wrapper}>
+      {label && <Text style={styles.label}>{label}</Text>}
+      <View style={inputContainerStyle}>
+        {leftIcon && (
+          <Ionicons
+            name={leftIcon as any}
+            size={20}
+            color={COLORS.textSecondary}
+            style={styles.leftIcon}
+          />
+        )}
+        <TextInput
+          style={inputStyleCombined}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={COLORS.textSecondary}
+          secureTextEntry={secureTextEntry && !showPassword}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={autoCorrect}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+          editable={!disabled}
+          maxLength={maxLength}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+        />
+        {(rightIcon || secureTextEntry) && (
+          <TouchableOpacity
+            style={styles.rightIcon}
+            onPress={handleRightIconPress}
+            disabled={disabled}
+          >
+            <Ionicons
+              name={
+                secureTextEntry
+                  ? showPassword
+                    ? 'eye-off'
+                    : 'eye'
+                  : (rightIcon as any)
+              }
+              size={20}
+              color={COLORS.textSecondary}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
+      {error && <Text style={styles.errorText}>{error}</Text>}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  wrapper: {
+    marginBottom: SPACING.md,
+  },
+  label: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.md,
+    minHeight: 48,
+  },
+  focused: {
+    borderColor: COLORS.primary,
+  },
+  error: {
+    borderColor: COLORS.error,
+  },
+  disabled: {
+    backgroundColor: COLORS.surface,
+    opacity: 0.6,
+  },
+  input: {
+    flex: 1,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+    paddingVertical: SPACING.sm,
+  },
+  inputWithLeftIcon: {
+    marginLeft: SPACING.sm,
+  },
+  inputWithRightIcon: {
+    marginRight: SPACING.sm,
+  },
+  multilineInput: {
+    textAlignVertical: 'top',
+    paddingTop: SPACING.sm,
+  },
+  disabledInput: {
+    color: COLORS.textSecondary,
+  },
+  leftIcon: {
+    marginRight: SPACING.xs,
+  },
+  rightIcon: {
+    padding: SPACING.xs,
+  },
+  errorText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.error,
+    marginTop: SPACING.xs,
+  },
+}); 

@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Tandil",
+    "slug": "tandil",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#EEEADE"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "requireFullScreen": false
+    },
+    "android": {
+      "package": "com.anoopavology.tandil",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#EEEADE"
+      },
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f3b7f8ad-2589-44e4-bfb9-fd2921557c8f"
+      }
+    }
+  }
+}

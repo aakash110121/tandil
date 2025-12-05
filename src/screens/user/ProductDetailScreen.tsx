@@ -1,0 +1,459 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Dimensions,
+  Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import Header from '../../components/common/Header';
+import { useTranslation } from 'react-i18next';
+
+const { width: screenWidth } = Dimensions.get('window');
+
+interface ProductDetailScreenProps {
+  route: {
+    params: {
+      product: {
+        id: string;
+        name: string;
+        price: number;
+        originalPrice: number;
+        rating: number;
+        reviews: number;
+        image: string;
+        badge: string;
+        inStock: boolean;
+        description?: string;
+        features?: string[];
+      };
+    };
+  };
+}
+
+const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
+  const navigation = useNavigation<any>();
+  const { t } = useTranslation();
+  const { product } = route.params;
+  const [quantity, setQuantity] = useState(1);
+
+  const handleAddToCart = () => {
+    if (!product.inStock) {
+      Alert.alert(t('category.outOfStock'), t('category.outOfStock'));
+      return;
+    }
+    
+    // Add to cart logic here
+    Alert.alert(
+      t('product.addedToCart'), 
+      `${product.name} (Qty: ${quantity})`,
+      [
+        { text: t('product.continueShopping'), style: 'cancel' },
+        { text: t('product.viewCart'), onPress: () => navigation.navigate('Cart') }
+      ]
+    );
+  };
+
+  const handleBuyNow = () => {
+    if (!product.inStock) {
+      Alert.alert(t('category.outOfStock'), t('category.outOfStock'));
+      return;
+    }
+    
+    // Navigate to checkout with product details
+    navigation.navigate('Checkout', { 
+      items: [{
+        ...product,
+        quantity: quantity
+      }]
+    });
+  };
+
+  const increaseQuantity = () => {
+    if (quantity < 10) {
+      setQuantity(quantity + 1);
+    }
+  };
+
+  const decreaseQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(quantity - 1);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <Header 
+        title={t('product.details')}
+        showBack={true}
+        showCart={true}
+      />
+      
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Product Image */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: (product.image || (product as any).images?.[0] || 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1200&q=60') + `&v=agri` }}
+            style={styles.productImage}
+            onError={({ nativeEvent }) => {
+              // Replace with agriculture fallback if image fails
+              (nativeEvent as any);
+            }}
+          />
+          {product.badge && (
+            <View style={styles.badgeContainer}>
+              <Text style={styles.badgeText}>{t(`product.badges.${String(product.badge).toLowerCase().replace(/\s+/g, '')}`, { defaultValue: product.badge })}</Text>
+            </View>
+          )}
+          {!product.inStock && (
+            <View style={styles.outOfStockOverlay}>
+              <Text style={styles.outOfStockText}>{t('category.outOfStock')}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Product Info */}
+        <View style={styles.productInfo}>
+          <Text style={styles.productName}>{t(`products.items.${product.id}.name`, { defaultValue: product.name })}</Text>
+          
+          <View style={styles.ratingContainer}>
+            <View style={styles.ratingStars}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Ionicons
+                  key={star}
+                  name={star <= product.rating ? "star" : "star-outline"}
+                  size={20}
+                  color={star <= product.rating ? COLORS.warning : COLORS.border}
+                />
+              ))}
+            </View>
+            <Text style={styles.ratingText}>{product.rating}</Text>
+            <Text style={styles.reviewsText}>({product.reviews} {t('product.reviews')})</Text>
+          </View>
+
+          <View style={styles.priceContainer}>
+            <Text style={styles.currentPrice}>{t('orders.currency', { defaultValue: 'AED' })} {product.price}</Text>
+            {product.originalPrice > product.price && (
+              <Text style={styles.originalPrice}>{t('orders.currency', { defaultValue: 'AED' })} {product.originalPrice}</Text>
+            )}
+            {product.originalPrice > product.price && (
+              <View style={styles.discountBadge}>
+                 <Text style={styles.discountText}>
+                   {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% {t('product.off')}
+                 </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Quantity Selection */}
+          <View style={styles.quantitySection}>
+            <Text style={styles.sectionTitle}>{t('product.quantity')}</Text>
+            <View style={styles.quantityContainer}>
+              <TouchableOpacity
+                style={styles.quantityButton}
+                onPress={decreaseQuantity}
+                disabled={quantity <= 1}
+              >
+                <Ionicons 
+                  name="remove" 
+                  size={20} 
+                  color={quantity <= 1 ? COLORS.border : COLORS.text} 
+                />
+              </TouchableOpacity>
+              
+              <Text style={styles.quantityText}>{quantity}</Text>
+              
+              <TouchableOpacity
+                style={styles.quantityButton}
+                onPress={increaseQuantity}
+                disabled={quantity >= 10}
+              >
+                <Ionicons 
+                  name="add" 
+                  size={20} 
+                  color={quantity >= 10 ? COLORS.border : COLORS.text} 
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Product Description */}
+          <View style={styles.descriptionSection}>
+            <Text style={styles.sectionTitle}>{t('product.description')}</Text>
+            <Text style={styles.descriptionText}>
+              {t(`products.items.${product.id}.longDescription`, { defaultValue: t(`products.items.${product.id}.description`, { defaultValue: product.description }) })}
+            </Text>
+          </View>
+
+          {/* Features */}
+          <View style={styles.featuresSection}>
+            <Text style={styles.sectionTitle}>{t('product.features')}</Text>
+            {(product as any).features && (product as any).features.map((feature: string, index: number) => (
+              <View key={index} style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+                <Text style={styles.featureText}>{feature}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Bottom Action Buttons */}
+      <View style={styles.bottomActions}>
+        <TouchableOpacity
+          style={[styles.addToCartButton, !product.inStock && styles.disabledButton]}
+          onPress={handleAddToCart}
+          disabled={!product.inStock}
+        >
+          <Ionicons name="cart-outline" size={20} color={COLORS.primary} />
+          <Text style={styles.addToCartText}>{t('product.addToCart')}</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.buyNowButton, !product.inStock && styles.disabledButton]}
+          onPress={handleBuyNow}
+          disabled={!product.inStock}
+        >
+          <Text style={styles.buyNowText}>{t('product.buyNow')}</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  imageContainer: {
+    position: 'relative',
+    height: 300,
+    backgroundColor: COLORS.surface,
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  badgeContainer: {
+    position: 'absolute',
+    top: SPACING.md,
+    left: SPACING.md,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  badgeText: {
+    color: COLORS.background,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  outOfStockOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  outOfStockText: {
+    color: COLORS.background,
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
+  },
+  productInfo: {
+    padding: SPACING.lg,
+  },
+  productName: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+    lineHeight: 28,
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    marginRight: SPACING.sm,
+  },
+  ratingText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.text,
+    marginRight: 4,
+  },
+  reviewsText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+  },
+  currentPrice: {
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.primary,
+    marginRight: SPACING.md,
+  },
+  originalPrice: {
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.textSecondary,
+    textDecorationLine: 'line-through',
+    marginRight: SPACING.md,
+  },
+  discountBadge: {
+    backgroundColor: COLORS.success,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  discountText: {
+    color: COLORS.background,
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  sizeSection: {
+    marginBottom: SPACING.lg,
+  },
+  sectionTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  sizeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  sizeButton: {
+    width: 50,
+    height: 50,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  sizeButtonSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
+  },
+  sizeButtonText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.text,
+  },
+  sizeButtonTextSelected: {
+    color: COLORS.background,
+  },
+  quantitySection: {
+    marginBottom: SPACING.lg,
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  quantityButton: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  quantityText: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.text,
+    minWidth: 30,
+    textAlign: 'center',
+  },
+  descriptionSection: {
+    marginBottom: SPACING.lg,
+  },
+  descriptionText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    lineHeight: 22,
+  },
+  featuresSection: {
+    marginBottom: SPACING.xl,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  featureText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+    marginLeft: SPACING.sm,
+  },
+  bottomActions: {
+    flexDirection: 'row',
+    padding: SPACING.lg,
+    backgroundColor: COLORS.background,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: SPACING.md,
+  },
+  addToCartButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
+    gap: SPACING.xs,
+  },
+  addToCartText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.primary,
+  },
+  buyNowButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.primary,
+  },
+  buyNowText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.background,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+});
+
+export default ProductDetailScreen;
