@@ -13,10 +13,13 @@
     },
     "ios": {
       "supportsTablet": true,
-      "requireFullScreen": false
+      "requireFullScreen": false,
+      "bundleIdentifier": "com.tandilapp.tandil",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "package": "com.anoopavology.tandil",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#EEEADE"
@@ -29,7 +32,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "f3b7f8ad-2589-44e4-bfb9-fd2921557c8f"
+        "projectId": "f6aa6463-0532-4871-89b1-21d6a1c5bcf3"
       }
     }
   }
