@@ -21,7 +21,8 @@
     "production": {
       "ios": {
         "simulator": false,
-        "distribution": "store"
+        "distribution": "store",
+        "credentialsSource": "local"
       },
       "android": {
         "buildType": "apk",
