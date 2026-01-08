@@ -14,29 +14,68 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { useTranslation } from 'react-i18next';
+import { authService } from '../../services/authService';
+import { useAppStore } from '../../store';
 
 const TechnicianLoginScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
+  const { setUser, setAuthenticated } = useAppStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = () => {
-    if (!email || !password) {
-      Alert.alert(t('booking.missingTitle'), t('booking.missingBody'));
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert(t('booking.missingTitle', { defaultValue: 'Missing Information' }), t('booking.missingBody', { defaultValue: 'Please fill in all fields' }));
       return;
     }
 
     setIsLoading(true);
+    setError(null);
 
-    // Simulate login process
-    setTimeout(() => {
+    try {
+      // Login with role "technician"
+      const response = await authService.login({
+        email: email.trim(),
+        password: password,
+      });
+
+      // Verify the role is technician
+      if (response.role !== 'technician') {
+        Alert.alert('Access Denied', 'This account is not authorized for technician access.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Get the mapped user from storage (authService stores it)
+      const appUser = await authService.getStoredUser();
+      
+      if (appUser) {
+        setUser(appUser);
+        setAuthenticated(true);
+        // Navigate to Main dashboard
+        navigation.replace('Main');
+      }
+    } catch (err: any) {
+      console.error('Technician login error:', err);
+      
+      const errorMessage = 
+        err.response?.data?.message || 
+        err.message || 
+        'Login failed. Please check your credentials and try again.';
+      
+      setError(errorMessage);
+      Alert.alert(
+        'Login Error',
+        errorMessage,
+        [{ text: 'OK' }]
+      );
+    } finally {
       setIsLoading(false);
-      // Mock successful login
-      navigation.replace('Main');
-    }, 2000);
+    }
   };
 
   const handleForgotPassword = () => {
@@ -60,11 +99,20 @@ const TechnicianLoginScreen: React.FC = () => {
 
         {/* Login Form */}
         <View style={styles.form}>
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
           <Input
             label={t('auth.emailLabel')}
             placeholder={t('auth.emailPlaceholder')}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              setError(null);
+            }}
             keyboardType="email-address"
             autoCapitalize="none"
           />
@@ -73,7 +121,10 @@ const TechnicianLoginScreen: React.FC = () => {
             label={t('auth.passwordLabel')}
             placeholder={t('auth.passwordPlaceholder')}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              setError(null);
+            }}
             secureTextEntry={!showPassword}
             rightIcon={showPassword ? 'eye-off' : 'eye'}
             onRightIconPress={() => setShowPassword(!showPassword)}
@@ -87,8 +138,9 @@ const TechnicianLoginScreen: React.FC = () => {
           </TouchableOpacity>
 
           <Button
-            title={isLoading ? "Signing In..." : "Sign In"}
+            title={isLoading ? t('auth.login', { defaultValue: 'Signing In...' }) : t('auth.login', { defaultValue: 'Sign In' })}
             onPress={handleLogin}
+            loading={isLoading}
             disabled={isLoading}
             style={styles.loginButton}
           />
@@ -188,6 +240,19 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
     marginLeft: SPACING.xs,
+  },
+  errorContainer: {
+    backgroundColor: '#FFEBEE',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: FONT_SIZES.sm,
+    textAlign: 'center',
   },
 });
 

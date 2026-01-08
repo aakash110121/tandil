@@ -10,9 +10,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { useAppStore } from '../../store';
 
 const TechnicianProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { user, logout } = useAppStore();
 
   const technician = {
     id: 'tech_001',
@@ -40,7 +42,7 @@ const TechnicianProfileScreen: React.FC = () => {
     { icon: 'log-out-outline', title: 'Logout', onPress: handleLogout, color: COLORS.error },
   ];
 
-  function handleLogout() {
+  const handleLogout = () => {
     Alert.alert(
       'Logout',
       'Are you sure you want to logout?',
@@ -49,11 +51,27 @@ const TechnicianProfileScreen: React.FC = () => {
         { 
           text: 'Logout', 
           style: 'destructive',
-          onPress: () => navigation.navigate('RoleSelection' as never)
+          onPress: async () => {
+            try {
+              await logout();
+              // Navigate to RoleSelection screen after logout
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'RoleSelection' as never }],
+              });
+            } catch (error) {
+              console.error('Logout error:', error);
+              // Still navigate even if logout fails
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'RoleSelection' as never }],
+              });
+            }
+          }
         },
       ]
     );
-  }
+  };
 
   const renderMenuItem = (item: any) => (
     <TouchableOpacity
@@ -104,9 +122,9 @@ const TechnicianProfileScreen: React.FC = () => {
             </View>
           </View>
           
-          <Text style={styles.technicianName}>{technician.name}</Text>
-          <Text style={styles.technicianEmail}>{technician.email}</Text>
-          <Text style={styles.technicianPhone}>{technician.phone}</Text>
+          <Text style={styles.technicianName}>{user?.name || technician.name}</Text>
+          <Text style={styles.technicianEmail}>{user?.email || technician.email}</Text>
+          <Text style={styles.technicianPhone}>{user?.phone || technician.phone}</Text>
           
           <View style={styles.ratingContainer}>
             <Ionicons name="star" size={16} color={COLORS.warning} />
