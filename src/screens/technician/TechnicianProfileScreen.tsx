@@ -30,18 +30,6 @@ const TechnicianProfileScreen: React.FC = () => {
     address: 'New York, NY',
   };
 
-  const menuItems = [
-    { icon: 'trophy-outline', title: 'Memberships', onPress: () => navigation.navigate('Memberships' as never) },
-    { icon: 'person-outline', title: 'Personal Information', onPress: () => {} },
-    { icon: 'location-outline', title: 'Service Areas', onPress: () => {} },
-    { icon: 'construct-outline', title: 'Skills & Specializations', onPress: () => {} },
-    { icon: 'card-outline', title: 'Payment Methods', onPress: () => {} },
-    { icon: 'notifications-outline', title: 'Notifications', onPress: () => {} },
-    { icon: 'shield-outline', title: 'Privacy & Security', onPress: () => {} },
-    { icon: 'help-circle-outline', title: 'Help & Support', onPress: () => {} },
-    { icon: 'log-out-outline', title: 'Logout', onPress: handleLogout, color: COLORS.error },
-  ];
-
   const handleLogout = () => {
     Alert.alert(
       'Logout',
@@ -54,17 +42,28 @@ const TechnicianProfileScreen: React.FC = () => {
           onPress: async () => {
             try {
               await logout();
-              // Navigate to RoleSelection screen after logout
-              navigation.reset({
+              // Navigate to root navigator (RoleSelection)
+              // Get root navigator by going up parent chain
+              let rootNavigator = navigation;
+              while (rootNavigator.getParent()) {
+                rootNavigator = rootNavigator.getParent() as any;
+              }
+              
+              // Reset to RoleSelection at root level
+              rootNavigator.reset({
                 index: 0,
-                routes: [{ name: 'RoleSelection' as never }],
+                routes: [{ name: 'RoleSelection' }],
               });
             } catch (error) {
               console.error('Logout error:', error);
               // Still navigate even if logout fails
-              navigation.reset({
+              let rootNavigator = navigation;
+              while (rootNavigator.getParent()) {
+                rootNavigator = rootNavigator.getParent() as any;
+              }
+              rootNavigator.reset({
                 index: 0,
-                routes: [{ name: 'RoleSelection' as never }],
+                routes: [{ name: 'RoleSelection' }],
               });
             }
           }
@@ -72,6 +71,18 @@ const TechnicianProfileScreen: React.FC = () => {
       ]
     );
   };
+
+  const menuItems = [
+    { icon: 'trophy-outline', title: 'Memberships', onPress: () => navigation.navigate('Memberships' as never) },
+    { icon: 'person-outline', title: 'Personal Information', onPress: () => {} },
+    { icon: 'location-outline', title: 'Service Areas', onPress: () => {} },
+    { icon: 'construct-outline', title: 'Skills & Specializations', onPress: () => {} },
+    { icon: 'card-outline', title: 'Payment Methods', onPress: () => {} },
+    { icon: 'notifications-outline', title: 'Notifications', onPress: () => {} },
+    { icon: 'shield-outline', title: 'Privacy & Security', onPress: () => {} },
+    { icon: 'help-circle-outline', title: 'Help & Support', onPress: () => {} },
+    { icon: 'log-out-outline', title: 'Logout', onPress: handleLogout, color: COLORS.error },
+  ];
 
   const renderMenuItem = (item: any) => (
     <TouchableOpacity
