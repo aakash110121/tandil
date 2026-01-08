@@ -14,27 +14,67 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { Button } from '../../components/common/Button';
+import { authService } from '../../services/authService';
+import { useAppStore } from '../../store';
 
 const SupervisorLoginScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [employeeId, setEmployeeId] = useState('');
+  const { setUser, setAuthenticated } = useAppStore();
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
-    if (!employeeId || !password) {
-      Alert.alert('Error', 'Please enter your Employee ID and password');
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter your email and password');
       return;
     }
 
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
+    setError(null);
+
+    try {
+      // Login with role "supervisor"
+      const response = await authService.login({
+        email: email.trim(),
+        password: password,
+      });
+
+      // Verify the role is supervisor
+      if (response.role !== 'supervisor') {
+        Alert.alert('Access Denied', 'This account is not authorized for supervisor access.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Get the mapped user from storage (authService stores it)
+      const appUser = await authService.getStoredUser();
+      
+      if (appUser) {
+        setUser(appUser);
+        setAuthenticated(true);
+        // Navigate to Main dashboard
+        navigation.replace('Main');
+      }
+    } catch (err: any) {
+      console.error('Supervisor login error:', err);
+      
+      const errorMessage = 
+        err.response?.data?.message || 
+        err.message || 
+        'Login failed. Please check your credentials and try again.';
+      
+      setError(errorMessage);
+      Alert.alert(
+        'Login Error',
+        errorMessage,
+        [{ text: 'OK' }]
+      );
+    } finally {
       setIsLoading(false);
-      navigation.replace('Main');
-    }, 1000);
+    }
   };
 
   return (
@@ -57,17 +97,27 @@ const SupervisorLoginScreen: React.FC = () => {
 
         {/* Login Form */}
         <View style={styles.formContainer}>
-          {/* Employee ID Input */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {/* Email Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Employee ID</Text>
+            <Text style={styles.label}>Email</Text>
             <View style={styles.inputWrapper}>
-              <Ionicons name="card-outline" size={20} color={COLORS.textSecondary} />
+              <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} />
               <TextInput
                 style={styles.input}
-                placeholder="SUP-2001"
-                value={employeeId}
-                onChangeText={setEmployeeId}
-                autoCapitalize="characters"
+                placeholder="Enter your email"
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  setError(null);
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
                 placeholderTextColor={COLORS.textSecondary}
               />
             </View>
@@ -82,7 +132,10 @@ const SupervisorLoginScreen: React.FC = () => {
                 style={styles.input}
                 placeholder="Enter your password"
                 value={password}
-                onChangeText={setPassword}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  setError(null);
+                }}
                 secureTextEntry={!showPassword}
                 placeholderTextColor={COLORS.textSecondary}
               />
@@ -105,6 +158,7 @@ const SupervisorLoginScreen: React.FC = () => {
           <Button
             title={isLoading ? 'Signing in...' : 'Sign In'}
             onPress={handleLogin}
+            loading={isLoading}
             disabled={isLoading}
             style={styles.loginButton}
           />
@@ -227,6 +281,19 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     color: COLORS.primary,
     fontWeight: FONT_WEIGHTS.medium,
+  },
+  errorContainer: {
+    backgroundColor: '#FFEBEE',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: FONT_SIZES.sm,
+    textAlign: 'center',
   },
 });
 
