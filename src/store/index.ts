@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, User, Order, CartItem, Notification, MembershipPackage, MembershipTier } from '../types';
 import { mockUser, mockOrders, mockProducts } from '../data/mockData';
+import { authService } from '../services/authService';
 
 interface AppStore extends AppState {
   // Actions
@@ -282,7 +283,16 @@ export const useAppStore = create<AppStore>()(
       
       clearNotifications: () => set({ notifications: [] }),
       
-      logout: () => {
+      logout: async () => {
+        // Call API logout endpoint
+        try {
+          await authService.logout();
+        } catch (error) {
+          console.error('Logout API error:', error);
+          // Still clear local state even if API call fails
+        }
+        
+        // Clear local state
         set({
           user: null,
           isAuthenticated: false,

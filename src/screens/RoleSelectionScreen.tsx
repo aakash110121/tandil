@@ -40,7 +40,7 @@ const RoleSelectionScreen: React.FC = () => {
       switch (role) {
         case 'user':
           console.log('RoleSelectionScreen: Navigating to Auth (Client)...');
-          navigation.replace('Auth');
+          navigation.replace('Auth', { role: 'client' });
           break;
         case 'technician':
           console.log('RoleSelectionScreen: Navigating to TechnicianApp (Field Worker)...');

@@ -7,69 +7,136 @@ import {
   StatusBar,
   TouchableOpacity,
   Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../constants';
 import { Input } from '../components/common/Input';
 import { Button } from '../components/common/Button';
 import { useAppStore } from '../store';
 import { useTranslation } from 'react-i18next';
+import { authService } from '../services/authService';
 
 const AuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { setUser, setAuthenticated } = useAppStore();
   const { t } = useTranslation();
   
+  // Get role from route params, default to 'client' for client role
+  const selectedRole = route.params?.role || 'client';
+  
   const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  console.log('AuthScreen: Rendering...');
+  const validateForm = (): boolean => {
+    setError(null);
+
+    if (!email.trim()) {
+      setError('Email is required');
+      return false;
+    }
+
+    if (!password.trim()) {
+      setError('Password is required');
+      return false;
+    }
+
+    if (!isLogin) {
+      if (!name.trim()) {
+        setError('Name is required');
+        return false;
+      }
+
+      if (!phone.trim()) {
+        setError('Phone number is required');
+        return false;
+      }
+
+      if (password !== confirmPassword) {
+        setError('Passwords do not match');
+        return false;
+      }
+
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters');
+        return false;
+      }
+    }
+
+    return true;
+  };
 
   const handleAuth = async () => {
-    console.log('AuthScreen: handleAuth called');
-    setLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      // Mock user data
-      const mockUser = {
-        id: 'user_001',
-        name: 'Ahmed Hassan',
-        email: email,
-        phone: phone || '+971501234567',
-        avatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-        loyaltyPoints: 1250,
-        address: {
-          id: 'addr_001',
-          street: 'Sheikh Zayed Road',
-          city: 'Dubai',
-          state: 'Dubai',
-          zipCode: '12345',
-          country: 'UAE',
-          latitude: 25.2048,
-          longitude: 55.2708,
-        },
-        preferences: {
-          language: 'en' as const,
-          theme: 'light' as const,
-          notifications: true,
-        },
-      };
+    if (!validateForm()) {
+      return;
+    }
 
-      setUser(mockUser);
-      setAuthenticated(true);
-      setLoading(false);
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (isLogin) {
+        // Login
+        const response = await authService.login({
+          email: email.trim(),
+          password: password,
+        });
+
+        // Get the mapped user from storage (authService stores it)
+        const appUser = await authService.getStoredUser();
+        
+        if (appUser) {
+          setUser(appUser);
+          setAuthenticated(true);
+          navigation.navigate('UserApp');
+        }
+      } else {
+        // Register
+        const response = await authService.register({
+          name: name.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          password: password,
+          password_confirmation: confirmPassword,
+          role: selectedRole, // Dynamic role from route params
+        });
+
+        // Get the mapped user from storage
+        const appUser = await authService.getStoredUser();
+        
+        if (appUser) {
+          setUser(appUser);
+          setAuthenticated(true);
+          navigation.navigate('UserApp');
+        }
+      }
+    } catch (err: any) {
+      console.error('Auth error:', err);
       
-      // Navigate to UserApp after successful authentication
-      console.log('AuthScreen: Navigating to UserApp...');
-      navigation.navigate('UserApp');
-    }, 1500);
+      // Handle error response
+      const errorMessage = 
+        err.response?.data?.message || 
+        err.message || 
+        (isLogin ? 'Login failed. Please try again.' : 'Registration failed. Please try again.');
+      
+      setError(errorMessage);
+      Alert.alert(
+        isLogin ? 'Login Error' : 'Registration Error',
+        errorMessage,
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSocialLogin = (provider: 'google' | 'apple') => {
@@ -111,11 +178,33 @@ const AuthScreen: React.FC = () => {
 
       {/* Form */}
       <View style={styles.form}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {!isLogin && (
+          <Input
+            label={t('auth.nameLabel')}
+            placeholder={t('auth.namePlaceholder')}
+            value={name}
+            onChangeText={(text) => {
+              setName(text);
+              setError(null);
+            }}
+            leftIcon="person-outline"
+          />
+        )}
+
         <Input
           label={t('auth.emailLabel')}
           placeholder={t('auth.emailPlaceholder')}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(text) => {
+            setEmail(text);
+            setError(null);
+          }}
           keyboardType="email-address"
           leftIcon="mail-outline"
         />
@@ -125,7 +214,10 @@ const AuthScreen: React.FC = () => {
             label={t('auth.phoneLabel')}
             placeholder={t('auth.phonePlaceholder')}
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(text) => {
+              setPhone(text);
+              setError(null);
+            }}
             keyboardType="phone-pad"
             leftIcon="call-outline"
           />
@@ -135,7 +227,10 @@ const AuthScreen: React.FC = () => {
           label={t('auth.passwordLabel')}
           placeholder={t('auth.passwordPlaceholder')}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(text) => {
+            setPassword(text);
+            setError(null);
+          }}
           secureTextEntry
           leftIcon="lock-closed-outline"
         />
@@ -145,7 +240,10 @@ const AuthScreen: React.FC = () => {
             label={t('auth.confirmPasswordLabel')}
             placeholder={t('auth.confirmPasswordPlaceholder')}
             value={confirmPassword}
-            onChangeText={setConfirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              setError(null);
+            }}
             secureTextEntry
             leftIcon="lock-closed-outline"
           />
@@ -306,6 +404,19 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
     fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  errorContainer: {
+    backgroundColor: '#FFEBEE',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.error,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: FONT_SIZES.sm,
+    textAlign: 'center',
   },
 });
 

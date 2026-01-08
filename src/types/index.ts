@@ -225,7 +225,7 @@ export interface VendorProduct {
 export type RootStackParamList = {
   Splash: undefined;
   RoleSelection: undefined;
-  Auth: undefined;
+  Auth: { role?: string } | undefined;
   UserApp: undefined;
   TechnicianApp: undefined;
   SupervisorApp: undefined;

@@ -14,11 +14,12 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import Header from '../../components/common/Header';
 import { useAppStore } from '../../store';
 import { useTranslation } from 'react-i18next';
+import { authService } from '../../services/authService';
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
-  const { user, language, setLanguage } = useAppStore();
+  const { user, language, setLanguage, logout } = useAppStore();
   
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
@@ -37,10 +38,23 @@ const SettingsScreen: React.FC = () => {
         {
           text: t('settings.alerts.logout'),
           style: 'destructive',
-          onPress: () => {
-            console.log('SettingsScreen: Logout confirmed, navigating to Auth');
-            // Handle logout logic
-            navigation.navigate('Auth');
+          onPress: async () => {
+            console.log('SettingsScreen: Logout confirmed');
+            try {
+              await logout();
+              // Navigate to RoleSelection screen after logout
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'RoleSelection' }],
+              });
+            } catch (error) {
+              console.error('Logout error:', error);
+              // Still navigate even if logout fails
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'RoleSelection' }],
+              });
+            }
           },
         },
       ]

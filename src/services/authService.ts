@@ -1,0 +1,135 @@
+import apiClient from './api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { User } from '../types';
+
+export interface LoginCredentials {
+  email: string;
+  password: string;
+}
+
+export interface RegisterData {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  password_confirmation: string;
+  role: string;
+}
+
+export interface LoginResponse {
+  status: boolean;
+  message: string;
+  token: string;
+  role: string;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+    status: string;
+    email_verified_at: string | null;
+    created_at: string;
+    updated_at: string;
+  };
+  data: {
+    id: number;
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+    status: string;
+    email_verified_at: string | null;
+    created_at: string;
+    updated_at: string;
+  };
+}
+
+// Map Laravel user response to app User type
+const mapLaravelUserToAppUser = (laravelUser: LoginResponse['user']): User => {
+  return {
+    id: laravelUser.id.toString(),
+    name: laravelUser.name,
+    email: laravelUser.email,
+    phone: laravelUser.phone,
+    avatar: undefined,
+    loyaltyPoints: 0, // Default value, update if API provides this
+    address: {
+      id: 'default',
+      street: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: 'UAE',
+    },
+    preferences: {
+      language: 'en',
+      theme: 'light',
+      notifications: true,
+    },
+  };
+};
+
+export const authService = {
+  login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
+    const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
+    const { token, user } = response.data;
+    
+    // Store token and user
+    if (token) {
+      await AsyncStorage.setItem('auth_token', token);
+      const appUser = mapLaravelUserToAppUser(user);
+      await AsyncStorage.setItem('user', JSON.stringify(appUser));
+    }
+    
+    return response.data;
+  },
+
+  register: async (data: RegisterData): Promise<LoginResponse> => {
+    const response = await apiClient.post<LoginResponse>('/auth/register', data);
+    const { token, user } = response.data;
+    
+    // Store token and user
+    if (token) {
+      await AsyncStorage.setItem('auth_token', token);
+      const appUser = mapLaravelUserToAppUser(user);
+      await AsyncStorage.setItem('user', JSON.stringify(appUser));
+    }
+    
+    return response.data;
+  },
+
+  logout: async () => {
+    try {
+      await apiClient.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      await AsyncStorage.removeItem('auth_token');
+      await AsyncStorage.removeItem('user');
+    }
+  },
+
+  getStoredUser: async (): Promise<User | null> => {
+    try {
+      const userJson = await AsyncStorage.getItem('user');
+      if (userJson) {
+        return JSON.parse(userJson);
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting stored user:', error);
+      return null;
+    }
+  },
+
+  getStoredToken: async (): Promise<string | null> => {
+    try {
+      return await AsyncStorage.getItem('auth_token');
+    } catch (error) {
+      console.error('Error getting stored token:', error);
+      return null;
+    }
+  },
+};
+

@@ -19,9 +19,22 @@ const ProfileScreen: React.FC = () => {
   const { t } = useTranslation();
   const { user, logout } = useAppStore();
 
-  const handleLogout = () => {
-    logout();
-    navigation.navigate('Auth');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // Navigate to RoleSelection screen after logout
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'RoleSelection' }],
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still navigate even if logout fails
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'RoleSelection' }],
+      });
+    }
   };
 
   const menuItems = [
