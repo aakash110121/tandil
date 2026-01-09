@@ -175,7 +175,14 @@ const SupervisorLoginScreen: React.FC = () => {
         {/* Back to Role Selection */}
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            // Navigate to root navigator's RoleSelection
+            let rootNavigator = navigation;
+            while (rootNavigator.getParent()) {
+              rootNavigator = rootNavigator.getParent() as any;
+            }
+            rootNavigator.navigate('RoleSelection');
+          }}
         >
           <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
           <Text style={styles.backText}>Back to Role Selection</Text>

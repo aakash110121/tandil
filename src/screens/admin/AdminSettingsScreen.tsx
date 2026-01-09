@@ -11,9 +11,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { useAppStore } from '../../store';
 
 const AdminSettingsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { logout } = useAppStore();
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
   const [autoAssignEnabled, setAutoAssignEnabled] = React.useState(false);
   const [maintenanceMode, setMaintenanceMode] = React.useState(false);
@@ -212,7 +214,31 @@ const AdminSettingsScreen: React.FC = () => {
                 { 
                   text: 'Logout', 
                   style: 'destructive',
-                  onPress: () => navigation.navigate('Login')
+                  onPress: async () => {
+                    try {
+                      await logout();
+                      // Navigate to root navigator (RoleSelection)
+                      let rootNavigator = navigation;
+                      while (rootNavigator.getParent()) {
+                        rootNavigator = rootNavigator.getParent() as any;
+                      }
+                      rootNavigator.reset({
+                        index: 0,
+                        routes: [{ name: 'RoleSelection' }],
+                      });
+                    } catch (error) {
+                      console.error('Logout error:', error);
+                      // Still navigate even if logout fails
+                      let rootNavigator = navigation;
+                      while (rootNavigator.getParent()) {
+                        rootNavigator = rootNavigator.getParent() as any;
+                      }
+                      rootNavigator.reset({
+                        index: 0,
+                        routes: [{ name: 'RoleSelection' }],
+                      });
+                    }
+                  }
                 },
               ]
             );
