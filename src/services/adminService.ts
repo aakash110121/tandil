@@ -61,5 +61,36 @@ export const adminService = {
     const response = await apiClient.get(`/admin/users/${userId}`);
     return response.data;
   },
+
+  createUser: async (userData: {
+    name: string;
+    email: string;
+    phone?: string;
+    password: string;
+    password_confirmation: string;
+    role: string;
+    status: string;
+  }): Promise<{ status: boolean; data: AdminUser; message?: string }> => {
+    const response = await apiClient.post('/admin/users', userData);
+    return response.data;
+  },
+
+  updateUser: async (userId: number, userData: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    password_confirmation?: string;
+    role?: string;
+    status?: string;
+  }): Promise<{ status: boolean; data: AdminUser; message?: string }> => {
+    const response = await apiClient.put(`/admin/users/${userId}`, userData);
+    return response.data;
+  },
+
+  deleteUser: async (userId: number): Promise<{ status: boolean; message?: string }> => {
+    const response = await apiClient.delete(`/admin/users/${userId}`);
+    return response.data;
+  },
 };
 

@@ -9,6 +9,8 @@ import { COLORS } from '../constants';
 import AdminLoginScreen from '../screens/admin/AdminLoginScreen';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import UsersManagementScreen from '../screens/admin/UsersManagementScreen';
+import AddUserScreen from '../screens/admin/AddUserScreen';
+import EditUserScreen from '../screens/admin/EditUserScreen';
 import ReportsScreen from '../screens/admin/ReportsScreen';
 import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
 import AdminSubscriptionsScreen from '../screens/admin/AdminSubscriptionsScreen';
@@ -85,6 +87,8 @@ const AdminAppNavigator = () => {
       >
         <Stack.Screen name="Login" component={AdminLoginScreen} />
         <Stack.Screen name="Main" component={TabNavigator} />
+        <Stack.Screen name="AddUser" component={AddUserScreen} />
+        <Stack.Screen name="EditUser" component={EditUserScreen} />
         <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionsScreen} />
         <Stack.Screen name="AdminTips" component={AdminTipsScreen} />
         <Stack.Screen name="AdminProducts" component={AdminProductsScreen} />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,11 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { adminService, AdminUser } from '../../services/adminService';
 
@@ -50,6 +52,9 @@ const UsersManagementScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
 
   const filters = [
     { id: 'all', label: 'All Users' },
@@ -60,9 +65,12 @@ const UsersManagementScreen: React.FC = () => {
   ];
 
   // Fetch users from API
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (showLoading = true) => {
     try {
       setError(null);
+      if (showLoading) {
+        setLoading(true);
+      }
       const response = await adminService.getUsers();
       setUsers(response.data.data || []);
     } catch (err: any) {
@@ -71,12 +79,23 @@ const UsersManagementScreen: React.FC = () => {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setIsInitialLoad(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
+
+  // Refresh users when screen comes into focus (e.g., after adding a user)
+  useFocusEffect(
+    useCallback(() => {
+      // Only refresh if we've already done the initial load
+      if (!isInitialLoad && !loading) {
+        fetchUsers(false);
+      }
+    }, [isInitialLoad, loading, fetchUsers])
+  );
 
   // Filter users based on selected filter and search query
   const filteredUsers = users.filter(user => {
@@ -96,6 +115,53 @@ const UsersManagementScreen: React.FC = () => {
   const onRefresh = () => {
     setRefreshing(true);
     fetchUsers();
+  };
+
+  const handleMenuPress = (user: AdminUser) => {
+    setSelectedUser(user);
+    setShowMenu(true);
+  };
+
+  const handleEdit = () => {
+    if (selectedUser) {
+      setShowMenu(false);
+      navigation.navigate('EditUser' as never, { user: selectedUser } as never);
+    }
+  };
+
+  const handleDelete = () => {
+    if (!selectedUser) return;
+    
+    Alert.alert(
+      'Delete User',
+      `Are you sure you want to delete ${selectedUser.name}? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => setShowMenu(false),
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setShowMenu(false);
+            try {
+              await adminService.deleteUser(selectedUser.id);
+              Alert.alert('Success', 'User deleted successfully');
+              fetchUsers(false);
+            } catch (err: any) {
+              console.error('Error deleting user:', err);
+              const errorMessage = 
+                err.response?.data?.message || 
+                err.message || 
+                'Failed to delete user. Please try again.';
+              Alert.alert('Error', errorMessage);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderUser = ({ item }: { item: AdminUser }) => {
@@ -131,7 +197,10 @@ const UsersManagementScreen: React.FC = () => {
               {item.status}
             </Text>
           </View>
-          <TouchableOpacity style={styles.moreButton}>
+          <TouchableOpacity 
+            style={styles.moreButton}
+            onPress={() => handleMenuPress(item)}
+          >
             <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -144,7 +213,10 @@ const UsersManagementScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>User Management</Text>
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => navigation.navigate('AddUser' as never)}
+        >
           <Ionicons name="person-add" size={24} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
@@ -221,6 +293,37 @@ const UsersManagementScreen: React.FC = () => {
           }
         />
       )}
+
+      {/* Action Menu Modal */}
+      <Modal
+        transparent
+        visible={showMenu}
+        animationType="fade"
+        onRequestClose={() => setShowMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.menuOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMenu(false)}
+        >
+          <View style={styles.menuContainer} onStartShouldSetResponder={() => true}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleEdit}
+            >
+              <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+              <Text style={styles.menuItemText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuItem, styles.menuItemDanger]}
+              onPress={handleDelete}
+            >
+              <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+              <Text style={[styles.menuItemText, styles.menuItemTextDanger]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -407,6 +510,42 @@ const styles = StyleSheet.create({
     color: COLORS.background,
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuContainer: {
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.md,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    gap: SPACING.md,
+  },
+  menuItemDanger: {
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  menuItemText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  menuItemTextDanger: {
+    color: COLORS.error,
   },
 });
 
