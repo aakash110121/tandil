@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,63 +7,49 @@ import {
   TouchableOpacity,
   FlatList,
   TextInput,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { adminService, AdminUser } from '../../services/adminService';
+
+// Map API role to display name
+const getRoleDisplayName = (role: string): string => {
+  const roleMap: { [key: string]: string } = {
+    'technician': 'Field Worker',
+    'supervisor': 'Supervisor',
+    'area_manager': 'Area Manager',
+    'hr': 'HR Manager',
+    'client': 'Client',
+    'admin': 'Admin',
+  };
+  return roleMap[role] || role;
+};
+
+// Generate employee ID based on role and user ID
+const generateEmployeeId = (role: string, userId: number): string => {
+  const prefixMap: { [key: string]: string } = {
+    'technician': 'EMP',
+    'supervisor': 'SUP',
+    'area_manager': 'AM',
+    'hr': 'HR',
+    'client': 'CLT',
+    'admin': 'ADMIN',
+  };
+  const prefix = prefixMap[role] || 'USR';
+  return `${prefix}-${userId.toString().padStart(4, '0')}`;
+};
 
 const UsersManagementScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
-
-  const users = [
-    {
-      id: 'user_001',
-      name: 'Ahmed Hassan',
-      email: 'ahmed@example.com',
-      role: 'Field Worker',
-      employeeId: 'EMP-1001',
-      status: 'active',
-      avatar: 'A',
-    },
-    {
-      id: 'user_002',
-      name: 'Sarah Johnson',
-      email: 'sarah@example.com',
-      role: 'Client',
-      employeeId: 'CLT-5001',
-      status: 'active',
-      avatar: 'S',
-    },
-    {
-      id: 'user_003',
-      name: 'Mohammed Ali',
-      email: 'mohammed@example.com',
-      role: 'Supervisor',
-      employeeId: 'SUP-2001',
-      status: 'active',
-      avatar: 'M',
-    },
-    {
-      id: 'user_004',
-      name: 'Fatima Khan',
-      email: 'fatima@example.com',
-      role: 'Area Manager',
-      employeeId: 'AM-3001',
-      status: 'active',
-      avatar: 'F',
-    },
-    {
-      id: 'user_005',
-      name: 'Ali Rashid',
-      email: 'ali@example.com',
-      role: 'HR Manager',
-      employeeId: 'HR-4001',
-      status: 'inactive',
-      avatar: 'A',
-    },
-  ];
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const filters = [
     { id: 'all', label: 'All Users' },
@@ -73,53 +59,85 @@ const UsersManagementScreen: React.FC = () => {
     { id: 'client', label: 'Clients' },
   ];
 
+  // Fetch users from API
+  const fetchUsers = async () => {
+    try {
+      setError(null);
+      const response = await adminService.getUsers();
+      setUsers(response.data.data || []);
+    } catch (err: any) {
+      console.error('Error fetching users:', err);
+      setError(err.response?.data?.message || 'Failed to load users');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Filter users based on selected filter and search query
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.employeeId.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = 
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      generateEmployeeId(user.role, user.id).toLowerCase().includes(searchQuery.toLowerCase());
     
     if (selectedFilter === 'all') return matchesSearch;
-    if (selectedFilter === 'worker') return matchesSearch && user.role === 'Field Worker';
-    if (selectedFilter === 'supervisor') return matchesSearch && user.role === 'Supervisor';
-    if (selectedFilter === 'manager') return matchesSearch && (user.role === 'Area Manager' || user.role === 'HR Manager');
-    if (selectedFilter === 'client') return matchesSearch && user.role === 'Client';
+    if (selectedFilter === 'worker') return matchesSearch && user.role === 'technician';
+    if (selectedFilter === 'supervisor') return matchesSearch && user.role === 'supervisor';
+    if (selectedFilter === 'manager') return matchesSearch && (user.role === 'area_manager' || user.role === 'hr');
+    if (selectedFilter === 'client') return matchesSearch && user.role === 'client';
     return matchesSearch;
   });
 
-  const renderUser = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.userCard}>
-      <View style={styles.userAvatar}>
-        <Text style={styles.avatarText}>{item.avatar}</Text>
-      </View>
-      
-      <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.name}</Text>
-        <Text style={styles.userEmail}>{item.email}</Text>
-        <View style={styles.userMeta}>
-          <Text style={styles.employeeId}>{item.employeeId}</Text>
-          <Text style={styles.separator}>•</Text>
-          <Text style={styles.userRole}>{item.role}</Text>
-        </View>
-      </View>
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchUsers();
+  };
 
-      <View style={styles.userActions}>
-        <View style={[
-          styles.statusBadge,
-          { backgroundColor: item.status === 'active' ? COLORS.success + '20' : COLORS.textSecondary + '20' }
-        ]}>
-          <Text style={[
-            styles.statusText,
-            { color: item.status === 'active' ? COLORS.success : COLORS.textSecondary }
-          ]}>
-            {item.status}
-          </Text>
+  const renderUser = ({ item }: { item: AdminUser }) => {
+    const employeeId = generateEmployeeId(item.role, item.id);
+    const roleDisplayName = getRoleDisplayName(item.role);
+    const avatarInitial = item.name.charAt(0).toUpperCase();
+
+    return (
+      <TouchableOpacity style={styles.userCard}>
+        <View style={styles.userAvatar}>
+          <Text style={styles.avatarText}>{avatarInitial}</Text>
         </View>
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+        
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{item.name}</Text>
+          <Text style={styles.userEmail}>{item.email}</Text>
+          <View style={styles.userMeta}>
+            <Text style={styles.employeeId}>{employeeId}</Text>
+            <Text style={styles.separator}>•</Text>
+            <Text style={styles.userRole}>{roleDisplayName}</Text>
+          </View>
+        </View>
+
+        <View style={styles.userActions}>
+          <View style={[
+            styles.statusBadge,
+            { backgroundColor: item.status === 'active' ? COLORS.success + '20' : COLORS.textSecondary + '20' }
+          ]}>
+            <Text style={[
+              styles.statusText,
+              { color: item.status === 'active' ? COLORS.success : COLORS.textSecondary }
+            ]}>
+              {item.status}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.moreButton}>
+            <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -169,18 +187,40 @@ const UsersManagementScreen: React.FC = () => {
       </ScrollView>
 
       {/* Users List */}
-      <FlatList
-        data={filteredUsers}
-        renderItem={renderUser}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="people-outline" size={64} color={COLORS.textSecondary} />
-            <Text style={styles.emptyText}>No users found</Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading users...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchUsers}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredUsers}
+          renderItem={renderUser}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.primary]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="people-outline" size={64} color={COLORS.textSecondary} />
+              <Text style={styles.emptyText}>No users found</Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 };
@@ -331,6 +371,42 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     color: COLORS.textSecondary,
     marginTop: SPACING.md,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING.xl * 2,
+  },
+  loadingText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.md,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING.xl * 2,
+    paddingHorizontal: SPACING.lg,
+  },
+  errorText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.error,
+    textAlign: 'center',
+    marginTop: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  retryButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  retryButtonText: {
+    color: COLORS.background,
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semiBold,
   },
 });
 
