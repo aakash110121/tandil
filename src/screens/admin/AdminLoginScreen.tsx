@@ -36,14 +36,23 @@ const AdminLoginScreen: React.FC = () => {
     setError(null);
 
     try {
+      console.log('Admin login attempt:', { email: email.trim() });
+      
       // Login with role "admin"
       const response = await authService.login({
         email: email.trim(),
         password: password,
       });
 
-      // Verify the role is admin
-      if (response.role !== 'admin') {
+      console.log('Login response:', response);
+      console.log('Response role:', response.role);
+      console.log('Response user role:', response.user?.role);
+
+      // Verify the role is admin - check both response.role and user.role
+      const userRole = response.role || response.user?.role || response.data?.role;
+      
+      if (userRole !== 'admin') {
+        console.warn('Access denied - role is:', userRole);
         Alert.alert('Access Denied', 'This account is not authorized for admin access.');
         setIsLoading(false);
         return;
@@ -57,12 +66,17 @@ const AdminLoginScreen: React.FC = () => {
         setAuthenticated(true);
         // Navigate to Main dashboard
         navigation.replace('Main');
+      } else {
+        throw new Error('Failed to retrieve user data after login');
       }
     } catch (err: any) {
       console.error('Admin login error:', err);
+      console.error('Error response:', err.response?.data);
+      console.error('Error status:', err.response?.status);
       
       const errorMessage = 
         err.response?.data?.message || 
+        err.response?.data?.error ||
         err.message || 
         'Login failed. Please check your credentials and try again.';
       

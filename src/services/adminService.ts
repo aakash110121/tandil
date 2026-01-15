@@ -13,10 +13,10 @@ export interface AdminUser {
   roles?: Array<{
     id: number;
     name: string;
-    guard_name: string;
-    created_at: string;
-    updated_at: string;
-    pivot: {
+    guard_name?: string;
+    created_at?: string;
+    updated_at?: string;
+    pivot?: {
       model_type: string;
       model_id: number;
     };
@@ -24,25 +24,26 @@ export interface AdminUser {
 }
 
 export interface UsersResponse {
-  status: boolean;
-  data: {
-    current_page: number;
+  message?: string;
+  status?: boolean;
+  data: AdminUser[] | {
+    current_page?: number;
     data: AdminUser[];
-    first_page_url: string;
-    from: number;
-    last_page: number;
-    last_page_url: string;
-    links: Array<{
+    first_page_url?: string;
+    from?: number;
+    last_page?: number;
+    last_page_url?: string;
+    links?: Array<{
       url: string | null;
       label: string;
       active: boolean;
     }>;
-    next_page_url: string | null;
-    path: string;
-    per_page: number;
-    prev_page_url: string | null;
-    to: number;
-    total: number;
+    next_page_url?: string | null;
+    path?: string;
+    per_page?: number;
+    prev_page_url?: string | null;
+    to?: number;
+    total?: number;
   };
 }
 

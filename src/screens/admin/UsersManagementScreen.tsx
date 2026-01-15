@@ -72,14 +72,31 @@ const UsersManagementScreen: React.FC = () => {
         setLoading(true);
       }
       const response = await adminService.getUsers();
-      if (response && response.data && response.data.data) {
-        setUsers(response.data.data || []);
+      console.log('Users API Response:', response);
+      
+      // Handle different response structures
+      let usersArray: AdminUser[] = [];
+      
+      if (response && response.data) {
+        // Check if data is a direct array (simple response)
+        if (Array.isArray(response.data)) {
+          usersArray = response.data;
+        } 
+        // Check if data is a paginated object with nested data array
+        else if (response.data && typeof response.data === 'object' && 'data' in response.data && Array.isArray(response.data.data)) {
+          usersArray = response.data.data;
+        }
+      }
+      
+      if (usersArray.length > 0 || (response && response.data && Array.isArray(response.data) && response.data.length === 0)) {
+        setUsers(usersArray);
       } else {
         setUsers([]);
-        setError('Invalid response format from server');
+        setError('No users found or invalid response format');
       }
     } catch (err: any) {
       console.error('Error fetching users:', err);
+      console.error('Error response:', err.response?.data);
       const errorMessage = err.response?.data?.message || err.message || 'Failed to load users';
       setError(errorMessage);
       setUsers([]);

@@ -72,17 +72,37 @@ const mapLaravelUserToAppUser = (laravelUser: LoginResponse['user']): User => {
 
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
-    const { token, user } = response.data;
-    
-    // Store token and user
-    if (token) {
-      await AsyncStorage.setItem('auth_token', token);
-      const appUser = mapLaravelUserToAppUser(user);
-      await AsyncStorage.setItem('user', JSON.stringify(appUser));
+    try {
+      const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
+      const responseData = response.data;
+      
+      // Handle different response structures
+      // Some APIs return user directly, others return it in data field
+      const userData = responseData.user || responseData.data || responseData;
+      const token = responseData.token;
+      const role = responseData.role || userData?.role;
+      
+      // Store token and user
+      if (token) {
+        await AsyncStorage.setItem('auth_token', token);
+        if (userData) {
+          const appUser = mapLaravelUserToAppUser(userData);
+          await AsyncStorage.setItem('user', JSON.stringify(appUser));
+        }
+      }
+      
+      // Return response with role included
+      return {
+        ...responseData,
+        role: role || responseData.role || userData?.role,
+        user: userData || responseData.user,
+      };
+    } catch (error: any) {
+      console.error('Login API Error:', error);
+      console.error('Error Response:', error.response?.data);
+      console.error('Error Status:', error.response?.status);
+      throw error;
     }
-    
-    return response.data;
   },
 
   register: async (data: RegisterData): Promise<LoginResponse> => {

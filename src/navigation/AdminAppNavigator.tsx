@@ -14,6 +14,7 @@ import EditUserScreen from '../screens/admin/EditUserScreen';
 import ReportsScreen from '../screens/admin/ReportsScreen';
 import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
 import AdminSubscriptionsScreen from '../screens/admin/AdminSubscriptionsScreen';
+import EditSubscriptionScreen from '../screens/admin/EditSubscriptionScreen';
 import AdminTipsScreen from '../screens/admin/AdminTipsScreen';
 import AdminProductsScreen from '../screens/admin/AdminProductsScreen';
 
@@ -90,6 +91,7 @@ const AdminAppNavigator = () => {
         <Stack.Screen name="AddUser" component={AddUserScreen} />
         <Stack.Screen name="EditUser" component={EditUserScreen} />
         <Stack.Screen name="AdminSubscriptions" component={AdminSubscriptionsScreen} />
+        <Stack.Screen name="EditSubscription" component={EditSubscriptionScreen} />
         <Stack.Screen name="AdminTips" component={AdminTipsScreen} />
         <Stack.Screen name="AdminProducts" component={AdminProductsScreen} />
       </Stack.Navigator>
