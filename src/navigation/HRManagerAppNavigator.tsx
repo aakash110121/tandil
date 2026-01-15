@@ -9,6 +9,8 @@ import { COLORS } from '../constants';
 import HRManagerLoginScreen from '../screens/hrmanager/HRManagerLoginScreen';
 import HRManagerDashboardScreen from '../screens/hrmanager/HRManagerDashboardScreen';
 import AddEmployeeScreen from '../screens/hrmanager/AddEmployeeScreen';
+import EmployeeListScreen from '../screens/hrmanager/EmployeeListScreen';
+import EditEmployeeScreen from '../screens/hrmanager/EditEmployeeScreen';
 import ManageLeavesScreen from '../screens/hrmanager/ManageLeavesScreen';
 import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScreen';
 
@@ -40,7 +42,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="EmployeesTab"
-        component={AddEmployeeScreen}
+        component={EmployeeListScreen}
         options={{
           tabBarLabel: 'Employees',
           tabBarIcon: ({ color, size }) => (
@@ -83,6 +85,8 @@ const HRManagerAppNavigator = () => {
         <Stack.Screen name="Login" component={HRManagerLoginScreen} />
         <Stack.Screen name="Main" component={TabNavigator} />
         <Stack.Screen name="AddEmployee" component={AddEmployeeScreen} />
+        <Stack.Screen name="EmployeeList" component={EmployeeListScreen} />
+        <Stack.Screen name="EditEmployee" component={EditEmployeeScreen} />
         <Stack.Screen name="ManageLeaves" component={ManageLeavesScreen} />
       </Stack.Navigator>
     </SafeAreaView>

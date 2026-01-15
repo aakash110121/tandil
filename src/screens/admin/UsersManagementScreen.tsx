@@ -72,10 +72,17 @@ const UsersManagementScreen: React.FC = () => {
         setLoading(true);
       }
       const response = await adminService.getUsers();
-      setUsers(response.data.data || []);
+      if (response && response.data && response.data.data) {
+        setUsers(response.data.data || []);
+      } else {
+        setUsers([]);
+        setError('Invalid response format from server');
+      }
     } catch (err: any) {
       console.error('Error fetching users:', err);
-      setError(err.response?.data?.message || 'Failed to load users');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load users';
+      setError(errorMessage);
+      setUsers([]);
     } finally {
       setLoading(false);
       setRefreshing(false);

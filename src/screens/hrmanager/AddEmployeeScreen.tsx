@@ -5,49 +5,159 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
+import { hrService } from '../../services/hrService';
 
 const AddEmployeeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   
-  const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    phone: '',
-    position: 'Field Worker',
-    joiningDate: '',
-    employeeId: '',
-  });
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [region, setRegion] = useState('');
+  const [position, setPosition] = useState<string>('');
+  const [joiningDate, setJoiningDate] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const positions = [
-    'Field Worker',
-    'Team Leader',
-    'Area Manager',
-    'HR Staff',
+    { value: 'Field Worker', label: 'Field Worker', designation: 'Technician' },
+    { value: 'Team Leader', label: 'Team Leader', designation: 'Supervisor' },
+    { value: 'Area Manager', label: 'Area Manager', designation: 'Area Manager' },
+    { value: 'HR Staff', label: 'HR Staff', designation: 'HR' },
   ];
 
-  const handleSubmit = () => {
-    if (!formData.fullName || !formData.email || !formData.phone || !formData.employeeId) {
-      Alert.alert('Error', 'Please fill in all required fields');
+  // Generate employee ID based on position (if not provided)
+  const generateEmployeeId = (designation: string): string => {
+    if (employeeId.trim()) {
+      return employeeId.trim();
+    }
+    const prefixMap: { [key: string]: string } = {
+      'Technician': 'EMP',
+      'Supervisor': 'SUP',
+      'Area Manager': 'AM',
+      'HR': 'HR',
+    };
+    const prefix = prefixMap[designation] || 'EMP';
+    const timestamp = Date.now();
+    return `${prefix}-${timestamp.toString().slice(-4)}`;
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: { [key: string]: string } = {};
+
+    if (!name.trim()) {
+      newErrors.name = 'Name is required';
+    }
+
+    if (!email.trim()) {
+      newErrors.email = 'Email Address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    if (!phone.trim()) {
+      newErrors.phone = 'Phone Number is required';
+    }
+
+    if (!position) {
+      newErrors.position = 'Position is required';
+    }
+
+    if (!employeeId.trim()) {
+      newErrors.employeeId = 'Employee ID is required';
+    }
+
+    if (!region.trim()) {
+      newErrors.region = 'Region is required';
+    }
+
+    if (!joiningDate.trim()) {
+      newErrors.joiningDate = 'Joining Date is required';
+    } else if (!/^\d{4}-\d{2}-\d{2}$/.test(joiningDate.trim())) {
+      newErrors.joiningDate = 'Please enter date in YYYY-MM-DD format';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
       return;
     }
 
-    Alert.alert(
-      'Success',
-      `Employee ${formData.fullName} (${formData.employeeId}) has been added successfully!`,
-      [
-        { 
-          text: 'OK', 
-          onPress: () => navigation.goBack()
-        }
-      ]
-    );
+    setLoading(true);
+    try {
+      const selectedPosition = positions.find(p => p.value === position);
+      if (!selectedPosition) {
+        Alert.alert('Error', 'Invalid position selected');
+        setLoading(false);
+        return;
+      }
+
+      const employeeId = generateEmployeeId(selectedPosition.designation);
+
+      await hrService.createEmployee({
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        user_id: null,
+        employee_id: employeeId.trim(),
+        designation: selectedPosition.designation,
+        region: region.trim(),
+        joining_date: joiningDate.trim(),
+      });
+
+      Alert.alert(
+        'Success',
+        'Employee added successfully!',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              // Reset form
+              setName('');
+              setEmail('');
+              setPhone('');
+              setEmployeeId('');
+              setRegion('');
+              setPosition('');
+              setJoiningDate('');
+              setErrors({});
+              navigation.goBack();
+            }
+          }
+        ]
+      );
+    } catch (err: any) {
+      console.error('Error creating employee:', err);
+      const errorMessage = 
+        err.response?.data?.message || 
+        err.response?.data?.error ||
+        err.message || 
+        'Failed to add employee. Please try again.';
+      
+      // Handle validation errors from API
+      if (err.response?.data?.errors) {
+        const apiErrors: { [key: string]: string } = {};
+        Object.keys(err.response.data.errors).forEach((key) => {
+          apiErrors[key] = err.response.data.errors[key][0];
+        });
+        setErrors(apiErrors);
+      } else {
+        Alert.alert('Error', errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -66,54 +176,81 @@ const AddEmployeeScreen: React.FC = () => {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
-          {/* Employee ID */}
+          {/* Name */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Employee ID *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., EMP-1001"
-              value={formData.employeeId}
-              onChangeText={(text) => setFormData({ ...formData, employeeId: text })}
-              placeholderTextColor={COLORS.textSecondary}
-            />
-          </View>
-
-          {/* Full Name */}
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Full Name *</Text>
-            <TextInput
-              style={styles.input}
+            <Input
+              label="Name *"
               placeholder="Enter full name"
-              value={formData.fullName}
-              onChangeText={(text) => setFormData({ ...formData, fullName: text })}
-              placeholderTextColor={COLORS.textSecondary}
+              value={name}
+              onChangeText={(text) => {
+                setName(text);
+                if (errors.name) setErrors({ ...errors, name: '' });
+              }}
+              leftIcon="person-outline"
+              error={errors.name}
             />
           </View>
 
           {/* Email */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Email Address *</Text>
-            <TextInput
-              style={styles.input}
+            <Input
+              label="Email Address *"
               placeholder="email@example.com"
-              value={formData.email}
-              onChangeText={(text) => setFormData({ ...formData, email: text })}
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                if (errors.email) setErrors({ ...errors, email: '' });
+              }}
               keyboardType="email-address"
               autoCapitalize="none"
-              placeholderTextColor={COLORS.textSecondary}
+              leftIcon="mail-outline"
+              error={errors.email}
             />
           </View>
 
           {/* Phone */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Phone Number *</Text>
-            <TextInput
-              style={styles.input}
+            <Input
+              label="Phone Number *"
               placeholder="+971 50 XXX XXXX"
-              value={formData.phone}
-              onChangeText={(text) => setFormData({ ...formData, phone: text })}
+              value={phone}
+              onChangeText={(text) => {
+                setPhone(text);
+                if (errors.phone) setErrors({ ...errors, phone: '' });
+              }}
               keyboardType="phone-pad"
-              placeholderTextColor={COLORS.textSecondary}
+              leftIcon="call-outline"
+              error={errors.phone}
+            />
+          </View>
+
+          {/* Employee ID */}
+          <View style={styles.formGroup}>
+            <Input
+              label="Employee ID *"
+              placeholder="e.g., EMP-1001"
+              value={employeeId}
+              onChangeText={(text) => {
+                setEmployeeId(text);
+                if (errors.employeeId) setErrors({ ...errors, employeeId: '' });
+              }}
+              leftIcon="id-card-outline"
+              error={errors.employeeId}
+            />
+          </View>
+
+          {/* Region */}
+          <View style={styles.formGroup}>
+            <Input
+              label="Region *"
+              placeholder="e.g., Dubai"
+              value={region}
+              onChangeText={(text) => {
+                setRegion(text);
+                if (errors.region) setErrors({ ...errors, region: '' });
+              }}
+              leftIcon="location-outline"
+              error={errors.region}
             />
           </View>
 
@@ -121,38 +258,47 @@ const AddEmployeeScreen: React.FC = () => {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Position *</Text>
             <View style={styles.positionGrid}>
-              {positions.map((position) => (
+              {positions.map((pos) => (
                 <TouchableOpacity
-                  key={position}
+                  key={pos.value}
                   style={[
                     styles.positionCard,
-                    formData.position === position && styles.positionCardActive
+                    position === pos.value && styles.positionCardActive
                   ]}
-                  onPress={() => setFormData({ ...formData, position })}
+                  onPress={() => {
+                    setPosition(pos.value);
+                    if (errors.position) setErrors({ ...errors, position: '' });
+                  }}
                 >
                   <Text style={[
                     styles.positionText,
-                    formData.position === position && styles.positionTextActive
+                    position === pos.value && styles.positionTextActive
                   ]}>
-                    {position}
+                    {pos.label}
                   </Text>
-                  {formData.position === position && (
+                  {position === pos.value && (
                     <Ionicons name="checkmark-circle" size={20} color={COLORS.primary} />
                   )}
                 </TouchableOpacity>
               ))}
             </View>
+            {errors.position && (
+              <Text style={styles.errorText}>{errors.position}</Text>
+            )}
           </View>
 
           {/* Joining Date */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Joining Date</Text>
-            <TextInput
-              style={styles.input}
+            <Input
+              label="Joining Date"
               placeholder="YYYY-MM-DD"
-              value={formData.joiningDate}
-              onChangeText={(text) => setFormData({ ...formData, joiningDate: text })}
-              placeholderTextColor={COLORS.textSecondary}
+              value={joiningDate}
+              onChangeText={(text) => {
+                setJoiningDate(text);
+                if (errors.joiningDate) setErrors({ ...errors, joiningDate: '' });
+              }}
+              leftIcon="calendar-outline"
+              error={errors.joiningDate}
             />
           </View>
 
@@ -168,6 +314,7 @@ const AddEmployeeScreen: React.FC = () => {
           <Button
             title="Add Employee"
             onPress={handleSubmit}
+            loading={loading}
             style={styles.submitButton}
           />
         </View>
@@ -212,14 +359,10 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.sm,
   },
-  input: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+  errorText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.error,
+    marginTop: SPACING.xs,
   },
   positionGrid: {
     gap: SPACING.sm,

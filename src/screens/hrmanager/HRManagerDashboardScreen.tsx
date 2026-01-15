@@ -280,7 +280,7 @@ const HRManagerDashboardScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Employee Directory</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('EmployeeList' as never)}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
