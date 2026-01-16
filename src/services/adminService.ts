@@ -93,5 +93,94 @@ export const adminService = {
     const response = await apiClient.delete(`/admin/users/${userId}`);
     return response.data;
   },
+
+  getDashboardStatistics: async (params?: {
+    period?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  }): Promise<{
+    success: boolean;
+    data: {
+      customers: {
+        total: number;
+        daily: number;
+        weekly: number;
+        monthly: number;
+        yearly: number;
+        growth: {
+          daily: string;
+          weekly: string;
+          monthly: string;
+          yearly: string;
+        };
+      };
+      technicians: {
+        total: number;
+        daily: number;
+        weekly: number;
+        monthly: number;
+        yearly: number;
+        growth: {
+          daily: string;
+          weekly: string;
+          monthly: string;
+          yearly: string;
+        };
+      };
+      employees?: {
+        total: number;
+        daily: number;
+        weekly: number;
+        monthly: number;
+        yearly: number;
+        growth: {
+          daily: string;
+          weekly: string;
+          monthly: string;
+          yearly: string;
+        };
+      };
+      total_users?: {
+        total: number;
+        daily: number;
+        weekly: number;
+        monthly: number;
+        yearly: number;
+        growth: {
+          daily: string;
+          weekly: string;
+          monthly: string;
+          yearly: string;
+        };
+      };
+      active_subscriptions?: {
+        total: number;
+        daily: number;
+        weekly: number;
+        monthly: number;
+        yearly: number;
+        growth: {
+          daily: string;
+          weekly: string;
+          monthly: string;
+          yearly: string;
+        };
+      };
+      monthly_revenue?: {
+        total: number;
+        daily: number;
+        weekly: number;
+        monthly: number;
+        yearly: number;
+        growth: {
+          daily: string;
+          weekly: string;
+          monthly: string;
+          yearly: string;
+        };
+      };
+    };
+  }> => {
+    const response = await apiClient.get('/admin/dashboard/statistics', { params });
+    return response.data;
+  },
 };
 
