@@ -182,5 +182,18 @@ export const adminService = {
     const response = await apiClient.get('/admin/dashboard/statistics', { params });
     return response.data;
   },
+
+  getUsersStatistics: async (): Promise<{
+    success: boolean;
+    data: {
+      all_users: number;
+      workers: number;
+      supervisors: number;
+      managers: number;
+    };
+  }> => {
+    const response = await apiClient.get('/admin/users/statistics');
+    return response.data;
+  },
 };
 

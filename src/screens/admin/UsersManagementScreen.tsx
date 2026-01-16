@@ -55,6 +55,12 @@ const UsersManagementScreen: React.FC = () => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [userStats, setUserStats] = useState<{
+    all_users: number;
+    workers: number;
+    supervisors: number;
+    managers: number;
+  } | null>(null);
 
   const filters = [
     { id: 'all', label: 'All Users' },
@@ -63,6 +69,19 @@ const UsersManagementScreen: React.FC = () => {
     { id: 'manager', label: 'Managers' },
     { id: 'client', label: 'Clients' },
   ];
+
+  // Fetch user statistics
+  const fetchUserStatistics = useCallback(async () => {
+    try {
+      const response = await adminService.getUsersStatistics();
+      if (response.success && response.data) {
+        setUserStats(response.data);
+      }
+    } catch (err: any) {
+      console.error('Error fetching user statistics:', err);
+      // Don't show error for statistics, just log it
+    }
+  }, []);
 
   // Fetch users from API
   const fetchUsers = useCallback(async (showLoading = true) => {
@@ -109,7 +128,8 @@ const UsersManagementScreen: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+    fetchUserStatistics();
+  }, [fetchUsers, fetchUserStatistics]);
 
   // Refresh users when screen comes into focus (e.g., after adding a user)
   useFocusEffect(
@@ -117,8 +137,9 @@ const UsersManagementScreen: React.FC = () => {
       // Only refresh if we've already done the initial load
       if (!isInitialLoad && !loading) {
         fetchUsers(false);
+        fetchUserStatistics();
       }
-    }, [isInitialLoad, loading, fetchUsers])
+    }, [isInitialLoad, loading, fetchUsers, fetchUserStatistics])
   );
 
   // Filter users based on selected filter and search query
@@ -257,30 +278,107 @@ const UsersManagementScreen: React.FC = () => {
         />
       </View>
 
-      {/* Filters */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false}
-        style={styles.filtersContainer}
-      >
-        {filters.map((filter) => (
+      {/* User Statistics as Filter Buttons */}
+      {userStats && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.statisticsContainer}
+        >
           <TouchableOpacity
-            key={filter.id}
             style={[
-              styles.filterChip,
-              selectedFilter === filter.id && styles.filterChipActive
+              styles.statCard,
+              selectedFilter === 'all' && styles.statCardActive
             ]}
-            onPress={() => setSelectedFilter(filter.id)}
+            onPress={() => setSelectedFilter('all')}
           >
+            <Text 
+              numberOfLines={1}
+              style={[
+                styles.statLabel,
+                selectedFilter === 'all' && styles.statLabelActive
+              ]}
+            >
+              All Users
+            </Text>
             <Text style={[
-              styles.filterText,
-              selectedFilter === filter.id && styles.filterTextActive
+              styles.statValue,
+              selectedFilter === 'all' && styles.statValueActive
             ]}>
-              {filter.label}
+              {userStats.all_users.toLocaleString('en-US')}
             </Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+          <TouchableOpacity
+            style={[
+              styles.statCard,
+              selectedFilter === 'worker' && styles.statCardActive
+            ]}
+            onPress={() => setSelectedFilter('worker')}
+          >
+            <Text 
+              numberOfLines={1}
+              style={[
+                styles.statLabel,
+                selectedFilter === 'worker' && styles.statLabelActive
+              ]}
+            >
+              Workers
+            </Text>
+            <Text style={[
+              styles.statValue,
+              selectedFilter === 'worker' && styles.statValueActive
+            ]}>
+              {userStats.workers.toLocaleString('en-US')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.statCard,
+              selectedFilter === 'supervisor' && styles.statCardActive
+            ]}
+            onPress={() => setSelectedFilter('supervisor')}
+          >
+            <Text 
+              numberOfLines={1}
+              style={[
+                styles.statLabel,
+                selectedFilter === 'supervisor' && styles.statLabelActive
+              ]}
+            >
+              Supervisors
+            </Text>
+            <Text style={[
+              styles.statValue,
+              selectedFilter === 'supervisor' && styles.statValueActive
+            ]}>
+              {userStats.supervisors.toLocaleString('en-US')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.statCard,
+              selectedFilter === 'manager' && styles.statCardActive
+            ]}
+            onPress={() => setSelectedFilter('manager')}
+          >
+            <Text 
+              numberOfLines={1}
+              style={[
+                styles.statLabel,
+                selectedFilter === 'manager' && styles.statLabelActive
+              ]}
+            >
+              Managers
+            </Text>
+            <Text style={[
+              styles.statValue,
+              selectedFilter === 'manager' && styles.statValueActive
+            ]}>
+              {userStats.managers.toLocaleString('en-US')}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
 
       {/* Users List */}
       {loading ? (
@@ -570,6 +668,47 @@ const styles = StyleSheet.create({
   },
   menuItemTextDanger: {
     color: COLORS.error,
+  },
+  statisticsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
+  },
+  statCard: {
+    minWidth: 110,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 70,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  statCardActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  statLabel: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    fontWeight: FONT_WEIGHTS.medium,
+    marginBottom: SPACING.xs,
+    textAlign: 'center',
+    width: '100%',
+  },
+  statLabelActive: {
+    color: COLORS.background,
+  },
+  statValue: {
+    fontSize: FONT_SIZES.xl,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.text,
+  },
+  statValueActive: {
+    color: COLORS.background,
   },
 });
 
