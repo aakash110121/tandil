@@ -44,7 +44,8 @@ const TechnicianLoginScreen: React.FC = () => {
       });
 
       // Verify the role is technician
-      if (response.role !== 'technician') {
+      const userRole = response.data?.role || response.data?.user?.role;
+      if (userRole !== 'technician') {
         Alert.alert('Access Denied', 'This account is not authorized for technician access.');
         setIsLoading(false);
         return;

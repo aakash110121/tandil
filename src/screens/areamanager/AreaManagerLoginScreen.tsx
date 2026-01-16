@@ -43,7 +43,8 @@ const AreaManagerLoginScreen: React.FC = () => {
       });
 
       // Verify the role is area_manager
-      if (response.role !== 'area_manager') {
+      const userRole = response.data?.role || response.data?.user?.role;
+      if (userRole !== 'area_manager') {
         Alert.alert('Access Denied', 'This account is not authorized for area manager access.');
         setIsLoading(false);
         return;

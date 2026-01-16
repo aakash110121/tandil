@@ -43,7 +43,8 @@ const SupervisorLoginScreen: React.FC = () => {
       });
 
       // Verify the role is supervisor
-      if (response.role !== 'supervisor') {
+      const userRole = response.data?.role || response.data?.user?.role;
+      if (userRole !== 'supervisor') {
         Alert.alert('Access Denied', 'This account is not authorized for supervisor access.');
         setIsLoading(false);
         return;

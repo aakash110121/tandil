@@ -17,36 +17,27 @@ export interface RegisterData {
 }
 
 export interface LoginResponse {
-  status: boolean;
+  success: boolean;
   message: string;
-  token: string;
-  role: string;
-  user: {
-    id: number;
-    name: string;
-    email: string;
-    phone: string;
-    role: string;
-    status: string;
-    email_verified_at: string | null;
-    created_at: string;
-    updated_at: string;
-  };
   data: {
-    id: number;
-    name: string;
-    email: string;
-    phone: string;
+    token: string;
     role: string;
-    status: string;
-    email_verified_at: string | null;
-    created_at: string;
-    updated_at: string;
+    user: {
+      id: number;
+      name: string;
+      email: string;
+      phone: string;
+      role: string;
+      status: string;
+      email_verified_at: string | null;
+      created_at: string;
+      updated_at: string;
+    };
   };
 }
 
 // Map Laravel user response to app User type
-const mapLaravelUserToAppUser = (laravelUser: LoginResponse['user']): User => {
+const mapLaravelUserToAppUser = (laravelUser: LoginResponse['data']['user']): User => {
   return {
     id: laravelUser.id.toString(),
     name: laravelUser.name,
@@ -76,11 +67,12 @@ export const authService = {
       const response = await apiClient.post<LoginResponse>('/auth/login', credentials);
       const responseData = response.data;
       
-      // Handle different response structures
-      // Some APIs return user directly, others return it in data field
-      const userData = responseData.user || responseData.data || responseData;
-      const token = responseData.token;
-      const role = responseData.role || userData?.role;
+      console.log('Login API Response:', responseData);
+      
+      // Extract token, role, and user from response.data.data
+      const token = responseData.data?.token;
+      const role = responseData.data?.role;
+      const userData = responseData.data?.user;
       
       // Store token and user
       if (token) {
@@ -91,12 +83,8 @@ export const authService = {
         }
       }
       
-      // Return response with role included
-      return {
-        ...responseData,
-        role: role || responseData.role || userData?.role,
-        user: userData || responseData.user,
-      };
+      // Return response in expected format for backward compatibility
+      return responseData;
     } catch (error: any) {
       console.error('Login API Error:', error);
       console.error('Error Response:', error.response?.data);
@@ -106,17 +94,32 @@ export const authService = {
   },
 
   register: async (data: RegisterData): Promise<LoginResponse> => {
-    const response = await apiClient.post<LoginResponse>('/auth/register', data);
-    const { token, user } = response.data;
-    
-    // Store token and user
-    if (token) {
-      await AsyncStorage.setItem('auth_token', token);
-      const appUser = mapLaravelUserToAppUser(user);
-      await AsyncStorage.setItem('user', JSON.stringify(appUser));
+    try {
+      const response = await apiClient.post<LoginResponse>('/auth/register', data);
+      const responseData = response.data;
+      
+      console.log('Register API Response:', responseData);
+      
+      // Extract token, role, and user from response.data.data
+      const token = responseData.data?.token;
+      const userData = responseData.data?.user;
+      
+      // Store token and user
+      if (token) {
+        await AsyncStorage.setItem('auth_token', token);
+        if (userData) {
+          const appUser = mapLaravelUserToAppUser(userData);
+          await AsyncStorage.setItem('user', JSON.stringify(appUser));
+        }
+      }
+      
+      return responseData;
+    } catch (error: any) {
+      console.error('Register API Error:', error);
+      console.error('Error Response:', error.response?.data);
+      console.error('Error Status:', error.response?.status);
+      throw error;
     }
-    
-    return response.data;
   },
 
   logout: async () => {

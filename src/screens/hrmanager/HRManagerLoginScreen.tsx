@@ -43,7 +43,8 @@ const HRManagerLoginScreen: React.FC = () => {
       });
 
       // Verify the role is hr
-      if (response.role !== 'hr') {
+      const userRole = response.data?.role || response.data?.user?.role;
+      if (userRole !== 'hr') {
         Alert.alert('Access Denied', 'This account is not authorized for HR manager access.');
         setIsLoading(false);
         return;

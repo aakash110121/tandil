@@ -45,11 +45,12 @@ const AdminLoginScreen: React.FC = () => {
       });
 
       console.log('Login response:', response);
-      console.log('Response role:', response.role);
-      console.log('Response user role:', response.user?.role);
+      console.log('Response data:', response.data);
+      console.log('Response role:', response.data?.role);
+      console.log('Response user role:', response.data?.user?.role);
 
-      // Verify the role is admin - check both response.role and user.role
-      const userRole = response.role || response.user?.role || response.data?.role;
+      // Verify the role is admin - check response.data.role
+      const userRole = response.data?.role || response.data?.user?.role;
       
       if (userRole !== 'admin') {
         console.warn('Access denied - role is:', userRole);
