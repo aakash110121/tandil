@@ -15,6 +15,7 @@
       "supportsTablet": true,
       "requireFullScreen": false,
       "bundleIdentifier": "com.tandilapp.tandil",
+      "buildNumber": "2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
