@@ -60,6 +60,7 @@ const UsersManagementScreen: React.FC = () => {
     workers: number;
     supervisors: number;
     managers: number;
+    clients?: number;
   } | null>(null);
 
   const filters = [
@@ -75,13 +76,18 @@ const UsersManagementScreen: React.FC = () => {
     try {
       const response = await adminService.getUsersStatistics();
       if (response.success && response.data) {
-        setUserStats(response.data);
+        // Calculate clients count from users if not provided by API
+        const clientsCount = users.filter(u => u.role === 'client').length;
+        setUserStats({
+          ...response.data,
+          clients: clientsCount,
+        });
       }
     } catch (err: any) {
       console.error('Error fetching user statistics:', err);
       // Don't show error for statistics, just log it
     }
-  }, []);
+  }, [users]);
 
   // Fetch users from API
   const fetchUsers = useCallback(async (showLoading = true) => {
@@ -128,8 +134,13 @@ const UsersManagementScreen: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
-    fetchUserStatistics();
-  }, [fetchUsers, fetchUserStatistics]);
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    if (users.length > 0) {
+      fetchUserStatistics();
+    }
+  }, [users, fetchUserStatistics]);
 
   // Refresh users when screen comes into focus (e.g., after adding a user)
   useFocusEffect(
@@ -375,6 +386,29 @@ const UsersManagementScreen: React.FC = () => {
               selectedFilter === 'manager' && styles.statValueActive
             ]}>
               {userStats.managers.toLocaleString('en-US')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.statCard,
+              selectedFilter === 'client' && styles.statCardActive
+            ]}
+            onPress={() => setSelectedFilter('client')}
+          >
+            <Text 
+              numberOfLines={1}
+              style={[
+                styles.statLabel,
+                selectedFilter === 'client' && styles.statLabelActive
+              ]}
+            >
+              Clients
+            </Text>
+            <Text style={[
+              styles.statValue,
+              selectedFilter === 'client' && styles.statValueActive
+            ]}>
+              {(userStats.clients ?? 0).toLocaleString('en-US')}
             </Text>
           </TouchableOpacity>
         </ScrollView>
