@@ -133,7 +133,20 @@ const AdminDashboardScreen: React.FC = () => {
         </View>
       </View>
       <Text style={styles.quickStatLabel}>{item.label}</Text>
-      <TouchableOpacity style={styles.quickStatAction}>
+      <TouchableOpacity 
+        style={styles.quickStatAction}
+        onPress={() => {
+          if (item.label === 'Pending Reports') {
+            navigation.navigate('PendingReports' as never);
+          } else if (item.label === 'New Orders') {
+            // Navigate to orders management if needed
+            navigation.navigate('UsersTab' as never);
+          } else if (item.label === 'Support Tickets') {
+            // Navigate to support tickets if needed
+            navigation.navigate('UsersTab' as never);
+          }
+        }}
+      >
         <Text style={[styles.quickStatActionText, { color: item.color }]}>{item.action} →</Text>
       </TouchableOpacity>
     </View>
