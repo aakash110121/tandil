@@ -20,3 +20,16 @@ export const API_CONFIG = {
   },
 };
 
+/** Build full image URL from API relative path (e.g. /media/products/xxx.jpg or products/xxx.jpg). */
+export function buildFullImageUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  const origin = API_BASE_URL.replace(/\/api\/?$/, '');
+  const path = trimmed.startsWith('/') ? trimmed.slice(1) : trimmed;
+  const fullPath =
+    path.startsWith('media/') ? path
+    : path.startsWith('storage/') ? path
+    : `storage/${path}`;
+  return `${origin}/${fullPath}`;
+}
+

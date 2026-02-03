@@ -195,5 +195,271 @@ export const adminService = {
     const response = await apiClient.get('/admin/users/statistics');
     return response.data;
   },
+
+  getRecentActivities: async (params?: { limit?: number }): Promise<{ success: boolean; data: AdminActivity[] }> => {
+    const response = await apiClient.get<{ success: boolean; data: AdminActivity[] }>(
+      '/admin/dashboard/recent-activities',
+      { params, timeout: 60000 }
+    );
+    return response.data;
+  },
+
+  // Reports API
+  getReports: async (params?: {
+    page?: number;
+    per_page?: number;
+    status?: 'pending' | 'generated' | 'scheduled';
+    type?: string;
+  }): Promise<ReportsListResponse> => {
+    const response = await apiClient.get<ReportsListResponse>('/admin/reports', { params });
+    return response.data;
+  },
+
+  generateReport: async (body: {
+    type: string;
+    title: string;
+    parameters: {
+      start_date: string;
+      end_date: string;
+      format?: string;
+      include_charts?: boolean;
+      include_details?: boolean;
+    };
+  }): Promise<{ success: boolean; message: string; data: AdminReport }> => {
+    const response = await apiClient.post<{ success: boolean; message: string; data: AdminReport }>(
+      '/admin/reports/generate',
+      body
+    );
+    return response.data;
+  },
+
+  scheduleReport: async (body: {
+    type: string;
+    title: string;
+    scheduled_at: string; // "YYYY-MM-DD HH:MM:SS"
+    recurrence?: 'daily' | 'weekly' | 'monthly' | 'yearly' | null;
+    parameters: {
+      start_date: string;
+      end_date: string;
+      format?: string;
+      include_charts?: boolean;
+    };
+  }): Promise<{ message: string; data: AdminReport }> => {
+    const response = await apiClient.post<{ message: string; data: AdminReport }>(
+      '/admin/reports/schedule',
+      body
+    );
+    return response.data;
+  },
+
+  deleteReport: async (reportId: number): Promise<{ success?: boolean; message: string }> => {
+    const response = await apiClient.delete<{ success?: boolean; message: string }>(
+      `/admin/reports/${reportId}`
+    );
+    return response.data;
+  },
+
+  cancelScheduledReport: async (reportId: number): Promise<{ success?: boolean; message: string }> => {
+    const response = await apiClient.delete<{ success?: boolean; message: string }>(
+      `/admin/reports/${reportId}/cancel`
+    );
+    return response.data;
+  },
+
+  // Admin products list (uses Bearer token)
+  getProducts: async (params?: {
+    search?: string;
+    category_id?: string | number;
+    filter?: string;
+    per_page?: number;
+    page?: number;
+  }): Promise<{
+    status: boolean;
+    message?: string;
+    data: AdminProduct[];
+    pagination: { current_page: number; last_page: number; per_page: number; total: number };
+  }> => {
+    const response = await apiClient.get('/admin/products', { params });
+    return response.data;
+  },
+
+  // Create product (POST /admin/products, Bearer token) – JSON body
+  createProduct: async (body: {
+    name: string;
+    description?: string;
+    price: number;
+    stock: number;
+    status: string;
+    category_id?: number | null;
+    weight_unit?: string;
+    sku: string;
+    handle: string;
+    image_urls?: string[];
+  }): Promise<{
+    status: boolean;
+    message?: string;
+    data: AdminProductCreated;
+  }> => {
+    const response = await apiClient.post('/admin/products', body, { timeout: 60000 });
+    return response.data;
+  },
+
+  // Create product with image files (same endpoint, multipart/form-data). Longer timeout for uploads.
+  createProductWithImages: async (params: {
+    name: string;
+    description?: string;
+    price: number;
+    stock: number;
+    status: string;
+    category_id?: number | null;
+    weight_unit?: string;
+    sku: string;
+    handle: string;
+    image_urls?: string[];
+    imageFiles: { uri: string }[];
+  }): Promise<{ status: boolean; message?: string; data: AdminProductCreated }> => {
+    const formData = new FormData();
+    formData.append('name', params.name);
+    if (params.description) formData.append('description', params.description);
+    formData.append('price', String(params.price));
+    formData.append('stock', String(params.stock));
+    formData.append('status', params.status);
+    if (params.category_id != null) formData.append('category_id', String(params.category_id));
+    if (params.weight_unit) formData.append('weight_unit', params.weight_unit);
+    formData.append('sku', params.sku);
+    formData.append('handle', params.handle);
+    if (params.image_urls?.length) {
+      formData.append('image_urls', JSON.stringify(params.image_urls));
+    }
+    params.imageFiles.forEach((file, index) => {
+      formData.append('images[]', {
+        uri: file.uri,
+        type: 'image/jpeg',
+        name: `product-image-${index}.jpg`,
+      } as any);
+    });
+    // 2 min timeout for multipart upload (images can be slow on mobile networks)
+    const response = await apiClient.post('/admin/products', formData, { timeout: 120000 });
+    return response.data;
+  },
+
+  // Delete product (DELETE /admin/products/:id, Bearer token)
+  deleteProduct: async (productId: number): Promise<{ status: boolean; message?: string }> => {
+    const response = await apiClient.delete(`/admin/products/${productId}`);
+    return response.data;
+  },
 };
+
+// Admin product (for list from GET /admin/products)
+export interface AdminProduct {
+  id: number;
+  category_id?: number;
+  name: string;
+  vendor?: string;
+  type?: string;
+  sku?: string;
+  description?: string;
+  price: string;
+  stock?: number;
+  status?: string;
+  image?: string | null;
+  image_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  category?: { id: number; name: string; slug?: string };
+  primary_image?: { id?: number; image_path?: string };
+  images?: Array<{ id?: number; image_path?: string; is_primary?: number }>;
+}
+
+// Admin product create response (POST /admin/products – JSON or multipart)
+export interface AdminProductCreated {
+  id: number;
+  name: string;
+  description?: string;
+  sku?: string;
+  price: string | number;
+  stock: number;
+  status: string;
+  weight_unit?: string;
+  handle?: string;
+  category_id?: number | null;
+  track_quantity?: boolean;
+  allow_backorder?: boolean;
+  requires_shipping?: boolean;
+  taxable?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  image?: string | null;
+  image_url?: string | null;
+  category?: { id: number; name: string } | null;
+  primary_image?: {
+    id: number;
+    product_id: number;
+    image_path: string;
+    sort_order: number;
+    is_primary: number;
+    created_at?: string;
+    updated_at?: string;
+  };
+  images?: Array<{
+    id: number;
+    product_id: number;
+    image_path: string;
+    sort_order: number;
+    is_primary: number;
+    created_at?: string;
+    updated_at?: string;
+  }>;
+}
+
+// Reports types
+export interface ReportCreatedBy {
+  id: number;
+  name: string;
+}
+
+export interface ReportParameters {
+  start_date?: string;
+  end_date?: string;
+  format?: string;
+  include_charts?: boolean;
+  include_details?: boolean;
+}
+
+export interface AdminReport {
+  id?: number;
+  title?: string;
+  type?: string;
+  status?: string;
+  created_at?: string;
+  scheduled_at?: string | null;
+  generated_at?: string | null;
+  file_url?: string | null;
+  file_size?: number;
+  created_by?: ReportCreatedBy;
+  parameters?: ReportParameters;
+}
+
+export interface ReportsMeta {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+}
+
+export interface ReportsListResponse {
+  success?: boolean;
+  data: AdminReport[];
+  meta: ReportsMeta;
+}
+
+export interface AdminActivity {
+  type?: string;
+  icon_type?: string;
+  description?: string;
+  timestamp?: string;
+  created_at?: string;
+  related_id?: number;
+  related_type?: string;
+}
 

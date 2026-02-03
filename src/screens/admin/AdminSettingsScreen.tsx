@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -7,43 +7,54 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { useAppStore } from '../../store';
+import { setAppLanguage } from '../../i18n';
+
+const LANGUAGES = [
+  { code: 'en' as const, label: 'English' },
+  { code: 'ar' as const, label: 'العربية' },
+  { code: 'ur' as const, label: 'اردو' },
+];
 
 const AdminSettingsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { logout } = useAppStore();
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
-  const [autoAssignEnabled, setAutoAssignEnabled] = React.useState(false);
-  const [maintenanceMode, setMaintenanceMode] = React.useState(false);
+  const { t, i18n } = useTranslation();
+  const { logout, setLanguage } = useAppStore();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [autoAssignEnabled, setAutoAssignEnabled] = useState(false);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   const settingsSections = [
     {
-      title: 'System Settings',
+      titleKey: 'admin.settings.systemSettings',
       items: [
         {
           icon: 'notifications',
-          title: 'Push Notifications',
-          subtitle: 'Enable system notifications',
+          titleKey: 'admin.settings.pushNotifications.title',
+          subtitleKey: 'admin.settings.pushNotifications.subtitle',
           type: 'toggle',
           value: notificationsEnabled,
           onToggle: setNotificationsEnabled,
         },
         {
           icon: 'refresh',
-          title: 'Auto-Assign Tasks',
-          subtitle: 'Automatically assign tasks to workers',
+          titleKey: 'admin.settings.autoAssignTasks.title',
+          subtitleKey: 'admin.settings.autoAssignTasks.subtitle',
           type: 'toggle',
           value: autoAssignEnabled,
           onToggle: setAutoAssignEnabled,
         },
         {
           icon: 'warning',
-          title: 'Maintenance Mode',
-          subtitle: 'Enable maintenance mode',
+          titleKey: 'admin.settings.maintenanceMode.title',
+          subtitleKey: 'admin.settings.maintenanceMode.subtitle',
           type: 'toggle',
           value: maintenanceMode,
           onToggle: setMaintenanceMode,
@@ -51,98 +62,101 @@ const AdminSettingsScreen: React.FC = () => {
       ],
     },
     {
-      title: 'App Configuration',
+      titleKey: 'admin.settings.appConfiguration',
       items: [
         {
           icon: 'color-palette',
-          title: 'Theme Settings',
-          subtitle: 'Customize app appearance',
+          titleKey: 'admin.settings.themeSettings.title',
+          subtitleKey: 'admin.settings.themeSettings.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert('Theme Settings', 'Theme customization coming soon'),
+          onPress: () => Alert.alert(t('admin.settings.themeSettings.title'), t('admin.settings.themeSettings.subtitle')),
         },
         {
           icon: 'language',
-          title: 'Language & Region',
-          subtitle: 'Change app language',
+          titleKey: 'admin.settings.languageRegion.title',
+          subtitleKey: 'admin.settings.languageRegion.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert('Language', 'Language settings coming soon'),
+          onPress: () => setLanguageModalVisible(true),
         },
         {
           icon: 'card',
-          title: 'Payment Settings',
-          subtitle: 'Configure payment methods',
+          titleKey: 'admin.settings.paymentSettings.title',
+          subtitleKey: 'admin.settings.paymentSettings.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert('Payment Settings', 'Payment configuration coming soon'),
+          onPress: () => Alert.alert(t('admin.settings.paymentSettings.title'), t('admin.settings.paymentSettings.subtitle')),
         },
       ],
     },
     {
-      title: 'Data & Privacy',
+      titleKey: 'admin.settings.dataPrivacy',
       items: [
         {
           icon: 'shield-checkmark',
-          title: 'Privacy Policy',
-          subtitle: 'View privacy policy',
+          titleKey: 'admin.settings.privacyPolicy.title',
+          subtitleKey: 'admin.settings.privacyPolicy.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert('Privacy Policy', 'Privacy policy details'),
+          onPress: () => Alert.alert(t('admin.settings.privacyPolicy.title'), t('admin.settings.privacyPolicy.subtitle')),
         },
         {
           icon: 'document-text',
-          title: 'Terms of Service',
-          subtitle: 'View terms and conditions',
+          titleKey: 'admin.settings.termsOfService.title',
+          subtitleKey: 'admin.settings.termsOfService.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert('Terms', 'Terms of service details'),
+          onPress: () => Alert.alert(t('admin.settings.termsOfService.title'), t('admin.settings.termsOfService.subtitle')),
         },
         {
           icon: 'trash',
-          title: 'Clear Cache',
-          subtitle: 'Clear app cache data',
+          titleKey: 'admin.settings.clearCache.title',
+          subtitleKey: 'admin.settings.clearCache.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert('Clear Cache', 'Are you sure you want to clear cache?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Clear', onPress: () => Alert.alert('Success', 'Cache cleared!') },
-          ]),
+          onPress: () =>
+            Alert.alert(t('admin.settings.clearCache.title'), t('admin.settings.clearCache.subtitle'), [
+              { text: t('admin.settings.cancel'), style: 'cancel' },
+              { text: t('admin.settings.clear'), onPress: () => Alert.alert(t('admin.settings.success'), t('admin.settings.cacheCleared')) },
+            ]),
         },
       ],
     },
     {
-      title: 'Advanced',
+      titleKey: 'admin.settings.advanced',
       items: [
         {
           icon: 'code',
-          title: 'Developer Options',
-          subtitle: 'Advanced developer settings',
+          titleKey: 'admin.settings.developerOptions.title',
+          subtitleKey: 'admin.settings.developerOptions.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert('Developer Options', 'Developer settings'),
+          onPress: () => Alert.alert(t('admin.settings.developerOptions.title'), t('admin.settings.developerOptions.subtitle')),
         },
         {
           icon: 'bug',
-          title: 'Debug Logs',
-          subtitle: 'View system logs',
+          titleKey: 'admin.settings.debugLogs.title',
+          subtitleKey: 'admin.settings.debugLogs.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert('Debug Logs', 'System logs viewer'),
+          onPress: () => Alert.alert(t('admin.settings.debugLogs.title'), t('admin.settings.debugLogs.subtitle')),
         },
         {
           icon: 'download',
-          title: 'Export Data',
-          subtitle: 'Export system data',
+          titleKey: 'admin.settings.exportData.title',
+          subtitleKey: 'admin.settings.exportData.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert('Export Data', 'Data export options'),
+          onPress: () => Alert.alert(t('admin.settings.exportData.title'), t('admin.settings.exportData.subtitle')),
         },
       ],
     },
   ];
 
   const renderSettingItem = (item: any) => {
+    const title = t(item.titleKey);
+    const subtitle = t(item.subtitleKey);
     if (item.type === 'toggle') {
       return (
-        <View key={item.title} style={styles.settingItem}>
+        <View key={item.titleKey} style={styles.settingItem}>
           <View style={styles.settingIcon}>
             <Ionicons name={item.icon as any} size={24} color={COLORS.primary} />
           </View>
           <View style={styles.settingContent}>
-            <Text style={styles.settingTitle}>{item.title}</Text>
-            <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+            <Text style={styles.settingTitle}>{title}</Text>
+            <Text style={styles.settingSubtitle}>{subtitle}</Text>
           </View>
           <Switch
             value={item.value}
@@ -155,8 +169,8 @@ const AdminSettingsScreen: React.FC = () => {
     }
 
     return (
-      <TouchableOpacity 
-        key={item.title} 
+      <TouchableOpacity
+        key={item.titleKey}
         style={styles.settingItem}
         onPress={item.onPress}
       >
@@ -164,8 +178,8 @@ const AdminSettingsScreen: React.FC = () => {
           <Ionicons name={item.icon as any} size={24} color={COLORS.primary} />
         </View>
         <View style={styles.settingContent}>
-          <Text style={styles.settingTitle}>{item.title}</Text>
-          <Text style={styles.settingSubtitle}>{item.subtitle}</Text>
+          <Text style={styles.settingTitle}>{title}</Text>
+          <Text style={styles.settingSubtitle}>{subtitle}</Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
       </TouchableOpacity>
@@ -176,7 +190,7 @@ const AdminSettingsScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t('admin.settings.title')}</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -194,8 +208,8 @@ const AdminSettingsScreen: React.FC = () => {
 
         {/* Settings Sections */}
         {settingsSections.map((section) => (
-          <View key={section.title} style={styles.section}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
+          <View key={section.titleKey} style={styles.section}>
+            <Text style={styles.sectionTitle}>{t(section.titleKey)}</Text>
             <View style={styles.sectionContent}>
               {section.items.map(renderSettingItem)}
             </View>
@@ -203,16 +217,16 @@ const AdminSettingsScreen: React.FC = () => {
         ))}
 
         {/* Logout Button */}
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.logoutButton}
           onPress={() => {
             Alert.alert(
-              'Logout',
-              'Are you sure you want to logout?',
+              t('admin.settings.logout'),
+              t('admin.settings.logoutConfirm'),
               [
-                { text: 'Cancel', style: 'cancel' },
-                { 
-                  text: 'Logout', 
+                { text: t('admin.settings.cancel'), style: 'cancel' },
+                {
+                  text: t('admin.settings.logout'),
                   style: 'destructive',
                   onPress: async () => {
                     try {
@@ -245,13 +259,59 @@ const AdminSettingsScreen: React.FC = () => {
           }}
         >
           <Ionicons name="log-out-outline" size={24} color={COLORS.error} />
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{t('admin.settings.logout')}</Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Tandil Admin v1.0.0</Text>
+          <Text style={styles.footerText}>{t('admin.settings.version')}</Text>
         </View>
       </ScrollView>
+
+      {/* Language & Region Modal */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{t('common.language')}</Text>
+            <Text style={styles.modalSubtitle}>{t('settings.items.language.subtitle')}</Text>
+            <View style={styles.languageOptions}>
+              {LANGUAGES.map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.languageButton,
+                    i18n.language === lang.code && styles.languageButtonActive,
+                  ]}
+                  onPress={async () => {
+                    await setAppLanguage(lang.code);
+                    setLanguage(lang.code);
+                    setLanguageModalVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.languageButtonText,
+                      i18n.language === lang.code && styles.languageButtonTextActive,
+                    ]}
+                  >
+                    {lang.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity
+              style={styles.modalClose}
+              onPress={() => setLanguageModalVisible(false)}
+            >
+              <Text style={styles.modalCloseText}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -381,6 +441,62 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
+  },
+  // Language modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    width: '85%',
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.text,
+    marginBottom: SPACING.xs,
+  },
+  modalSubtitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+  },
+  languageOptions: {
+    gap: SPACING.sm,
+  },
+  languageButton: {
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  languageButtonActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '10',
+  },
+  languageButtonText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+  },
+  languageButtonTextActive: {
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  modalClose: {
+    alignSelf: 'flex-end',
+    marginTop: SPACING.md,
+  },
+  modalCloseText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHTS.medium,
   },
 });
 

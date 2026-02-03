@@ -56,7 +56,7 @@ const ReportsScreen: React.FC = () => {
     },
   ];
 
-  const reports = [
+  const reportTypes = [
     {
       id: 'financial',
       title: 'Financial Report',
@@ -155,7 +155,7 @@ const ReportsScreen: React.FC = () => {
         {/* Report Types */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Report Types</Text>
-          {reports.map((report) => (
+          {reportTypes.map((report) => (
             <TouchableOpacity key={report.id} style={styles.reportCard}>
               <View style={[styles.reportIcon, { backgroundColor: report.color + '20' }]}>
                 <Ionicons name={report.icon as any} size={28} color={report.color} />

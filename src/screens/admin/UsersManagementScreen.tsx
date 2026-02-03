@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  FlatList,
   TextInput,
   ActivityIndicator,
   RefreshControl,
@@ -264,6 +263,52 @@ const UsersManagementScreen: React.FC = () => {
     );
   };
 
+  const renderStatsRow = () => (
+    userStats ? (
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.statisticsContainer}
+      >
+        <TouchableOpacity
+          style={[styles.statCard, selectedFilter === 'all' && styles.statCardActive]}
+          onPress={() => setSelectedFilter('all')}
+        >
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'all' && styles.statLabelActive]}>All Users</Text>
+          <Text style={[styles.statValue, selectedFilter === 'all' && styles.statValueActive]}>{userStats.all_users.toLocaleString('en-US')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.statCard, selectedFilter === 'worker' && styles.statCardActive]}
+          onPress={() => setSelectedFilter('worker')}
+        >
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'worker' && styles.statLabelActive]}>Workers</Text>
+          <Text style={[styles.statValue, selectedFilter === 'worker' && styles.statValueActive]}>{userStats.workers.toLocaleString('en-US')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.statCard, selectedFilter === 'supervisor' && styles.statCardActive]}
+          onPress={() => setSelectedFilter('supervisor')}
+        >
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'supervisor' && styles.statLabelActive]}>Supervisors</Text>
+          <Text style={[styles.statValue, selectedFilter === 'supervisor' && styles.statValueActive]}>{userStats.supervisors.toLocaleString('en-US')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.statCard, selectedFilter === 'manager' && styles.statCardActive]}
+          onPress={() => setSelectedFilter('manager')}
+        >
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'manager' && styles.statLabelActive]}>Managers</Text>
+          <Text style={[styles.statValue, selectedFilter === 'manager' && styles.statValueActive]}>{userStats.managers.toLocaleString('en-US')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.statCard, selectedFilter === 'client' && styles.statCardActive]}
+          onPress={() => setSelectedFilter('client')}
+        >
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'client' && styles.statLabelActive]}>Clients</Text>
+          <Text style={[styles.statValue, selectedFilter === 'client' && styles.statValueActive]}>{(userStats.clients ?? 0).toLocaleString('en-US')}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    ) : null
+  );
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -289,132 +334,7 @@ const UsersManagementScreen: React.FC = () => {
         />
       </View>
 
-      {/* User Statistics as Filter Buttons */}
-      {userStats && (
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statisticsContainer}
-        >
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              selectedFilter === 'all' && styles.statCardActive
-            ]}
-            onPress={() => setSelectedFilter('all')}
-          >
-            <Text 
-              numberOfLines={1}
-              style={[
-                styles.statLabel,
-                selectedFilter === 'all' && styles.statLabelActive
-              ]}
-            >
-              All Users
-            </Text>
-            <Text style={[
-              styles.statValue,
-              selectedFilter === 'all' && styles.statValueActive
-            ]}>
-              {userStats.all_users.toLocaleString('en-US')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              selectedFilter === 'worker' && styles.statCardActive
-            ]}
-            onPress={() => setSelectedFilter('worker')}
-          >
-            <Text 
-              numberOfLines={1}
-              style={[
-                styles.statLabel,
-                selectedFilter === 'worker' && styles.statLabelActive
-              ]}
-            >
-              Workers
-            </Text>
-            <Text style={[
-              styles.statValue,
-              selectedFilter === 'worker' && styles.statValueActive
-            ]}>
-              {userStats.workers.toLocaleString('en-US')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              selectedFilter === 'supervisor' && styles.statCardActive
-            ]}
-            onPress={() => setSelectedFilter('supervisor')}
-          >
-            <Text 
-              numberOfLines={1}
-              style={[
-                styles.statLabel,
-                selectedFilter === 'supervisor' && styles.statLabelActive
-              ]}
-            >
-              Supervisors
-            </Text>
-            <Text style={[
-              styles.statValue,
-              selectedFilter === 'supervisor' && styles.statValueActive
-            ]}>
-              {userStats.supervisors.toLocaleString('en-US')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              selectedFilter === 'manager' && styles.statCardActive
-            ]}
-            onPress={() => setSelectedFilter('manager')}
-          >
-            <Text 
-              numberOfLines={1}
-              style={[
-                styles.statLabel,
-                selectedFilter === 'manager' && styles.statLabelActive
-              ]}
-            >
-              Managers
-            </Text>
-            <Text style={[
-              styles.statValue,
-              selectedFilter === 'manager' && styles.statValueActive
-            ]}>
-              {userStats.managers.toLocaleString('en-US')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.statCard,
-              selectedFilter === 'client' && styles.statCardActive
-            ]}
-            onPress={() => setSelectedFilter('client')}
-          >
-            <Text 
-              numberOfLines={1}
-              style={[
-                styles.statLabel,
-                selectedFilter === 'client' && styles.statLabelActive
-              ]}
-            >
-              Clients
-            </Text>
-            <Text style={[
-              styles.statValue,
-              selectedFilter === 'client' && styles.statValueActive
-            ]}>
-              {(userStats.clients ?? 0).toLocaleString('en-US')}
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
-
-      {/* Users List */}
+      {/* Users List: single ScrollView so tabs and list are one flow = no gap */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
@@ -424,16 +344,15 @@ const UsersManagementScreen: React.FC = () => {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={fetchUsers}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchUsers()}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={filteredUsers}
-          renderItem={renderUser}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listScrollContent}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -441,13 +360,21 @@ const UsersManagementScreen: React.FC = () => {
               colors={[COLORS.primary]}
             />
           }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={64} color={COLORS.textSecondary} />
-              <Text style={styles.emptyText}>No users found</Text>
-            </View>
-          }
-        />
+        >
+          {renderStatsRow()}
+          <View style={styles.listContent}>
+            {filteredUsers.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={64} color={COLORS.textSecondary} />
+                <Text style={styles.emptyText}>No users found</Text>
+              </View>
+            ) : (
+              filteredUsers.map((item) => (
+                <View key={item.id.toString()}>{renderUser({ item })}</View>
+              ))
+            )}
+          </View>
+        </ScrollView>
       )}
 
       {/* Action Menu Modal */}
@@ -512,7 +439,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.md,
     paddingHorizontal: SPACING.md,
     marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   searchInput: {
     flex: 1,
@@ -547,8 +474,15 @@ const styles = StyleSheet.create({
   filterTextActive: {
     color: COLORS.background,
   },
+  list: {
+    flex: 1,
+  },
+  listScrollContent: {
+    paddingBottom: SPACING.sm,
+  },
   listContent: {
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xs,
   },
   userCard: {
     flexDirection: 'row',
@@ -556,7 +490,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
   },
   userAvatar: {
     width: 48,
@@ -706,18 +640,19 @@ const styles = StyleSheet.create({
   statisticsContainer: {
     flexDirection: 'row',
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    marginBottom: SPACING.md,
-    gap: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    marginBottom: 0,
+    gap: SPACING.xs,
   },
   statCard: {
-    minWidth: 110,
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 70,
+    minWidth: 72,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 6,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -726,18 +661,17 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   statLabel: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.xs,
     color: COLORS.textSecondary,
     fontWeight: FONT_WEIGHTS.medium,
-    marginBottom: SPACING.xs,
+    marginBottom: 2,
     textAlign: 'center',
-    width: '100%',
   },
   statLabelActive: {
     color: COLORS.background,
   },
   statValue: {
-    fontSize: FONT_SIZES.xl,
+    fontSize: FONT_SIZES.sm,
     fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.text,
   },

@@ -16,7 +16,8 @@
       "requireFullScreen": false,
       "bundleIdentifier": "com.tandilapp.tandil",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Allow access to your photos to add product images."
       }
     },
     "android": {
@@ -25,7 +26,8 @@
         "backgroundColor": "#EEEADE"
       },
       "edgeToEdgeEnabled": true,
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "pan",
+      "permissions": ["READ_EXTERNAL_STORAGE", "READ_MEDIA_IMAGES"]
     },
     "web": {
       "favicon": "./assets/favicon.png"

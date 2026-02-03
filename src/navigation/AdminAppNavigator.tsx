@@ -2,6 +2,7 @@ import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
 
@@ -17,12 +18,15 @@ import AdminSubscriptionsScreen from '../screens/admin/AdminSubscriptionsScreen'
 import EditSubscriptionScreen from '../screens/admin/EditSubscriptionScreen';
 import AdminTipsScreen from '../screens/admin/AdminTipsScreen';
 import AdminProductsScreen from '../screens/admin/AdminProductsScreen';
+import AdminAddProductScreen from '../screens/admin/AdminAddProductScreen';
 import AdminPendingReportsScreen from '../screens/admin/AdminPendingReportsScreen';
+import AdminRecentActivitiesScreen from '../screens/admin/AdminRecentActivitiesScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 const TabNavigator = () => {
+  const { t } = useTranslation();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -39,7 +43,7 @@ const TabNavigator = () => {
         name="DashboardTab"
         component={AdminDashboardScreen}
         options={{
-          tabBarLabel: 'Dashboard',
+          tabBarLabel: t('admin.tabs.dashboard'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -49,7 +53,7 @@ const TabNavigator = () => {
         name="UsersTab"
         component={UsersManagementScreen}
         options={{
-          tabBarLabel: 'Users',
+          tabBarLabel: t('admin.tabs.users'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
           ),
@@ -59,7 +63,7 @@ const TabNavigator = () => {
         name="ReportsTab"
         component={ReportsScreen}
         options={{
-          tabBarLabel: 'Reports',
+          tabBarLabel: t('admin.tabs.reports'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="bar-chart-outline" size={size} color={color} />
           ),
@@ -69,7 +73,7 @@ const TabNavigator = () => {
         name="SettingsTab"
         component={AdminSettingsScreen}
         options={{
-          tabBarLabel: 'Settings',
+          tabBarLabel: t('admin.tabs.settings'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="settings-outline" size={size} color={color} />
           ),
@@ -95,7 +99,9 @@ const AdminAppNavigator = () => {
         <Stack.Screen name="EditSubscription" component={EditSubscriptionScreen} />
         <Stack.Screen name="AdminTips" component={AdminTipsScreen} />
         <Stack.Screen name="AdminProducts" component={AdminProductsScreen} />
+        <Stack.Screen name="AdminAddProduct" component={AdminAddProductScreen} />
         <Stack.Screen name="PendingReports" component={AdminPendingReportsScreen} />
+        <Stack.Screen name="RecentActivities" component={AdminRecentActivitiesScreen} />
       </Stack.Navigator>
     </SafeAreaView>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,17 +11,57 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
-import { adminService } from '../../services/adminService';
+import { adminService, AdminActivity } from '../../services/adminService';
+
+function getGreetingKey(): 'admin.dashboard.greetingMorning' | 'admin.dashboard.greetingAfternoon' | 'admin.dashboard.greetingEvening' {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'admin.dashboard.greetingMorning';
+  if (hour < 17) return 'admin.dashboard.greetingAfternoon';
+  return 'admin.dashboard.greetingEvening';
+}
+
+const ACTIVITY_ICON_MAP: Record<string, { icon: string; color: string }> = {
+  check: { icon: 'checkmark-circle', color: COLORS.success },
+  error: { icon: 'warning', color: COLORS.error },
+  warning: { icon: 'warning', color: COLORS.warning },
+  person: { icon: 'person-add', color: COLORS.primary },
+  user: { icon: 'person-add', color: COLORS.primary },
+  customer: { icon: 'person-add', color: COLORS.primary },
+  register: { icon: 'person-add', color: COLORS.primary },
+  registration: { icon: 'person-add', color: COLORS.primary },
+  subscription: { icon: 'checkmark-circle', color: COLORS.success },
+  visit: { icon: 'checkmark-circle', color: COLORS.success },
+  inventory: { icon: 'warning', color: COLORS.warning },
+  stock: { icon: 'warning', color: COLORS.warning },
+  alert: { icon: 'warning', color: COLORS.warning },
+  default: { icon: 'document-text', color: COLORS.textSecondary },
+};
+
+function getActivityIcon(activity: AdminActivity): { icon: string; color: string } {
+  const iconType = (activity.icon_type || activity.type || '').toLowerCase();
+  const mapped = ACTIVITY_ICON_MAP[iconType] ?? ACTIVITY_ICON_MAP.default;
+  const desc = (activity.description || '').toLowerCase();
+  if (mapped !== ACTIVITY_ICON_MAP.default) return mapped;
+  if (desc.includes('customer') || desc.includes('registered') || desc.includes('user')) return ACTIVITY_ICON_MAP.person;
+  if (desc.includes('stock') || desc.includes('inventory') || desc.includes('out of')) return ACTIVITY_ICON_MAP.inventory;
+  if (desc.includes('visit') || desc.includes('completed')) return ACTIVITY_ICON_MAP.visit;
+  if (desc.includes('subscription')) return ACTIVITY_ICON_MAP.subscription;
+  return mapped;
+}
 
 type TimeRange = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 const AdminDashboardScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [timeRange, setTimeRange] = useState<TimeRange>('daily');
   const [showTimeRangeModal, setShowTimeRangeModal] = useState(false);
   const [statistics, setStatistics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [recentActivities, setRecentActivities] = useState<Array<{ id: string; message: string; timestamp: string; icon: string; color: string }>>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
 
   const admin = {
     id: 'admin_001',
@@ -66,45 +106,61 @@ const AdminDashboardScreen: React.FC = () => {
     fetchStatistics();
   }, [fetchStatistics]);
 
+  const fetchRecentActivities = useCallback(async () => {
+    try {
+      setActivitiesLoading(true);
+      const response = await adminService.getRecentActivities({ limit: 20 });
+      const list = response.data ?? [];
+      const now = Date.now();
+      // Only show past activities: exclude future created_at and exclude timestamp text like "3 weeks from now"
+      const pastOnly = list.filter((a: AdminActivity) => {
+        const t = new Date(a.created_at || 0).getTime();
+        const isPastDate = t > 0 && t <= now;
+        const timestampStr = (a.timestamp || '').toLowerCase();
+        const isFutureLabel = timestampStr.includes('from now');
+        return isPastDate && !isFutureLabel;
+      });
+      // Sort by created_at descending (newest first) so the 3 most recent show first
+      const sorted = [...pastOnly].sort((a, b) => {
+        const dateA = new Date(a.created_at || 0).getTime();
+        const dateB = new Date(b.created_at || 0).getTime();
+        return dateB - dateA;
+      });
+      const recentThree = sorted.slice(0, 3);
+      const mapped = recentThree.map((a: AdminActivity, index: number) => {
+        const { icon, color } = getActivityIcon(a);
+        return {
+          id: `activity-${index}-${a.related_id ?? ''}`,
+          message: a.description ?? '',
+          timestamp: a.timestamp ?? a.created_at ?? '',
+          icon,
+          color,
+        };
+      });
+      setRecentActivities(mapped);
+    } catch (error: any) {
+      console.error('Error fetching recent activities:', error);
+      setRecentActivities([]);
+    } finally {
+      setActivitiesLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchStatistics();
-    }, [fetchStatistics])
+      fetchRecentActivities();
+    }, [fetchStatistics, fetchRecentActivities])
   );
 
-
-  const recentActivities = [
-    {
-      id: 'activity_001',
-      type: 'subscription',
-      message: 'New 12-month subscription by Palm Grove Estate',
-      timestamp: '5 min ago',
-      icon: 'checkmark-circle',
-      color: COLORS.success,
-    },
-    {
-      id: 'activity_002',
-      type: 'user',
-      message: 'New customer registered - Mohammed Ali Farm',
-      timestamp: '1 hour ago',
-      icon: 'person-add',
-      color: COLORS.primary,
-    },
-    {
-      id: 'activity_003',
-      type: 'alert',
-      message: 'Low inventory alert: Organic Fertilizer',
-      timestamp: '2 hours ago',
-      icon: 'warning',
-      color: COLORS.warning,
-    },
-  ];
-
-  const quickStats = [
-    { label: 'Pending Reports', value: '12', action: 'View', color: COLORS.warning },
-    { label: 'New Orders', value: '34', action: 'Manage', color: COLORS.success },
-    { label: 'Support Tickets', value: '8', action: 'Respond', color: COLORS.error },
-  ];
+  const quickStats = useMemo(
+    () => [
+      { id: 'pending_reports', labelKey: 'admin.dashboard.pendingReports', value: '12', actionKey: 'admin.dashboard.view', color: COLORS.warning, navTarget: 'PendingReports' as const },
+      { id: 'new_orders', labelKey: 'admin.dashboard.newOrders', value: '34', actionKey: 'admin.dashboard.manage', color: COLORS.success, navTarget: 'UsersTab' as const },
+      { id: 'support_tickets', labelKey: 'admin.dashboard.supportTickets', value: '8', actionKey: 'admin.dashboard.respond', color: COLORS.error, navTarget: 'UsersTab' as const },
+    ],
+    []
+  );
 
   const topProducts = [
     { id: 1, name: 'Organic Fertilizer 5kg', sales: 245, revenue: 'AED 22K' },
@@ -129,25 +185,15 @@ const AdminDashboardScreen: React.FC = () => {
       <View style={styles.quickStatHeader}>
         <Text style={styles.quickStatValue}>{item.value}</Text>
         <View style={[styles.quickStatBadge, { backgroundColor: item.color + '20' }]}>
-          <Text style={[styles.quickStatBadgeText, { color: item.color }]}>New</Text>
+          <Text style={[styles.quickStatBadgeText, { color: item.color }]}>{t('admin.dashboard.new')}</Text>
         </View>
       </View>
-      <Text style={styles.quickStatLabel}>{item.label}</Text>
-      <TouchableOpacity 
+      <Text style={styles.quickStatLabel}>{t(item.labelKey)}</Text>
+      <TouchableOpacity
         style={styles.quickStatAction}
-        onPress={() => {
-          if (item.label === 'Pending Reports') {
-            navigation.navigate('PendingReports' as never);
-          } else if (item.label === 'New Orders') {
-            // Navigate to orders management if needed
-            navigation.navigate('UsersTab' as never);
-          } else if (item.label === 'Support Tickets') {
-            // Navigate to support tickets if needed
-            navigation.navigate('UsersTab' as never);
-          }
-        }}
+        onPress={() => navigation.navigate(item.navTarget as never)}
       >
-        <Text style={[styles.quickStatActionText, { color: item.color }]}>{item.action} →</Text>
+        <Text style={[styles.quickStatActionText, { color: item.color }]}>{t(item.actionKey)} →</Text>
       </TouchableOpacity>
     </View>
   );
@@ -156,7 +202,7 @@ const AdminDashboardScreen: React.FC = () => {
     <View style={styles.productCard}>
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productSales}>{item.sales} sales</Text>
+        <Text style={styles.productSales}>{item.sales} {t('admin.dashboard.sales')}</Text>
       </View>
       <Text style={styles.productRevenue}>{item.revenue}</Text>
     </View>
@@ -168,10 +214,10 @@ const AdminDashboardScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.greeting}>Good afternoon!</Text>
+            <Text style={styles.greeting}>{t(getGreetingKey())}</Text>
             <Text style={styles.adminName}>{admin.name}</Text>
             <Text style={styles.adminRole}>{admin.role}</Text>
-            <Text style={styles.adminId}>ID: {admin.employeeId}</Text>
+            <Text style={styles.adminId}>{t('admin.dashboard.idPrefix')}{admin.employeeId}</Text>
           </View>
           <TouchableOpacity
             style={styles.profileButton}
@@ -189,8 +235,8 @@ const AdminDashboardScreen: React.FC = () => {
         <View style={styles.userStatsSection}>
           <View style={styles.userStatsHeader}>
             <View style={styles.userStatsTitleContainer}>
-              <Text style={styles.userStatsTitle}>User Statistics</Text>
-              <Text style={styles.userStatsSubtitle}>Track growth of customers, technicians, and employees</Text>
+              <Text style={styles.userStatsTitle}>{t('admin.dashboard.userStatistics')}</Text>
+              <Text style={styles.userStatsSubtitle}>{t('admin.dashboard.userStatisticsSubtitle')}</Text>
             </View>
             <TouchableOpacity
               style={styles.timeRangeButton}
@@ -198,7 +244,7 @@ const AdminDashboardScreen: React.FC = () => {
               activeOpacity={0.7}
             >
               <Text style={styles.timeRangeText}>
-                {timeRange === 'daily' ? 'Daily' : timeRange === 'weekly' ? 'Weekly' : timeRange === 'monthly' ? 'Monthly' : 'Yearly'}
+                {timeRange === 'daily' ? t('admin.dashboard.daily') : timeRange === 'weekly' ? t('admin.dashboard.weekly') : timeRange === 'monthly' ? t('admin.dashboard.monthly') : t('admin.dashboard.yearly')}
               </Text>
               <Ionicons name="chevron-down" size={16} color={COLORS.text} />
             </TouchableOpacity>
@@ -221,12 +267,12 @@ const AdminDashboardScreen: React.FC = () => {
                    timeRange === 'monthly' ? statistics.customers.monthly :
                    statistics.customers.yearly}
                 </Text>
-                <Text style={styles.userStatLabel}>Customers</Text>
+                <Text style={styles.userStatLabel}>{t('admin.dashboard.customers')}</Text>
                 <Text style={styles.userStatPeriod}>
-                  {timeRange === 'daily' ? 'Today' :
-                   timeRange === 'weekly' ? 'This Week' :
-                   timeRange === 'monthly' ? 'This Month' :
-                   'This Year'}
+                  {timeRange === 'daily' ? t('admin.dashboard.today') :
+                   timeRange === 'weekly' ? t('admin.dashboard.thisWeek') :
+                   timeRange === 'monthly' ? t('admin.dashboard.thisMonth') :
+                   t('admin.dashboard.thisYear')}
                 </Text>
                 <View style={styles.userStatGrowth}>
                   {(() => {
@@ -238,13 +284,12 @@ const AdminDashboardScreen: React.FC = () => {
                     const isNegative = growthValue.startsWith('-');
                     const isNeutral = growthValue === '+0' || growthValue === '0';
                     const growthColor = isPositive ? COLORS.success : isNegative ? COLORS.error : COLORS.textSecondary;
-                    
                     return (
                       <Text style={[styles.userStatGrowthText, { color: growthColor }]}>
                         {isPositive && '↑ '}
                         {isNegative && '↓ '}
                         {isNeutral && '— '}
-                        {growthValue.includes('%') ? growthValue : `${growthValue}%`} vs previous period
+                        {growthValue.includes('%') ? growthValue : `${growthValue}%`} {t('admin.dashboard.vsPreviousPeriod')}
                       </Text>
                     );
                   })()}
@@ -262,12 +307,12 @@ const AdminDashboardScreen: React.FC = () => {
                    timeRange === 'monthly' ? statistics.technicians.monthly :
                    statistics.technicians.yearly}
                 </Text>
-                <Text style={styles.userStatLabel}>Technicians</Text>
+                <Text style={styles.userStatLabel}>{t('admin.dashboard.technicians')}</Text>
                 <Text style={styles.userStatPeriod}>
-                  {timeRange === 'daily' ? 'Today' :
-                   timeRange === 'weekly' ? 'This Week' :
-                   timeRange === 'monthly' ? 'This Month' :
-                   'This Year'}
+                  {timeRange === 'daily' ? t('admin.dashboard.today') :
+                   timeRange === 'weekly' ? t('admin.dashboard.thisWeek') :
+                   timeRange === 'monthly' ? t('admin.dashboard.thisMonth') :
+                   t('admin.dashboard.thisYear')}
                 </Text>
                 <View style={styles.userStatGrowth}>
                   {(() => {
@@ -279,13 +324,12 @@ const AdminDashboardScreen: React.FC = () => {
                     const isNegative = growthValue.startsWith('-');
                     const isNeutral = growthValue === '+0' || growthValue === '0';
                     const growthColor = isPositive ? COLORS.success : isNegative ? COLORS.error : COLORS.textSecondary;
-                    
                     return (
                       <Text style={[styles.userStatGrowthText, { color: growthColor }]}>
                         {isPositive && '↑ '}
                         {isNegative && '↓ '}
                         {isNeutral && '— '}
-                        {growthValue.includes('%') ? growthValue : `${growthValue}%`} vs previous period
+                        {growthValue.includes('%') ? growthValue : `${growthValue}%`} {t('admin.dashboard.vsPreviousPeriod')}
                       </Text>
                     );
                   })()}
@@ -310,12 +354,12 @@ const AdminDashboardScreen: React.FC = () => {
                     statistics.technicians.yearly
                   )}
                 </Text>
-                <Text style={styles.userStatLabel}>Employees/Staff</Text>
+                <Text style={styles.userStatLabel}>{t('admin.dashboard.employeesStaff')}</Text>
                 <Text style={styles.userStatPeriod}>
-                  {timeRange === 'daily' ? 'Today' :
-                   timeRange === 'weekly' ? 'This Week' :
-                   timeRange === 'monthly' ? 'This Month' :
-                   'This Year'}
+                  {timeRange === 'daily' ? t('admin.dashboard.today') :
+                   timeRange === 'weekly' ? t('admin.dashboard.thisWeek') :
+                   timeRange === 'monthly' ? t('admin.dashboard.thisMonth') :
+                   t('admin.dashboard.thisYear')}
                 </Text>
                 <View style={styles.userStatGrowth}>
                   {(() => {
@@ -328,13 +372,12 @@ const AdminDashboardScreen: React.FC = () => {
                     const isNegative = growthValue.startsWith('-');
                     const isNeutral = growthValue === '+0' || growthValue === '0';
                     const growthColor = isPositive ? COLORS.success : isNegative ? COLORS.error : COLORS.textSecondary;
-                    
                     return (
                       <Text style={[styles.userStatGrowthText, { color: growthColor }]}>
                         {isPositive && '↑ '}
                         {isNegative && '↓ '}
                         {isNeutral && '— '}
-                        {growthValue.includes('%') ? growthValue : `${growthValue}%`} vs previous period
+                        {growthValue.includes('%') ? growthValue : `${growthValue}%`} {t('admin.dashboard.vsPreviousPeriod')}
                       </Text>
                     );
                   })()}
@@ -356,12 +399,12 @@ const AdminDashboardScreen: React.FC = () => {
                       return value.toLocaleString('en-US');
                     })()}
                   </Text>
-                  <Text style={styles.userStatLabel}>Total Users</Text>
+                  <Text style={styles.userStatLabel}>{t('admin.dashboard.totalUsers')}</Text>
                   <Text style={styles.userStatPeriod}>
-                    {timeRange === 'daily' ? 'Today' :
-                     timeRange === 'weekly' ? 'This Week' :
-                     timeRange === 'monthly' ? 'This Month' :
-                     'This Year'}
+                    {timeRange === 'daily' ? t('admin.dashboard.today') :
+                     timeRange === 'weekly' ? t('admin.dashboard.thisWeek') :
+                     timeRange === 'monthly' ? t('admin.dashboard.thisMonth') :
+                     t('admin.dashboard.thisYear')}
                   </Text>
                   <View style={styles.userStatGrowth}>
                     {(() => {
@@ -373,13 +416,12 @@ const AdminDashboardScreen: React.FC = () => {
                       const isNegative = growthValue.startsWith('-');
                       const isNeutral = growthValue === '+0' || growthValue === '0';
                       const growthColor = isPositive ? COLORS.success : isNegative ? COLORS.error : COLORS.textSecondary;
-                      
                       return (
                         <Text style={[styles.userStatGrowthText, { color: growthColor }]}>
                           {isPositive && '↑ '}
                           {isNegative && '↓ '}
                           {isNeutral && '— '}
-                          {growthValue.includes('%') ? growthValue : `${growthValue}%`} vs previous period
+                          {growthValue.includes('%') ? growthValue : `${growthValue}%`} {t('admin.dashboard.vsPreviousPeriod')}
                         </Text>
                       );
                     })()}
@@ -402,12 +444,12 @@ const AdminDashboardScreen: React.FC = () => {
                       return value.toLocaleString('en-US');
                     })()}
                   </Text>
-                  <Text style={styles.userStatLabel}>Active Subscriptions</Text>
+                  <Text style={styles.userStatLabel}>{t('admin.dashboard.activeSubscriptions')}</Text>
                   <Text style={styles.userStatPeriod}>
-                    {timeRange === 'daily' ? 'Today' :
-                     timeRange === 'weekly' ? 'This Week' :
-                     timeRange === 'monthly' ? 'This Month' :
-                     'This Year'}
+                    {timeRange === 'daily' ? t('admin.dashboard.today') :
+                     timeRange === 'weekly' ? t('admin.dashboard.thisWeek') :
+                     timeRange === 'monthly' ? t('admin.dashboard.thisMonth') :
+                     t('admin.dashboard.thisYear')}
                   </Text>
                   <View style={styles.userStatGrowth}>
                     {(() => {
@@ -419,13 +461,12 @@ const AdminDashboardScreen: React.FC = () => {
                       const isNegative = growthValue.startsWith('-');
                       const isNeutral = growthValue === '+0' || growthValue === '0';
                       const growthColor = isPositive ? COLORS.success : isNegative ? COLORS.error : COLORS.textSecondary;
-                      
                       return (
                         <Text style={[styles.userStatGrowthText, { color: growthColor }]}>
                           {isPositive && '↑ '}
                           {isNegative && '↓ '}
                           {isNeutral && '— '}
-                          {growthValue.includes('%') ? growthValue : `${growthValue}%`} vs previous period
+                          {growthValue.includes('%') ? growthValue : `${growthValue}%`} {t('admin.dashboard.vsPreviousPeriod')}
                         </Text>
                       );
                     })()}
@@ -453,12 +494,12 @@ const AdminDashboardScreen: React.FC = () => {
                       return `AED ${value.toLocaleString('en-US')}`;
                     })()}
                   </Text>
-                  <Text style={styles.userStatLabel}>Monthly Revenue</Text>
+                  <Text style={styles.userStatLabel}>{t('admin.dashboard.monthlyRevenue')}</Text>
                   <Text style={styles.userStatPeriod}>
-                    {timeRange === 'daily' ? 'Today' :
-                     timeRange === 'weekly' ? 'This Week' :
-                     timeRange === 'monthly' ? 'This Month' :
-                     'This Year'}
+                    {timeRange === 'daily' ? t('admin.dashboard.today') :
+                     timeRange === 'weekly' ? t('admin.dashboard.thisWeek') :
+                     timeRange === 'monthly' ? t('admin.dashboard.thisMonth') :
+                     t('admin.dashboard.thisYear')}
                   </Text>
                   <View style={styles.userStatGrowth}>
                     {(() => {
@@ -470,13 +511,12 @@ const AdminDashboardScreen: React.FC = () => {
                       const isNegative = growthValue.startsWith('-');
                       const isNeutral = growthValue === '+0' || growthValue === '0';
                       const growthColor = isPositive ? COLORS.success : isNegative ? COLORS.error : COLORS.textSecondary;
-                      
                       return (
                         <Text style={[styles.userStatGrowthText, { color: growthColor }]}>
                           {isPositive && '↑ '}
                           {isNegative && '↓ '}
                           {isNeutral && '— '}
-                          {growthValue.includes('%') ? growthValue : `${growthValue}%`} vs previous period
+                          {growthValue.includes('%') ? growthValue : `${growthValue}%`} {t('admin.dashboard.vsPreviousPeriod')}
                         </Text>
                       );
                     })()}
@@ -489,11 +529,11 @@ const AdminDashboardScreen: React.FC = () => {
 
         {/* Quick Stats */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Overview</Text>
+          <Text style={styles.sectionTitle}>{t('admin.dashboard.quickOverview')}</Text>
           <FlatList
             data={quickStats}
             renderItem={renderQuickStat}
-            keyExtractor={(item) => item.label}
+            keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.quickStatsList}
@@ -503,23 +543,35 @@ const AdminDashboardScreen: React.FC = () => {
         {/* Recent Activities */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activities</Text>
-            <TouchableOpacity>
-              <Text style={styles.viewAllText}>View All</Text>
+            <Text style={styles.sectionTitle}>{t('admin.dashboard.recentActivities')}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('RecentActivities' as never)}>
+              <Text style={styles.viewAllText}>{t('admin.dashboard.viewAll')}</Text>
             </TouchableOpacity>
           </View>
-          
-          <FlatList
-            data={recentActivities}
-            renderItem={renderActivity}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
+
+          {activitiesLoading ? (
+            <View style={styles.activitiesLoading}>
+              <ActivityIndicator size="small" color={COLORS.primary} />
+              <Text style={styles.activitiesLoadingText}>{t('admin.dashboard.loadingActivities')}</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={recentActivities}
+              renderItem={renderActivity}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+              ListEmptyComponent={
+                <View style={styles.activitiesEmpty}>
+                  <Text style={styles.activitiesEmptyText}>{t('admin.dashboard.noRecentActivities')}</Text>
+                </View>
+              }
+            />
+          )}
         </View>
 
         {/* Top Products */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Selling Products</Text>
+          <Text style={styles.sectionTitle}>{t('admin.dashboard.topSellingProducts')}</Text>
           <FlatList
             data={topProducts}
             renderItem={renderProduct}
@@ -530,48 +582,48 @@ const AdminDashboardScreen: React.FC = () => {
 
         {/* Admin Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Admin Controls</Text>
+          <Text style={styles.sectionTitle}>{t('admin.dashboard.adminControls')}</Text>
           <View style={styles.adminActions}>
             <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('UsersTab' as never)}>
               <View style={styles.adminActionIcon}>
                 <Ionicons name="people-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.adminActionText}>Manage Users</Text>
+              <Text style={styles.adminActionText}>{t('admin.dashboard.manageUsers')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('AdminSubscriptions' as never)}>
               <View style={styles.adminActionIcon}>
                 <Ionicons name="calendar-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.adminActionText}>Subscriptions</Text>
+              <Text style={styles.adminActionText}>{t('admin.dashboard.subscriptions')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('AdminTips' as never)}>
               <View style={styles.adminActionIcon}>
                 <Ionicons name="notifications-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.adminActionText}>Send Tips</Text>
+              <Text style={styles.adminActionText}>{t('admin.dashboard.sendTips')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('AdminProducts' as never)}>
               <View style={styles.adminActionIcon}>
                 <Ionicons name="cart-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.adminActionText}>Products</Text>
+              <Text style={styles.adminActionText}>{t('admin.dashboard.products')}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('ReportsTab' as never)}>
+            <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('PendingReports' as never)}>
               <View style={styles.adminActionIcon}>
                 <Ionicons name="document-text-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.adminActionText}>Reports</Text>
+              <Text style={styles.adminActionText}>{t('admin.dashboard.reports')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('ReportsTab' as never)}>
               <View style={styles.adminActionIcon}>
                 <Ionicons name="stats-chart-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.adminActionText}>Analytics</Text>
+              <Text style={styles.adminActionText}>{t('admin.dashboard.analytics')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -590,7 +642,7 @@ const AdminDashboardScreen: React.FC = () => {
           onPress={() => setShowTimeRangeModal(false)}
         >
           <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
-            <Text style={styles.modalTitle}>Select Time Range</Text>
+            <Text style={styles.modalTitle}>{t('admin.dashboard.selectTimeRange')}</Text>
             {(['daily', 'weekly', 'monthly', 'yearly'] as TimeRange[]).map((range) => (
               <TouchableOpacity
                 key={range}
@@ -607,7 +659,7 @@ const AdminDashboardScreen: React.FC = () => {
                   styles.modalOptionText,
                   timeRange === range && styles.modalOptionTextSelected
                 ]}>
-                  {range === 'daily' ? 'Daily' : range === 'weekly' ? 'Weekly' : range === 'monthly' ? 'Monthly' : 'Yearly'}
+                  {range === 'daily' ? t('admin.dashboard.daily') : range === 'weekly' ? t('admin.dashboard.weekly') : range === 'monthly' ? t('admin.dashboard.monthly') : t('admin.dashboard.yearly')}
                 </Text>
                 {timeRange === range && (
                   <Ionicons name="checkmark" size={20} color={COLORS.primary} />
@@ -729,6 +781,25 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
     fontWeight: FONT_WEIGHTS.medium,
+  },
+  activitiesLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  activitiesLoadingText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+  },
+  activitiesEmpty: {
+    paddingVertical: SPACING.lg,
+    alignItems: 'center',
+  },
+  activitiesEmptyText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
   },
   quickStatsList: {
     gap: SPACING.md,

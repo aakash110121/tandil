@@ -11,132 +11,193 @@ import {
   Alert,
   Modal,
   Share,
+  Switch,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { Button } from '../../components/common/Button';
+import { Input } from '../../components/common/Input';
+import { adminService, AdminReport, ReportsMeta } from '../../services/adminService';
 
-// This will be created in services
-// import { reportService } from '../../services/reportService';
-
-interface Report {
-  id: number;
-  title: string;
-  type: string;
-  status: 'pending' | 'generated' | 'scheduled';
-  created_at: string;
-  scheduled_at?: string;
-  generated_at?: string;
-  file_url?: string;
+function formatDateToYYYYMMDD(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
+
+const PER_PAGE = 15;
 
 const AdminPendingReportsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [reports, setReports] = useState<Report[]>([]);
+  const [reports, setReports] = useState<AdminReport[]>([]);
+  const [meta, setMeta] = useState<ReportsMeta | null>(null);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [selectedReport, setSelectedReport] = useState<AdminReport | null>(null);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [reportType, setReportType] = useState('');
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('');
+  const [scheduleTitle, setScheduleTitle] = useState('');
+  const [scheduleParamStartDate, setScheduleParamStartDate] = useState('');
+  const [scheduleParamEndDate, setScheduleParamEndDate] = useState('');
+  const [scheduleFormat, setScheduleFormat] = useState<'pdf' | 'csv' | 'excel'>('pdf');
+  const [scheduleIncludeCharts, setScheduleIncludeCharts] = useState(true);
+  const [scheduleRecurrence, setScheduleRecurrence] = useState<string>(''); // '' = one-time, or 'daily'|'weekly'|'monthly'|'yearly'
+  const [scheduleDatePickerOpen, setScheduleDatePickerOpen] = useState<'date' | 'time' | 'paramStart' | 'paramEnd' | null>(null);
+  const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
+  // Generate report form
+  const [generateTitle, setGenerateTitle] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [format, setFormat] = useState<'pdf' | 'csv' | 'excel'>('pdf');
+  const [includeCharts, setIncludeCharts] = useState(true);
+  const [includeDetails, setIncludeDetails] = useState(true);
+  const [generateSubmitting, setGenerateSubmitting] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState<'start' | 'end' | null>(null);
 
   const reportTypes = [
     { value: 'financial', label: 'Financial Report', description: 'Revenue, expenses, and profit analysis' },
     { value: 'performance', label: 'Performance Report', description: 'Worker productivity and ratings' },
-    { value: 'customer', label: 'Customer Report', description: 'Customer satisfaction and retention' },
-    { value: 'operational', label: 'Operational Report', description: 'Service efficiency and completion rates' },
     { value: 'user', label: 'User Report', description: 'User statistics and activity' },
     { value: 'subscription', label: 'Subscription Report', description: 'Subscription analytics and trends' },
   ];
 
-  // TODO: Replace with actual API call
-  const fetchReports = useCallback(async () => {
+  const fetchReports = useCallback(async (pageNum: number = 1, isRefresh: boolean = false) => {
+    if (isRefresh) setRefreshing(true);
+    else if (pageNum === 1) setLoading(true);
+    else setLoadingMore(true);
     try {
-      setLoading(true);
-      // const response = await reportService.getReports();
-      // setReports(response.data);
-      
-      // Mock data for now
-      setReports([
-        {
-          id: 1,
-          title: 'Monthly Financial Report',
-          type: 'financial',
-          status: 'pending',
-          created_at: '2024-01-15T10:00:00Z',
-        },
-        {
-          id: 2,
-          title: 'Weekly Performance Report',
-          type: 'performance',
-          status: 'generated',
-          created_at: '2024-01-14T09:00:00Z',
-          generated_at: '2024-01-14T10:30:00Z',
-          file_url: 'https://example.com/reports/report-2.pdf',
-        },
-        {
-          id: 3,
-          title: 'Customer Satisfaction Report',
-          type: 'customer',
-          status: 'scheduled',
-          created_at: '2024-01-13T08:00:00Z',
-          scheduled_at: '2024-01-20T09:00:00Z',
-        },
-      ]);
+      const response = await adminService.getReports({ page: pageNum, per_page: PER_PAGE });
+      const data = Array.isArray(response) ? response : (response as any).data ?? [];
+      const list = Array.isArray(data) ? data : [];
+      const responseMeta = (response as any).meta ?? null;
+      if (pageNum === 1 || isRefresh) {
+        setReports(list);
+        setMeta(responseMeta);
+        setPage(1);
+      } else {
+        setReports((prev) => [...prev, ...list]);
+        setMeta(responseMeta);
+        setPage(pageNum);
+      }
     } catch (error: any) {
       console.error('Error fetching reports:', error);
-      Alert.alert('Error', 'Failed to load reports');
+      if (pageNum === 1) setReports([]);
+      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to load reports');
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchReports();
+    fetchReports(1);
   }, [fetchReports]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchReports();
+      fetchReports(1);
     }, [fetchReports])
   );
 
   const onRefresh = () => {
-    setRefreshing(true);
-    fetchReports();
+    fetchReports(1, true);
   };
 
-  const handleMenuPress = (report: Report) => {
+  const loadMore = useCallback(() => {
+    if (!meta || page >= meta.last_page || loadingMore) return;
+    fetchReports(page + 1);
+  }, [meta, page, loadingMore, fetchReports]);
+
+  const handleMenuPress = (report: AdminReport) => {
     setSelectedReport(report);
     setShowActionMenu(true);
   };
+
+  const handleDeleteReport = () => {
+    if (!selectedReport?.id) return;
+    setShowActionMenu(false);
+    Alert.alert(
+      'Delete Report',
+      'Are you sure you want to delete this report? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await adminService.deleteReport(selectedReport.id!);
+              Alert.alert('Success', 'Report deleted successfully');
+              fetchReports(1);
+            } catch (error: any) {
+              Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to delete report');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const resetGenerateForm = useCallback(() => {
+    setReportType('');
+    setGenerateTitle('');
+    setStartDate('');
+    setEndDate('');
+    setFormat('pdf');
+    setIncludeCharts(true);
+    setIncludeDetails(true);
+    setDatePickerOpen(null);
+  }, []);
 
   const handleGenerateReport = async () => {
     if (!reportType) {
       Alert.alert('Error', 'Please select a report type');
       return;
     }
+    const title = generateTitle.trim() || (reportTypes.find(t => t.value === reportType)?.label ?? 'Report');
+    if (!startDate || !endDate) {
+      Alert.alert('Error', 'Please enter start date and end date (YYYY-MM-DD)');
+      return;
+    }
 
+    setGenerateSubmitting(true);
     try {
-      // TODO: Call API to generate report
-      // await reportService.generateReport({ type: reportType });
-      Alert.alert('Success', 'Report generation started. You will be notified when it\'s ready.');
+      const response = await adminService.generateReport({
+        type: reportType,
+        title,
+        parameters: {
+          start_date: startDate.trim(),
+          end_date: endDate.trim(),
+          format,
+          include_charts: includeCharts,
+          include_details: includeDetails,
+        },
+      });
+      Alert.alert('Success', response.message ?? 'Report generation started. You will be notified when it\'s ready.');
       setShowGenerateModal(false);
-      setReportType('');
-      fetchReports();
+      resetGenerateForm();
+      fetchReports(1);
     } catch (error: any) {
       console.error('Error generating report:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to generate report');
+      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to generate report');
+    } finally {
+      setGenerateSubmitting(false);
     }
   };
 
-  const handleShareReport = async (report: Report) => {
+  const handleShareReport = async (report: AdminReport) => {
     if (!report.file_url) {
       Alert.alert('Error', 'Report file not available');
       return;
@@ -144,9 +205,9 @@ const AdminPendingReportsScreen: React.FC = () => {
 
     try {
       await Share.share({
-        message: `Check out this ${report.title}: ${report.file_url}`,
+        message: `Check out this ${report.title ?? 'Report'}: ${report.file_url}`,
         url: report.file_url,
-        title: report.title,
+        title: report.title ?? 'Report',
       });
       setShowActionMenu(false);
     } catch (error: any) {
@@ -155,31 +216,65 @@ const AdminPendingReportsScreen: React.FC = () => {
     }
   };
 
+  const formatTimeToHHMMSS = (timeStr: string): string => {
+    if (!timeStr) return '09:00:00';
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}:00`;
+    return '09:00:00';
+  };
+
+  const resetScheduleForm = useCallback(() => {
+    setReportType('');
+    setScheduleTitle('');
+    setScheduleDate('');
+    setScheduleTime('');
+    setScheduleParamStartDate('');
+    setScheduleParamEndDate('');
+    setScheduleFormat('pdf');
+    setScheduleIncludeCharts(true);
+    setScheduleRecurrence('');
+    setScheduleDatePickerOpen(null);
+  }, []);
+
   const handleScheduleReport = async () => {
     if (!reportType || !scheduleDate || !scheduleTime) {
-      Alert.alert('Error', 'Please fill all fields');
+      Alert.alert('Error', 'Please select report type, schedule date and time');
       return;
     }
+    if (!scheduleParamStartDate || !scheduleParamEndDate) {
+      Alert.alert('Error', 'Please enter report start date and end date (parameters)');
+      return;
+    }
+    const title = scheduleTitle.trim() || (reportTypes.find(t => t.value === reportType)?.label ?? 'Scheduled Report');
+    const scheduled_at = `${scheduleDate} ${formatTimeToHHMMSS(scheduleTime)}`;
 
+    setScheduleSubmitting(true);
     try {
-      // TODO: Call API to schedule report
-      // await reportService.scheduleReport({
-      //   type: reportType,
-      //   scheduled_at: `${scheduleDate} ${scheduleTime}`,
-      // });
-      Alert.alert('Success', 'Report scheduled successfully');
+      const response = await adminService.scheduleReport({
+        type: reportType,
+        title,
+        scheduled_at,
+        recurrence: scheduleRecurrence === '' ? null : (scheduleRecurrence as 'daily' | 'weekly' | 'monthly' | 'yearly'),
+        parameters: {
+          start_date: scheduleParamStartDate.trim(),
+          end_date: scheduleParamEndDate.trim(),
+          format: scheduleFormat,
+          include_charts: scheduleIncludeCharts,
+        },
+      });
+      Alert.alert('Success', response.message ?? 'Report scheduled successfully');
       setShowScheduleModal(false);
-      setReportType('');
-      setScheduleDate('');
-      setScheduleTime('');
-      fetchReports();
+      resetScheduleForm();
+      fetchReports(1);
     } catch (error: any) {
       console.error('Error scheduling report:', error);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to schedule report');
+      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to schedule report');
+    } finally {
+      setScheduleSubmitting(false);
     }
   };
 
-  const handleDownloadReport = async (report: Report) => {
+  const handleDownloadReport = async (report: AdminReport) => {
     if (!report.file_url) {
       Alert.alert('Error', 'Report file not available');
       return;
@@ -236,27 +331,38 @@ const AdminPendingReportsScreen: React.FC = () => {
     }
   };
 
-  const renderReport = ({ item }: { item: Report }) => {
-    const typeLabel = reportTypes.find(t => t.value === item.type)?.label || item.type;
-    
+  const renderReport = ({ item, index }: { item: AdminReport; index: number }) => {
+    const typeLabel = reportTypes.find(t => t.value === item.type)?.label || item.type || 'Report';
+    const title = item.title ?? item.type ?? 'Report';
+    const status = item.status ?? 'pending';
+
     return (
       <TouchableOpacity style={styles.reportCard}>
         <View style={styles.reportHeader}>
           <View style={styles.reportInfo}>
-            <Text style={styles.reportTitle}>{item.title}</Text>
+            <Text style={styles.reportTitle}>{title}</Text>
             <Text style={styles.reportType}>{typeLabel}</Text>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-            <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-              {getStatusLabel(item.status)}
-            </Text>
+          <View style={styles.reportHeaderRight}>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(status) + '20' }]}>
+              <Text style={[styles.statusText, { color: getStatusColor(status) }]}>
+                {getStatusLabel(status)}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.moreButtonHeader}
+              onPress={() => handleMenuPress(item)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
+            </TouchableOpacity>
           </View>
         </View>
-        
+
         <View style={styles.reportMeta}>
           <View style={styles.metaItem}>
             <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
-            <Text style={styles.metaText}>Created: {formatDate(item.created_at)}</Text>
+            <Text style={styles.metaText}>Created: {formatDate(item.created_at ?? '')}</Text>
           </View>
           {item.scheduled_at && (
             <View style={styles.metaItem}>
@@ -270,34 +376,38 @@ const AdminPendingReportsScreen: React.FC = () => {
               <Text style={styles.metaText}>Generated: {formatDate(item.generated_at)}</Text>
             </View>
           )}
+          {item.created_by?.name && (
+            <View style={styles.metaItem}>
+              <Ionicons name="person-outline" size={14} color={COLORS.textSecondary} />
+              <Text style={styles.metaText}>By {item.created_by.name}</Text>
+            </View>
+          )}
         </View>
 
-        <View style={styles.reportActions}>
-          {item.status === 'generated' && item.file_url && (
-            <>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => handleDownloadReport(item)}
-              >
-                <Ionicons name="download-outline" size={18} color={COLORS.primary} />
-                <Text style={styles.actionButtonText}>Download</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => handleShareReport(item)}
-              >
-                <Ionicons name="share-outline" size={18} color={COLORS.primary} />
-                <Text style={styles.actionButtonText}>Share</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          <TouchableOpacity 
-            style={styles.moreButton}
-            onPress={() => handleMenuPress(item)}
-          >
-            <Ionicons name="ellipsis-vertical" size={20} color={COLORS.textSecondary} />
-          </TouchableOpacity>
-        </View>
+        {(status === 'generated' && item.file_url) ? (
+          <View style={styles.reportActions}>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => handleDownloadReport(item)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.actionCardIconWrap}>
+                <Ionicons name="download-outline" size={28} color={COLORS.primary} />
+              </View>
+              <Text style={styles.actionCardText}>Download Report</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionCard}
+              onPress={() => handleShareReport(item)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.actionCardIconWrap}>
+                <Ionicons name="share-outline" size={28} color={COLORS.primary} />
+              </View>
+              <Text style={styles.actionCardText}>Share Report</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </TouchableOpacity>
     );
   };
@@ -349,7 +459,7 @@ const AdminPendingReportsScreen: React.FC = () => {
         <FlatList
           data={reports}
           renderItem={renderReport}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => String(item.id ?? index)}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
@@ -357,6 +467,19 @@ const AdminPendingReportsScreen: React.FC = () => {
               onRefresh={onRefresh}
               colors={[COLORS.primary]}
             />
+          }
+          onEndReached={() => { if (meta && page < meta.last_page) loadMore(); }}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={
+            meta && page < meta.last_page && reports.length > 0 ? (
+              <TouchableOpacity style={styles.loadMoreButton} onPress={loadMore} disabled={loadingMore}>
+                {loadingMore ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <Text style={styles.loadMoreText}>Load more</Text>
+                )}
+              </TouchableOpacity>
+            ) : null
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
@@ -377,19 +500,19 @@ const AdminPendingReportsScreen: React.FC = () => {
         transparent
         visible={showGenerateModal}
         animationType="slide"
-        onRequestClose={() => setShowGenerateModal(false)}
+        onRequestClose={() => { setShowGenerateModal(false); resetGenerateForm(); }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Generate Report</Text>
-              <TouchableOpacity onPress={() => setShowGenerateModal(false)}>
+              <TouchableOpacity onPress={() => { setShowGenerateModal(false); resetGenerateForm(); }}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll}>
-              <Text style={styles.modalLabel}>Select Report Type *</Text>
+            <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalLabel}>Report Type *</Text>
               {reportTypes.map((type) => (
                 <TouchableOpacity
                   key={type.value}
@@ -413,6 +536,107 @@ const AdminPendingReportsScreen: React.FC = () => {
                   )}
                 </TouchableOpacity>
               ))}
+
+              <Text style={styles.modalLabel}>Title *</Text>
+              <Input
+                placeholder="e.g. Monthly Financial Report"
+                value={generateTitle}
+                onChangeText={setGenerateTitle}
+                style={styles.generateInput}
+              />
+
+              <Text style={styles.modalLabel}>Start Date *</Text>
+              <TouchableOpacity
+                style={styles.dateInputRow}
+                onPress={() => setDatePickerOpen('start')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.dateInputText, !startDate && styles.dateInputPlaceholder]}>
+                  {startDate || 'Select start date'}
+                </Text>
+                <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
+              </TouchableOpacity>
+
+              <Text style={styles.modalLabel}>End Date *</Text>
+              <TouchableOpacity
+                style={styles.dateInputRow}
+                onPress={() => setDatePickerOpen('end')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.dateInputText, !endDate && styles.dateInputPlaceholder]}>
+                  {endDate || 'Select end date'}
+                </Text>
+                <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
+              </TouchableOpacity>
+
+              {datePickerOpen !== null && (
+                <DateTimePicker
+                  value={
+                    datePickerOpen === 'start'
+                      ? (startDate ? new Date(startDate) : new Date())
+                      : (endDate ? new Date(endDate) : new Date())
+                  }
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    if (Platform.OS === 'android') {
+                      setDatePickerOpen(null);
+                    }
+                    if (event.type === 'dismissed') return;
+                    if (selectedDate) {
+                      const formatted = formatDateToYYYYMMDD(selectedDate);
+                      if (datePickerOpen === 'start') setStartDate(formatted);
+                      else setEndDate(formatted);
+                    }
+                  }}
+                />
+              )}
+              {Platform.OS === 'ios' && datePickerOpen !== null && (
+                <TouchableOpacity style={styles.datePickerDone} onPress={() => setDatePickerOpen(null)}>
+                  <Text style={styles.datePickerDoneText}>Done</Text>
+                </TouchableOpacity>
+              )}
+
+              <Text style={styles.modalLabel}>Format</Text>
+              <View style={styles.formatRow}>
+                <TouchableOpacity
+                  style={[styles.formatOption, format === 'pdf' && styles.formatOptionActive]}
+                  onPress={() => setFormat('pdf')}
+                >
+                  <Text style={[styles.formatOptionText, format === 'pdf' && styles.formatOptionTextActive]}>PDF</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.formatOption, format === 'csv' && styles.formatOptionActive]}
+                  onPress={() => setFormat('csv')}
+                >
+                  <Text style={[styles.formatOptionText, format === 'csv' && styles.formatOptionTextActive]}>CSV</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.formatOption, format === 'excel' && styles.formatOptionActive]}
+                  onPress={() => setFormat('excel')}
+                >
+                  <Text style={[styles.formatOptionText, format === 'excel' && styles.formatOptionTextActive]}>Excel</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>Include charts</Text>
+                <Switch
+                  value={includeCharts}
+                  onValueChange={setIncludeCharts}
+                  trackColor={{ false: COLORS.border, true: COLORS.primary + '80' }}
+                  thumbColor={includeCharts ? COLORS.primary : COLORS.textSecondary}
+                />
+              </View>
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>Include details</Text>
+                <Switch
+                  value={includeDetails}
+                  onValueChange={setIncludeDetails}
+                  trackColor={{ false: COLORS.border, true: COLORS.primary + '80' }}
+                  thumbColor={includeDetails ? COLORS.primary : COLORS.textSecondary}
+                />
+              </View>
             </ScrollView>
 
             <View style={styles.modalFooter}>
@@ -420,15 +644,17 @@ const AdminPendingReportsScreen: React.FC = () => {
                 title="Cancel"
                 onPress={() => {
                   setShowGenerateModal(false);
-                  setReportType('');
+                  resetGenerateForm();
                 }}
                 variant="outline"
                 style={styles.modalButton}
+                disabled={generateSubmitting}
               />
               <Button
-                title="Generate"
+                title={generateSubmitting ? 'Generating…' : 'Generate'}
                 onPress={handleGenerateReport}
                 style={styles.modalButton}
+                disabled={generateSubmitting}
               />
             </View>
           </View>
@@ -440,19 +666,19 @@ const AdminPendingReportsScreen: React.FC = () => {
         transparent
         visible={showScheduleModal}
         animationType="slide"
-        onRequestClose={() => setShowScheduleModal(false)}
+        onRequestClose={() => { setShowScheduleModal(false); resetScheduleForm(); }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Schedule Report</Text>
-              <TouchableOpacity onPress={() => setShowScheduleModal(false)}>
+              <TouchableOpacity onPress={() => { setShowScheduleModal(false); resetScheduleForm(); }}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll}>
-              <Text style={styles.modalLabel}>Select Report Type *</Text>
+            <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalLabel}>Report Type *</Text>
               {reportTypes.map((type) => (
                 <TouchableOpacity
                   key={type.value}
@@ -477,39 +703,141 @@ const AdminPendingReportsScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
 
+              <Text style={styles.modalLabel}>Title *</Text>
+              <Input
+                placeholder="e.g. Weekly Financial Report"
+                value={scheduleTitle}
+                onChangeText={setScheduleTitle}
+                style={styles.generateInput}
+              />
+
               <Text style={styles.modalLabel}>Schedule Date *</Text>
-              <TouchableOpacity style={styles.dateTimeInput}>
-                <Text style={styles.dateTimeText}>
-                  {scheduleDate || 'Select date (YYYY-MM-DD)'}
+              <TouchableOpacity style={styles.dateInputRow} onPress={() => setScheduleDatePickerOpen('date')} activeOpacity={0.7}>
+                <Text style={[styles.dateInputText, !scheduleDate && styles.dateInputPlaceholder]}>
+                  {scheduleDate || 'Select schedule date'}
                 </Text>
-                <Ionicons name="calendar-outline" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
               </TouchableOpacity>
 
               <Text style={styles.modalLabel}>Schedule Time *</Text>
-              <TouchableOpacity style={styles.dateTimeInput}>
-                <Text style={styles.dateTimeText}>
-                  {scheduleTime || 'Select time (HH:MM)'}
+              <TouchableOpacity style={styles.dateInputRow} onPress={() => setScheduleDatePickerOpen('time')} activeOpacity={0.7}>
+                <Text style={[styles.dateInputText, !scheduleTime && styles.dateInputPlaceholder]}>
+                  {scheduleTime || 'Select schedule time'}
                 </Text>
-                <Ionicons name="time-outline" size={20} color={COLORS.textSecondary} />
+                <Ionicons name="time-outline" size={22} color={COLORS.primary} />
               </TouchableOpacity>
+
+              <Text style={styles.modalLabel}>Recurrence</Text>
+              <View style={styles.recurrenceRow}>
+                {(['', 'daily', 'weekly', 'monthly', 'yearly'] as const).map((rec) => (
+                  <TouchableOpacity
+                    key={rec || 'once'}
+                    style={[styles.recurrenceChip, scheduleRecurrence === rec && styles.recurrenceChipActive]}
+                    onPress={() => setScheduleRecurrence(rec)}
+                  >
+                    <Text style={[styles.recurrenceChipText, scheduleRecurrence === rec && styles.recurrenceChipTextActive]}>
+                      {rec === '' ? 'One-time' : rec.charAt(0).toUpperCase() + rec.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.modalLabel}>Report data range (parameters) *</Text>
+              <Text style={styles.modalLabelSmall}>Start Date</Text>
+              <TouchableOpacity style={styles.dateInputRow} onPress={() => setScheduleDatePickerOpen('paramStart')} activeOpacity={0.7}>
+                <Text style={[styles.dateInputText, !scheduleParamStartDate && styles.dateInputPlaceholder]}>
+                  {scheduleParamStartDate || 'Select start date'}
+                </Text>
+                <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
+              </TouchableOpacity>
+              <Text style={styles.modalLabelSmall}>End Date</Text>
+              <TouchableOpacity style={styles.dateInputRow} onPress={() => setScheduleDatePickerOpen('paramEnd')} activeOpacity={0.7}>
+                <Text style={[styles.dateInputText, !scheduleParamEndDate && styles.dateInputPlaceholder]}>
+                  {scheduleParamEndDate || 'Select end date'}
+                </Text>
+                <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
+              </TouchableOpacity>
+
+              <Text style={styles.modalLabel}>Format</Text>
+              <View style={styles.formatRow}>
+                <TouchableOpacity style={[styles.formatOption, scheduleFormat === 'pdf' && styles.formatOptionActive]} onPress={() => setScheduleFormat('pdf')}>
+                  <Text style={[styles.formatOptionText, scheduleFormat === 'pdf' && styles.formatOptionTextActive]}>PDF</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.formatOption, scheduleFormat === 'csv' && styles.formatOptionActive]} onPress={() => setScheduleFormat('csv')}>
+                  <Text style={[styles.formatOptionText, scheduleFormat === 'csv' && styles.formatOptionTextActive]}>CSV</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.formatOption, scheduleFormat === 'excel' && styles.formatOptionActive]} onPress={() => setScheduleFormat('excel')}>
+                  <Text style={[styles.formatOptionText, scheduleFormat === 'excel' && styles.formatOptionTextActive]}>Excel</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>Include charts</Text>
+                <Switch
+                  value={scheduleIncludeCharts}
+                  onValueChange={setScheduleIncludeCharts}
+                  trackColor={{ false: COLORS.border, true: COLORS.primary + '80' }}
+                  thumbColor={scheduleIncludeCharts ? COLORS.primary : COLORS.textSecondary}
+                />
+              </View>
             </ScrollView>
+
+            {scheduleDatePickerOpen !== null && (
+              <DateTimePicker
+                value={
+                  scheduleDatePickerOpen === 'date'
+                    ? (scheduleDate ? new Date(scheduleDate) : new Date())
+                    : scheduleDatePickerOpen === 'time'
+                      ? (scheduleTime ? (() => {
+                          const [h, m] = scheduleTime.split(':').map(Number);
+                          const d = new Date();
+                          d.setHours(isNaN(h) ? 9 : h, isNaN(m) ? 0 : m, 0, 0);
+                          return d;
+                        })() : new Date())
+                      : scheduleDatePickerOpen === 'paramStart'
+                        ? (scheduleParamStartDate ? new Date(scheduleParamStartDate) : new Date())
+                        : (scheduleParamEndDate ? new Date(scheduleParamEndDate) : new Date())
+                }
+                mode={scheduleDatePickerOpen === 'time' ? 'time' : 'date'}
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  if (Platform.OS === 'android') setScheduleDatePickerOpen(null);
+                  if (event.type === 'dismissed') return;
+                  if (selectedDate) {
+                    if (scheduleDatePickerOpen === 'date') {
+                      setScheduleDate(formatDateToYYYYMMDD(selectedDate));
+                    } else if (scheduleDatePickerOpen === 'time') {
+                      const h = selectedDate.getHours();
+                      const m = selectedDate.getMinutes();
+                      setScheduleTime(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+                    } else if (scheduleDatePickerOpen === 'paramStart') {
+                      setScheduleParamStartDate(formatDateToYYYYMMDD(selectedDate));
+                    } else {
+                      setScheduleParamEndDate(formatDateToYYYYMMDD(selectedDate));
+                    }
+                  }
+                }}
+              />
+            )}
+            {Platform.OS === 'ios' && scheduleDatePickerOpen !== null && (
+              <TouchableOpacity style={styles.datePickerDone} onPress={() => setScheduleDatePickerOpen(null)}>
+                <Text style={styles.datePickerDoneText}>Done</Text>
+              </TouchableOpacity>
+            )}
 
             <View style={styles.modalFooter}>
               <Button
                 title="Cancel"
-                onPress={() => {
-                  setShowScheduleModal(false);
-                  setReportType('');
-                  setScheduleDate('');
-                  setScheduleTime('');
-                }}
+                onPress={() => { setShowScheduleModal(false); resetScheduleForm(); }}
                 variant="outline"
                 style={styles.modalButton}
+                disabled={scheduleSubmitting}
               />
               <Button
-                title="Schedule"
+                title={scheduleSubmitting ? 'Scheduling…' : 'Schedule'}
                 onPress={handleScheduleReport}
                 style={styles.modalButton}
+                disabled={scheduleSubmitting}
               />
             </View>
           </View>
@@ -553,7 +881,7 @@ const AdminPendingReportsScreen: React.FC = () => {
                 </TouchableOpacity>
               </>
             )}
-            {selectedReport?.status === 'scheduled' && (
+            {selectedReport?.status === 'scheduled' && selectedReport?.id != null && (
               <TouchableOpacity
                 style={styles.menuItem}
                 onPress={() => {
@@ -564,9 +892,13 @@ const AdminPendingReportsScreen: React.FC = () => {
                       text: 'Yes',
                       style: 'destructive',
                       onPress: async () => {
-                        // TODO: Call API to cancel scheduled report
-                        Alert.alert('Success', 'Scheduled report cancelled');
-                        fetchReports();
+                        try {
+                          await adminService.cancelScheduledReport(selectedReport.id!);
+                          Alert.alert('Success', 'Scheduled report cancelled successfully');
+                          fetchReports(1);
+                        } catch (error: any) {
+                          Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to cancel scheduled report');
+                        }
                       },
                     },
                   ]);
@@ -574,6 +906,15 @@ const AdminPendingReportsScreen: React.FC = () => {
               >
                 <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
                 <Text style={[styles.menuItemText, { color: COLORS.error }]}>Cancel Schedule</Text>
+              </TouchableOpacity>
+            )}
+            {selectedReport?.id != null && selectedReport?.status !== 'scheduled' && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={handleDeleteReport}
+              >
+                <Ionicons name="trash-outline" size={20} color={COLORS.error} />
+                <Text style={[styles.menuItemText, { color: COLORS.error }]}>Delete</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -673,6 +1014,14 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.semiBold,
     textTransform: 'capitalize',
   },
+  reportHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  moreButtonHeader: {
+    padding: SPACING.xs,
+  },
   reportMeta: {
     marginBottom: SPACING.sm,
   },
@@ -688,23 +1037,28 @@ const styles = StyleSheet.create({
   },
   reportActions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    marginTop: SPACING.xs,
+    gap: SPACING.md,
+    marginTop: SPACING.md,
   },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary + '10',
+  actionCard: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.sm,
-    gap: SPACING.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  actionButtonText: {
-    fontSize: FONT_SIZES.xs,
+  actionCardIconWrap: {
+    marginBottom: SPACING.sm,
+  },
+  actionCardText: {
+    fontSize: FONT_SIZES.sm,
     fontWeight: FONT_WEIGHTS.medium,
-    color: COLORS.primary,
+    color: COLORS.text,
+    textAlign: 'center',
   },
   moreButton: {
     padding: SPACING.xs,
@@ -733,6 +1087,15 @@ const styles = StyleSheet.create({
   },
   emptyButton: {
     marginTop: SPACING.md,
+  },
+  loadMoreButton: {
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+  },
+  loadMoreText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.primary,
   },
   modalOverlay: {
     flex: 1,
@@ -802,6 +1165,111 @@ const styles = StyleSheet.create({
   reportTypeOptionDesc: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.textSecondary,
+  },
+  generateInput: {
+    marginBottom: SPACING.md,
+  },
+  dateInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: SPACING.md,
+  },
+  dateInputText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+  },
+  dateInputPlaceholder: {
+    color: COLORS.textSecondary,
+  },
+  datePickerDone: {
+    alignSelf: 'flex-end',
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  datePickerDoneText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.primary,
+  },
+  formatRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  formatOption: {
+    flex: 1,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  formatOptionActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '10',
+  },
+  formatOptionText: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.text,
+  },
+  formatOptionTextActive: {
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  switchLabel: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  recurrenceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  recurrenceChip: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  recurrenceChipActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '10',
+  },
+  recurrenceChipText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.text,
+  },
+  recurrenceChipTextActive: {
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  modalLabelSmall: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
   },
   dateTimeInput: {
     flexDirection: 'row',

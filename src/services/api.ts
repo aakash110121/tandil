@@ -2,8 +2,15 @@ import axios, { AxiosInstance, AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_CONFIG } from '../config/api';
 
-// Create axios instance
+// Create axios instance (adds Bearer token via interceptor)
 const apiClient: AxiosInstance = axios.create({
+  baseURL: API_CONFIG.baseURL,
+  timeout: API_CONFIG.timeout,
+  headers: API_CONFIG.headers,
+});
+
+// Public API client - no auth token (for endpoints like GET /shop/products)
+export const publicApiClient: AxiosInstance = axios.create({
   baseURL: API_CONFIG.baseURL,
   timeout: API_CONFIG.timeout,
   headers: API_CONFIG.headers,
@@ -19,6 +26,10 @@ apiClient.interceptors.request.use(
       }
     } catch (error) {
       console.error('Error getting auth token:', error);
+    }
+    // When sending FormData, remove Content-Type so axios sets multipart/form-data with boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
     }
     return config;
   },
