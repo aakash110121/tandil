@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,12 +15,13 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { buildFullImageUrl } from '../../config/api';
+import { getProductImageUri } from '../../utils/productImage';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
-import { adminService } from '../../services/adminService';
+import { adminService, AdminProduct } from '../../services/adminService';
 import { setPendingProductImage } from './pendingProductImage';
 
 const STATUS_OPTIONS = [
@@ -29,6 +30,29 @@ const STATUS_OPTIONS = [
   { value: 'archived', label: 'Archived' },
 ];
 
+const CurrentProductImage: React.FC<{ uri: string }> = ({ uri }) => {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <View style={[styles.thumbWrap, styles.currentImagePlaceholder]}>
+        <Ionicons name="broken-image-outline" size={32} color={COLORS.textSecondary} />
+        <Text style={styles.placeholderLabel}>Could not load</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.thumbWrap}>
+      <Image
+        source={{ uri }}
+        style={styles.thumb}
+        contentFit="cover"
+        cachePolicy="disk"
+        onError={() => setFailed(true)}
+      />
+    </View>
+  );
+};
+
 const WEIGHT_UNITS = [
   { value: 'kg', label: 'kg' },
   { value: 'g', label: 'g' },
@@ -36,8 +60,13 @@ const WEIGHT_UNITS = [
   { value: 'oz', label: 'oz' },
 ];
 
-const AdminAddProductScreen: React.FC = () => {
+type AdminEditProductParams = { product: AdminProduct };
+
+const AdminEditProductScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<RouteProp<{ params: AdminEditProductParams }, 'params'>>();
+  const product = route.params?.product;
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -58,25 +87,30 @@ const AdminAddProductScreen: React.FC = () => {
   const [pickingMain, setPickingMain] = useState(false);
   const [pickingExtra, setPickingExtra] = useState(false);
 
+  useEffect(() => {
+    if (!product) return;
+    setName(product.name ?? '');
+    setDescription(product.description ?? '');
+    setPrice(typeof product.price === 'string' ? product.price : String(product.price ?? ''));
+    setStock(String(product.stock ?? ''));
+    setStatus((product.status as string) ?? 'active');
+    setCategoryId(product.category_id != null ? String(product.category_id) : '');
+    setWeightUnit(product.weight_unit ?? 'kg');
+    setSku(product.sku ?? '');
+    setHandle(product.handle ?? '');
+  }, [product]);
+
   const pickMainImageFromDevice = async () => {
     if (pickingMain) return;
     setPickingMain(true);
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission needed',
-          'Allow access to your photos to add the main image. You can enable it in Settings.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Permission needed', 'Allow access to your photos to update the main image.', [{ text: 'OK' }]);
         return;
       }
       if (typeof ImagePicker.launchImageLibraryAsync !== 'function') {
-        Alert.alert(
-          'Not available',
-          'Image picker is not available in this environment. Try running in Expo Go or a development build.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Not available', 'Image picker is not available in this environment.', [{ text: 'OK' }]);
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -88,8 +122,7 @@ const AdminAddProductScreen: React.FC = () => {
         setMainImage({ uri: result.assets[0].uri });
       }
     } catch (err: any) {
-      const message = err?.message || err?.code || 'Could not open photo library.';
-      Alert.alert('Unable to open photos', message, [{ text: 'OK' }]);
+      Alert.alert('Unable to open photos', err?.message ?? 'Could not open photo library.', [{ text: 'OK' }]);
     } finally {
       setPickingMain(false);
     }
@@ -101,19 +134,11 @@ const AdminAddProductScreen: React.FC = () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission needed',
-          'Allow access to your photos to add extra images. You can enable it in Settings.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Permission needed', 'Allow access to your photos to update extra images.', [{ text: 'OK' }]);
         return;
       }
       if (typeof ImagePicker.launchImageLibraryAsync !== 'function') {
-        Alert.alert(
-          'Not available',
-          'Image picker is not available in this environment. Try running in Expo Go or a development build.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Not available', 'Image picker is not available in this environment.', [{ text: 'OK' }]);
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -125,8 +150,7 @@ const AdminAddProductScreen: React.FC = () => {
         setExtraImages((prev) => [...prev, ...result.assets!.map((a) => ({ uri: a.uri }))]);
       }
     } catch (err: any) {
-      const message = err?.message || err?.code || 'Could not open photo library.';
-      Alert.alert('Unable to open photos', message, [{ text: 'OK' }]);
+      Alert.alert('Unable to open photos', err?.message ?? 'Could not open photo library.', [{ text: 'OK' }]);
     } finally {
       setPickingExtra(false);
     }
@@ -138,9 +162,7 @@ const AdminAddProductScreen: React.FC = () => {
   };
 
   const addExtraImageUrl = () => setExtraImageUrls((prev) => [...prev, '']);
-  const removeExtraImageUrl = (index: number) => {
-    setExtraImageUrls((prev) => prev.filter((_, i) => i !== index));
-  };
+  const removeExtraImageUrl = (index: number) => setExtraImageUrls((prev) => prev.filter((_, i) => i !== index));
   const updateExtraImageUrl = (index: number, value: string) => {
     setExtraImageUrls((prev) => {
       const next = [...prev];
@@ -165,11 +187,15 @@ const AdminAddProductScreen: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleCreateProduct = async () => {
+  const handleUpdateProduct = async () => {
+    if (!product?.id) {
+      Alert.alert('Error', 'Product not found.');
+      return;
+    }
     if (!validateForm()) {
       Alert.alert(
         'Missing required fields',
-        'Please fill in all required fields (Name, Price, Stock, SKU, Handle) and fix any errors before creating the product.',
+        'Please fill in all required fields (Name, Price, Stock, SKU, Handle) and fix any errors.',
         [{ text: 'OK' }]
       );
       return;
@@ -179,97 +205,62 @@ const AdminAddProductScreen: React.FC = () => {
     try {
       const categoryIdNum = categoryId.trim() ? parseInt(categoryId, 10) : undefined;
       const urlList: string[] = [mainImageUrl, ...extraImageUrls].filter((u) => u.trim().length > 0);
-      let createdData: { image_url?: string | null; image?: string | null; primary_image?: { image_url?: string; image_path?: string }; images?: Array<{ image_url?: string; image_path?: string }> } | undefined;
+      const payload = {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        price: parseFloat(price),
+        stock: parseInt(stock, 10),
+        status,
+        category_id: categoryIdNum ?? null,
+        weight_unit: weightUnit,
+        sku: sku.trim(),
+        handle: handle.trim(),
+        image_urls: urlList.length > 0 ? urlList : undefined,
+      };
 
       const hasMainFile = mainImage != null;
       const hasExtraFiles = extraImages.length > 0;
+      let updatedData: { image_url?: string; image?: string; primary_image?: { image_url?: string; image_path?: string }; images?: Array<{ image_url?: string; image_path?: string }> } | undefined;
 
       if (hasMainFile || hasExtraFiles) {
-        const mainFile = mainImage ?? (extraImages[0] ? { uri: extraImages[0].uri } : null);
-        const extraFiles = mainImage ? extraImages : extraImages.slice(1);
-        if (mainFile) {
-          const res = await adminService.createProductWithImages({
-            name: name.trim(),
-            description: description.trim() || undefined,
-            price: parseFloat(price),
-            stock: parseInt(stock, 10),
-            status,
-            category_id: categoryIdNum ?? null,
-            weight_unit: weightUnit,
-            sku: sku.trim(),
-            handle: handle.trim(),
-            image_urls: urlList.length > 0 ? urlList : undefined,
-            mainImage: mainFile,
-            extraImages: extraFiles.map((i) => ({ uri: i.uri })),
-          });
-          createdData = res.data;
-        }
-      }
-      if (!createdData) {
-        const res = await adminService.createProduct({
-          name: name.trim(),
-          description: description.trim() || undefined,
-          price: parseFloat(price),
-          stock: parseInt(stock, 10),
-          status,
-          category_id: categoryIdNum ?? null,
-          weight_unit: weightUnit,
-          sku: sku.trim(),
-          handle: handle.trim(),
-          image_urls: urlList.length > 0 ? urlList : undefined,
+        const res = await adminService.updateProductWithImages(product.id, {
+          ...payload,
+          mainImage: mainImage ?? undefined,
+          extraImages: extraImages.map((i) => ({ uri: i.uri })),
         });
-        createdData = res.data;
+        updatedData = res.data;
+      } else {
+        const res = await adminService.updateProduct(product.id, payload);
+        updatedData = res.data;
       }
 
       const rawImageUrl =
-        (typeof createdData?.image_url === 'string' && createdData.image_url.trim() ? createdData.image_url : null) ??
-        (typeof createdData?.primary_image?.image_url === 'string' && createdData.primary_image.image_url.trim() ? createdData.primary_image.image_url : null) ??
-        (createdData?.images?.length && typeof createdData.images[0]?.image_url === 'string' ? createdData.images[0].image_url : null) ??
-        (typeof createdData?.image === 'string' && createdData.image.trim() ? createdData.image : null) ??
-        (typeof createdData?.primary_image?.image_path === 'string' ? createdData.primary_image.image_path : null) ??
-        (createdData?.images?.[0]?.image_path ?? null);
+        (typeof updatedData?.image_url === 'string' && updatedData.image_url.trim() ? updatedData.image_url : null) ??
+        (typeof updatedData?.primary_image?.image_url === 'string' && updatedData.primary_image.image_url.trim() ? updatedData.primary_image.image_url : null) ??
+        (updatedData?.images?.length && typeof updatedData.images[0]?.image_url === 'string' ? updatedData.images[0].image_url : null) ??
+        (typeof updatedData?.image === 'string' && updatedData.image.trim() ? updatedData.image : null) ??
+        (typeof updatedData?.primary_image?.image_path === 'string' ? updatedData.primary_image.image_path : null) ??
+        (updatedData?.images?.[0]?.image_path ?? null);
       if (rawImageUrl) {
         const fullUrl = buildFullImageUrl(rawImageUrl);
         Image.prefetch(fullUrl, { cachePolicy: 'disk' }).catch(() => {});
       }
 
-      const createdProduct = (createdData as { data?: { id: number } })?.data;
-      if (createdProduct?.id != null && mainImage) {
-        setPendingProductImage(createdProduct.id, mainImage.uri);
+      if (mainImage) {
+        setPendingProductImage(product.id, mainImage.uri);
       }
 
       Alert.alert(
         'Success',
-        'Product created successfully.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setName('');
-              setDescription('');
-              setPrice('');
-              setStock('');
-              setStatus('active');
-              setCategoryId('');
-              setWeightUnit('kg');
-              setSku('');
-              setHandle('');
-              setMainImage(null);
-              setMainImageUrl('');
-              setExtraImages([]);
-              setExtraImageUrls(['']);
-              setErrors({});
-              navigation.goBack();
-            },
-          },
-        ]
+        'Product updated successfully.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.message ||
         err.response?.data?.error ||
         err.message ||
-        'Failed to create product. Please try again.';
+        'Failed to update product. Please try again.';
       if (err.response?.data?.errors) {
         const apiErrors: { [key: string]: string } = {};
         Object.keys(err.response.data.errors).forEach((key) => {
@@ -331,20 +322,48 @@ const AdminAddProductScreen: React.FC = () => {
     </View>
   );
 
+  const existingMainUri = product ? getProductImageUri(product) : null;
+  const existingExtraUris: string[] = (() => {
+    if (!product) return [];
+    const arr = (product as Record<string, unknown>)['images'] as Array<{ image_url?: string; image_path?: string; is_primary?: number }> | undefined;
+    if (!Array.isArray(arr)) return [];
+    const nonPrimary = arr.filter((i) => i.is_primary !== 1 && i.is_primary !== true);
+    return nonPrimary.map((i) => {
+      const raw = (typeof i.image_url === 'string' && i.image_url.trim() ? i.image_url : null) ?? (typeof i.image_path === 'string' ? i.image_path : null);
+      return raw ? buildFullImageUrl(raw) : '';
+    }).filter(Boolean);
+  })();
+
+  if (!product) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Product</Text>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={styles.errorText}>Product not found.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Product</Text>
+        <Text style={styles.headerTitle}>Edit Product</Text>
         <View style={styles.headerRight} />
       </View>
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={0}
       >
         <ScrollView
           style={styles.scrollView}
@@ -363,7 +382,6 @@ const AdminAddProductScreen: React.FC = () => {
               leftIcon="pricetag-outline"
               error={errors.name}
             />
-
             <Input
               label="Description"
               placeholder="Description here"
@@ -373,7 +391,6 @@ const AdminAddProductScreen: React.FC = () => {
               numberOfLines={3}
               error={errors.description}
             />
-
             <Input
               label="Price *"
               placeholder="e.g. 99.99"
@@ -383,7 +400,6 @@ const AdminAddProductScreen: React.FC = () => {
               leftIcon="cash-outline"
               error={errors.price}
             />
-
             <Input
               label="Stock *"
               placeholder="e.g. 10"
@@ -393,7 +409,6 @@ const AdminAddProductScreen: React.FC = () => {
               leftIcon="cube-outline"
               error={errors.stock}
             />
-
             {renderDropdown(
               'Status',
               status,
@@ -403,7 +418,6 @@ const AdminAddProductScreen: React.FC = () => {
               (v) => { setStatus(v); if (errors.status) setErrors({ ...errors, status: '' }); },
               errors.status
             )}
-
             <Input
               label="Category ID (optional)"
               placeholder="e.g. 2"
@@ -412,7 +426,6 @@ const AdminAddProductScreen: React.FC = () => {
               keyboardType="numeric"
               error={errors.category_id}
             />
-
             {renderDropdown(
               'Weight unit',
               weightUnit,
@@ -421,7 +434,6 @@ const AdminAddProductScreen: React.FC = () => {
               () => setShowWeightUnitDropdown((v) => !v),
               setWeightUnit
             )}
-
             <Input
               label="SKU *"
               placeholder="e.g. SKU-UNIQUE-002"
@@ -429,7 +441,6 @@ const AdminAddProductScreen: React.FC = () => {
               onChangeText={(t) => { setSku(t); if (errors.sku) setErrors({ ...errors, sku: '' }); }}
               error={errors.sku}
             />
-
             <Input
               label="Handle *"
               placeholder="e.g. test-product-unique"
@@ -442,7 +453,20 @@ const AdminAddProductScreen: React.FC = () => {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Main image</Text>
-            <Text style={styles.uploadedHint}>Shows on the product list. One image.</Text>
+            <Text style={styles.uploadedHint}>Shows on the product list. Upload to replace.</Text>
+            {!mainImage && (
+              <View style={styles.uploadedPreviewWrap}>
+                <Text style={styles.uploadedLabel}>Current main image</Text>
+                {existingMainUri ? (
+                  <CurrentProductImage uri={existingMainUri} />
+                ) : (
+                  <View style={[styles.thumbWrap, styles.currentImagePlaceholder]}>
+                    <Ionicons name="image-outline" size={32} color={COLORS.textSecondary} />
+                    <Text style={styles.placeholderLabel}>No image</Text>
+                  </View>
+                )}
+              </View>
+            )}
             <TouchableOpacity
               style={[styles.uploadFromDeviceBtn, pickingMain && styles.uploadFromDeviceBtnDisabled]}
               onPress={pickMainImageFromDevice}
@@ -468,11 +492,11 @@ const AdminAddProductScreen: React.FC = () => {
             />
             {mainImage && (
               <View style={styles.uploadedPreviewWrap}>
-                <View style={[styles.thumbWrap, styles.mainThumbWrap]}>
-                  <Image source={{ uri: mainImage.uri }} style={styles.thumb} resizeMode="cover" />
-                  <View style={styles.mainBadge}>
+                <View style={[styles.thumbWrap, styles.primaryThumbWrap]}>
+                  <Image source={{ uri: mainImage.uri }} style={styles.thumb} contentFit="cover" />
+                  <View style={styles.primaryBadge}>
                     <Ionicons name="star" size={12} color={COLORS.background} />
-                    <Text style={styles.mainBadgeText}>Main</Text>
+                    <Text style={styles.primaryBadgeText}>Main</Text>
                   </View>
                   <TouchableOpacity style={styles.thumbRemove} onPress={removeMainImage}>
                     <Ionicons name="close-circle" size={24} color={COLORS.error} />
@@ -484,7 +508,17 @@ const AdminAddProductScreen: React.FC = () => {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Extra images</Text>
-            <Text style={styles.uploadedHint}>Additional product images (gallery). Optional.</Text>
+            <Text style={styles.uploadedHint}>Additional product images (gallery). Upload to replace all.</Text>
+            {extraImages.length === 0 && existingExtraUris.length > 0 && (
+              <View style={styles.uploadedPreviewWrap}>
+                <Text style={styles.uploadedLabel}>Current extra images</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbScroll}>
+                  {existingExtraUris.map((uri, index) => (
+                    <CurrentProductImage key={index} uri={uri} />
+                  ))}
+                </ScrollView>
+              </View>
+            )}
             <TouchableOpacity
               style={[styles.uploadFromDeviceBtn, pickingExtra && styles.uploadFromDeviceBtnDisabled]}
               onPress={pickExtraImagesFromDevice}
@@ -531,10 +565,11 @@ const AdminAddProductScreen: React.FC = () => {
             ))}
             {extraImages.length > 0 && (
               <View style={styles.uploadedPreviewWrap}>
+                <Text style={styles.uploadedLabel}>New extra images</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbScroll}>
                   {extraImages.map((img, index) => (
                     <View key={index} style={styles.thumbWrap}>
-                      <Image source={{ uri: img.uri }} style={styles.thumb} resizeMode="cover" />
+                      <Image source={{ uri: img.uri }} style={styles.thumb} contentFit="cover" />
                       <TouchableOpacity style={styles.thumbRemove} onPress={() => removeExtraImage(index)}>
                         <Ionicons name="close-circle" size={24} color={COLORS.error} />
                       </TouchableOpacity>
@@ -546,8 +581,8 @@ const AdminAddProductScreen: React.FC = () => {
           </View>
 
           <Button
-            title="Create Product"
-            onPress={handleCreateProduct}
+            title="Update Product"
+            onPress={handleUpdateProduct}
             disabled={loading}
             loading={loading}
             style={styles.submitButton}
@@ -644,9 +679,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderStyle: 'dashed',
   },
-  uploadFromDeviceBtnDisabled: {
-    opacity: 0.6,
-  },
+  uploadFromDeviceBtnDisabled: { opacity: 0.6 },
   uploadFromDeviceText: {
     fontSize: FONT_SIZES.md,
     color: COLORS.primary,
@@ -661,7 +694,7 @@ const styles = StyleSheet.create({
   uploadedHint: {
     fontSize: FONT_SIZES.xs,
     color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
+    marginTop: SPACING.xs,
   },
   thumbScroll: { marginHorizontal: -SPACING.lg },
   thumbWrap: {
@@ -672,11 +705,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
-  mainThumbWrap: {
+  currentImagePlaceholder: {
+    backgroundColor: COLORS.border + '40',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 80,
+  },
+  placeholderLabel: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  primaryThumbWrap: {
     borderWidth: 2,
     borderColor: COLORS.primary,
   },
-  mainBadge: {
+  primaryBadge: {
     position: 'absolute',
     bottom: 4,
     left: 4,
@@ -690,10 +734,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderRadius: BORDER_RADIUS.sm,
   },
-  mainBadgeText: {
+  primaryBadgeText: {
     fontSize: 10,
     fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.background,
+  },
+  setPrimaryBtn: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    right: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: COLORS.background,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  setPrimaryBtnText: {
+    fontSize: 10,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.primary,
   },
   thumb: { width: '100%', height: '100%' },
   thumbRemove: {
@@ -709,11 +774,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: SPACING.sm,
   },
-  addUrlBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
+  addUrlBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
   addUrlText: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: FONT_WEIGHTS.medium },
   imageUrlRow: {
     flexDirection: 'row',
@@ -737,4 +798,4 @@ const styles = StyleSheet.create({
   bottomPad: { height: SPACING.xl * 2 },
 });
 
-export default AdminAddProductScreen;
+export default AdminEditProductScreen;

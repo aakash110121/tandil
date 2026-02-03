@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,96 +9,50 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 
 const { width } = Dimensions.get('window');
 
 const ReportsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [selectedPeriod, setSelectedPeriod] = useState('week');
 
-  const stats = [
-    {
-      id: 'revenue',
-      title: 'Total Revenue',
-      value: 'AED 45,280',
-      change: '+12.5%',
-      trend: 'up',
-      icon: 'cash',
-      color: COLORS.success,
-    },
-    {
-      id: 'visits',
-      title: 'Total Visits',
-      value: '1,245',
-      change: '+8.2%',
-      trend: 'up',
-      icon: 'calendar',
-      color: COLORS.primary,
-    },
-    {
-      id: 'customers',
-      title: 'Active Customers',
-      value: '342',
-      change: '+15.3%',
-      trend: 'up',
-      icon: 'people',
-      color: COLORS.info,
-    },
-    {
-      id: 'workers',
-      title: 'Active Workers',
-      value: '28',
-      change: '-2.1%',
-      trend: 'down',
-      icon: 'person',
-      color: COLORS.warning,
-    },
-  ];
+  const stats = useMemo(
+    () => [
+      { id: 'revenue', titleKey: 'admin.reports.totalRevenue', value: 'AED 45,280', change: '+12.5%', trend: 'up', icon: 'cash', color: COLORS.success },
+      { id: 'visits', titleKey: 'admin.reports.totalVisits', value: '1,245', change: '+8.2%', trend: 'up', icon: 'calendar', color: COLORS.primary },
+      { id: 'customers', titleKey: 'admin.reports.activeCustomers', value: '342', change: '+15.3%', trend: 'up', icon: 'people', color: COLORS.info },
+      { id: 'workers', titleKey: 'admin.reports.activeWorkers', value: '28', change: '-2.1%', trend: 'down', icon: 'person', color: COLORS.warning },
+    ],
+    []
+  );
 
-  const reportTypes = [
-    {
-      id: 'financial',
-      title: 'Financial Report',
-      description: 'Revenue, expenses, and profit analysis',
-      icon: 'bar-chart',
-      color: COLORS.success,
-    },
-    {
-      id: 'performance',
-      title: 'Performance Report',
-      description: 'Worker productivity and ratings',
-      icon: 'trending-up',
-      color: COLORS.primary,
-    },
-    {
-      id: 'customer',
-      title: 'Customer Report',
-      description: 'Customer satisfaction and retention',
-      icon: 'happy',
-      color: COLORS.info,
-    },
-    {
-      id: 'operational',
-      title: 'Operational Report',
-      description: 'Service efficiency and completion rates',
-      icon: 'analytics',
-      color: COLORS.warning,
-    },
-  ];
+  const reportTypes = useMemo(
+    () => [
+      { id: 'financial', titleKey: 'admin.reports.financialReport', descKey: 'admin.reports.financialDescription', icon: 'bar-chart', color: COLORS.success },
+      { id: 'performance', titleKey: 'admin.reports.performanceReport', descKey: 'admin.reports.performanceDescription', icon: 'trending-up', color: COLORS.primary },
+      { id: 'customer', titleKey: 'admin.reports.customerReport', descKey: 'admin.reports.customerDescription', icon: 'happy', color: COLORS.info },
+      { id: 'operational', titleKey: 'admin.reports.operationalReport', descKey: 'admin.reports.operationalDescription', icon: 'analytics', color: COLORS.warning },
+    ],
+    []
+  );
 
-  const periods = [
-    { id: 'day', label: 'Today' },
-    { id: 'week', label: 'Week' },
-    { id: 'month', label: 'Month' },
-    { id: 'year', label: 'Year' },
-  ];
+  const periods = useMemo(
+    () => [
+      { id: 'day', labelKey: 'admin.reports.today' },
+      { id: 'week', labelKey: 'admin.reports.week' },
+      { id: 'month', labelKey: 'admin.reports.month' },
+      { id: 'year', labelKey: 'admin.reports.year' },
+    ],
+    []
+  );
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Reports & Analytics</Text>
+        <Text style={styles.headerTitle}>{t('admin.reports.title')}</Text>
         <TouchableOpacity style={styles.exportButton}>
           <Ionicons name="download-outline" size={24} color={COLORS.primary} />
         </TouchableOpacity>
@@ -120,7 +74,7 @@ const ReportsScreen: React.FC = () => {
                 styles.periodText,
                 selectedPeriod === period.id && styles.periodTextActive
               ]}>
-                {period.label}
+                {t(period.labelKey)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -133,7 +87,7 @@ const ReportsScreen: React.FC = () => {
               <View style={[styles.statIcon, { backgroundColor: stat.color + '20' }]}>
                 <Ionicons name={stat.icon as any} size={24} color={stat.color} />
               </View>
-              <Text style={styles.statTitle}>{stat.title}</Text>
+              <Text style={styles.statTitle}>{t(stat.titleKey)}</Text>
               <Text style={styles.statValue}>{stat.value}</Text>
               <View style={styles.statChange}>
                 <Ionicons 
@@ -152,38 +106,36 @@ const ReportsScreen: React.FC = () => {
           ))}
         </View>
 
-        {/* Report Types */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Report Types</Text>
+          <Text style={styles.sectionTitle}>{t('admin.reports.reportTypesSection')}</Text>
           {reportTypes.map((report) => (
             <TouchableOpacity key={report.id} style={styles.reportCard}>
               <View style={[styles.reportIcon, { backgroundColor: report.color + '20' }]}>
                 <Ionicons name={report.icon as any} size={28} color={report.color} />
               </View>
               <View style={styles.reportInfo}>
-                <Text style={styles.reportTitle}>{report.title}</Text>
-                <Text style={styles.reportDescription}>{report.description}</Text>
+                <Text style={styles.reportTitle}>{t(report.titleKey)}</Text>
+                <Text style={styles.reportDescription}>{t(report.descKey)}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={styles.sectionTitle}>{t('admin.reports.quickActionsSection')}</Text>
           <View style={styles.quickActions}>
             <TouchableOpacity style={styles.actionCard}>
               <Ionicons name="document-text-outline" size={32} color={COLORS.primary} />
-              <Text style={styles.actionText}>Generate Report</Text>
+              <Text style={styles.actionText}>{t('admin.reports.generateReport')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionCard}>
               <Ionicons name="share-outline" size={32} color={COLORS.primary} />
-              <Text style={styles.actionText}>Share Report</Text>
+              <Text style={styles.actionText}>{t('admin.reports.shareReport')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionCard}>
               <Ionicons name="calendar-outline" size={32} color={COLORS.primary} />
-              <Text style={styles.actionText}>Schedule Report</Text>
+              <Text style={styles.actionText}>{t('admin.reports.scheduleReport')}</Text>
             </TouchableOpacity>
           </View>
         </View>

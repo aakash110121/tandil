@@ -11,16 +11,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { adminService, AdminUser } from '../../services/adminService';
 
 const EditUserScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const user: AdminUser = route.params?.user;
-  
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -30,12 +32,10 @@ const EditUserScreen: React.FC = () => {
   const [status, setStatus] = useState<string>('active');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  
-  // Dropdown states
+
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
-  // Initialize form with user data
   useEffect(() => {
     if (user) {
       setName(user.name || '');
@@ -47,62 +47,50 @@ const EditUserScreen: React.FC = () => {
   }, [user]);
 
   const roles = [
-    { value: 'client', label: 'Client' },
-    { value: 'technician', label: 'Technician' },
-    { value: 'supervisor', label: 'Supervisor' },
-    { value: 'area_manager', label: 'Area manager' },
-    { value: 'hr', label: 'Hr' },
-    { value: 'admin', label: 'Admin' },
+    { value: 'client', labelKey: 'admin.editUser.roleClient' },
+    { value: 'technician', labelKey: 'admin.editUser.roleTechnician' },
+    { value: 'supervisor', labelKey: 'admin.editUser.roleSupervisor' },
+    { value: 'area_manager', labelKey: 'admin.editUser.roleAreaManager' },
+    { value: 'hr', labelKey: 'admin.editUser.roleHr' },
+    { value: 'admin', labelKey: 'admin.editUser.roleAdmin' },
   ];
 
   const statuses = [
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
+    { value: 'active', labelKey: 'admin.editUser.statusActive' },
+    { value: 'inactive', labelKey: 'admin.editUser.statusInactive' },
   ];
 
   const getRoleLabel = (value: string) => {
-    return roles.find(r => r.value === value)?.label || 'Select a role';
+    const r = roles.find((x) => x.value === value);
+    return r ? t(r.labelKey) : t('admin.editUser.selectRole');
   };
 
   const getStatusLabel = (value: string) => {
-    return statuses.find(s => s.value === value)?.label || 'Active';
+    const s = statuses.find((x) => x.value === value);
+    return s ? t(s.labelKey) : t('admin.editUser.statusActive');
   };
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!name.trim()) {
-      newErrors.name = 'Full Name is required';
-    }
-
+    if (!name.trim()) newErrors.name = t('admin.editUser.errorFullName');
     if (!email.trim()) {
-      newErrors.email = 'Email Address is required';
+      newErrors.email = t('admin.editUser.errorEmail');
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = t('admin.editUser.errorEmailInvalid');
     }
-
-    // Password is optional for update, but if provided, must be valid
     if (password.trim()) {
-      if (password.length < 8) {
-        newErrors.password = 'Must be at least 8 characters long';
-      }
+      if (password.length < 8) newErrors.password = t('admin.editUser.errorPasswordLength');
       if (!confirmPassword.trim()) {
-        newErrors.confirmPassword = 'Please confirm the password';
+        newErrors.confirmPassword = t('admin.editUser.errorConfirmPassword');
       } else if (password !== confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match';
+        newErrors.confirmPassword = t('admin.editUser.errorPasswordsMatch');
       }
     } else if (confirmPassword.trim()) {
-      // If confirm password is provided but password is not
-      newErrors.password = 'Please enter a password';
+      newErrors.password = t('admin.editUser.errorPasswordRequired');
     }
-
-    if (!role) {
-      newErrors.role = 'User Role is required';
-    }
-
-    if (!status) {
-      newErrors.status = 'Account Status is required';
-    }
+    if (!role) newErrors.role = t('admin.editUser.errorRole');
+    if (!status) newErrors.status = t('admin.editUser.errorStatus');
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -114,7 +102,7 @@ const EditUserScreen: React.FC = () => {
     }
 
     if (!user) {
-      Alert.alert('Error', 'User data not found');
+      Alert.alert(t('admin.users.error'), t('admin.editUser.userNotFound'));
       return;
     }
 
@@ -175,15 +163,17 @@ const EditUserScreen: React.FC = () => {
   const renderDropdown = (
     label: string,
     value: string,
-    options: Array<{ value: string; label: string }>,
+    options: Array<{ value: string; labelKey: string }>,
     showDropdown: boolean,
     onToggle: () => void,
     onSelect: (value: string) => void,
     error?: string,
-    hint?: string
+    hint?: string,
+    placeholderKey?: string
   ) => {
-    const selectedLabel = options.find(opt => opt.value === value)?.label || label;
-    
+    const selectedOpt = options.find((opt) => opt.value === value);
+    const selectedLabel = selectedOpt ? t(selectedOpt.labelKey) : label;
+
     return (
       <View style={styles.dropdownWrapper}>
         <Text style={styles.label}>
@@ -198,7 +188,7 @@ const EditUserScreen: React.FC = () => {
           onPress={onToggle}
         >
           <Text style={[styles.dropdownText, !value && styles.dropdownPlaceholder]}>
-            {value ? selectedLabel : `Select ${label.toLowerCase().replace('*', '').trim()}`}
+            {value ? selectedLabel : (placeholderKey ? t(placeholderKey) : label)}
           </Text>
           <Ionicons
             name={showDropdown ? 'chevron-up' : 'chevron-down'}
@@ -240,7 +230,7 @@ const EditUserScreen: React.FC = () => {
                         value === option.value && styles.dropdownItemTextSelected,
                       ]}
                     >
-                      {option.label}
+                      {t(option.labelKey)}
                     </Text>
                     {value === option.value && (
                       <Ionicons name="checkmark" size={20} color={COLORS.primary} />
@@ -260,9 +250,9 @@ const EditUserScreen: React.FC = () => {
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
-          <Text style={styles.errorText}>User data not found</Text>
+          <Text style={styles.errorText}>{t('admin.editUser.userNotFound')}</Text>
           <Button
-            title="Go Back"
+            title={t('admin.editUser.goBack')}
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           />
@@ -273,7 +263,6 @@ const EditUserScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -281,7 +270,7 @@ const EditUserScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit User</Text>
+        <Text style={styles.headerTitle}>{t('admin.editUser.title')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -290,13 +279,11 @@ const EditUserScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Personal Information Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
-          
+          <Text style={styles.sectionTitle}>{t('admin.editUser.personalInfo')}</Text>
           <Input
-            label="Full Name *"
-            placeholder="Enter full name"
+            label={t('admin.editUser.fullName')}
+            placeholder={t('admin.editUser.fullNamePlaceholder')}
             value={name}
             onChangeText={(text) => {
               setName(text);
@@ -305,10 +292,9 @@ const EditUserScreen: React.FC = () => {
             leftIcon="person-outline"
             error={errors.name}
           />
-
           <Input
-            label="Email Address *"
-            placeholder="Enter email address"
+            label={t('admin.editUser.email')}
+            placeholder={t('admin.editUser.emailPlaceholder')}
             value={email}
             onChangeText={(text) => {
               setEmail(text);
@@ -319,10 +305,9 @@ const EditUserScreen: React.FC = () => {
             leftIcon="mail-outline"
             error={errors.email}
           />
-
           <Input
-            label="Phone Number"
-            placeholder="+971 XX XXX XXXX"
+            label={t('admin.editUser.phone')}
+            placeholder={t('admin.editUser.phonePlaceholder')}
             value={phone}
             onChangeText={(text) => {
               setPhone(text);
@@ -334,13 +319,11 @@ const EditUserScreen: React.FC = () => {
           />
         </View>
 
-        {/* Security Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Security</Text>
-          
+          <Text style={styles.sectionTitle}>{t('admin.editUser.security')}</Text>
           <Input
-            label="Password"
-            placeholder="Leave blank to keep current password"
+            label={t('admin.editUser.password')}
+            placeholder={t('admin.editUser.passwordPlaceholder')}
             value={password}
             onChangeText={(text) => {
               setPassword(text);
@@ -351,15 +334,14 @@ const EditUserScreen: React.FC = () => {
             error={errors.password}
           />
           {!errors.password && password && (
-            <Text style={styles.hint}>Must be at least 8 characters long</Text>
+            <Text style={styles.hint}>{t('admin.editUser.errorPasswordLength')}</Text>
           )}
           {!password && (
-            <Text style={styles.hint}>Leave blank to keep current password</Text>
+            <Text style={styles.hint}>{t('admin.editUser.passwordPlaceholder')}</Text>
           )}
-
           <Input
-            label="Confirm Password"
-            placeholder="Re-enter password if changing"
+            label={t('admin.editUser.confirmPassword')}
+            placeholder={t('admin.editUser.confirmPasswordPlaceholder')}
             value={confirmPassword}
             onChangeText={(text) => {
               setConfirmPassword(text);
@@ -371,12 +353,10 @@ const EditUserScreen: React.FC = () => {
           />
         </View>
 
-        {/* Role & Status Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Role & Status</Text>
-          
+          <Text style={styles.sectionTitle}>{t('admin.editUser.roleAndStatus')}</Text>
           {renderDropdown(
-            'User Role *',
+            t('admin.editUser.userRole'),
             role,
             roles,
             showRoleDropdown,
@@ -388,11 +368,12 @@ const EditUserScreen: React.FC = () => {
               setRole(value);
               if (errors.role) setErrors({ ...errors, role: '' });
             },
-            errors.role
+            errors.role,
+            undefined,
+            'admin.editUser.selectRole'
           )}
-
           {renderDropdown(
-            'Account Status *',
+            t('admin.editUser.accountStatus'),
             status,
             statuses,
             showStatusDropdown,
@@ -405,21 +386,21 @@ const EditUserScreen: React.FC = () => {
               if (errors.status) setErrors({ ...errors, status: '' });
             },
             errors.status,
-            'Set the initial account status'
+            t('admin.editUser.statusHint'),
+            'admin.addUser.selectStatus'
           )}
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           <Button
-            title="Cancel"
+            title={t('admin.editUser.cancel')}
             onPress={() => navigation.goBack()}
             variant="outline"
             style={styles.cancelButton}
             icon={<Ionicons name="close" size={20} color={COLORS.primary} style={styles.buttonIcon} />}
           />
           <Button
-            title="Update User"
+            title={t('admin.editUser.updateUser')}
             onPress={handleUpdateUser}
             loading={loading}
             style={styles.createButton}

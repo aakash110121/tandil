@@ -619,11 +619,11 @@ const AdminDashboardScreen: React.FC = () => {
               <Text style={styles.adminActionText}>{t('admin.dashboard.reports')}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('ReportsTab' as never)}>
+            <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('AdminCategories' as never)}>
               <View style={styles.adminActionIcon}>
-                <Ionicons name="stats-chart-outline" size={24} color={COLORS.primary} />
+                <Ionicons name="pricetag-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.adminActionText}>{t('admin.dashboard.analytics')}</Text>
+              <Text style={styles.adminActionText}>{t('admin.dashboard.category')}</Text>
             </TouchableOpacity>
           </View>
         </View>

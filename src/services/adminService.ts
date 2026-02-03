@@ -304,7 +304,7 @@ export const adminService = {
     return response.data;
   },
 
-  // Create product with image files (same endpoint, multipart/form-data). Longer timeout for uploads.
+  // Create product with image files (multipart). API expects main_image (primary) + images[] (extra).
   createProductWithImages: async (params: {
     name: string;
     description?: string;
@@ -316,7 +316,8 @@ export const adminService = {
     sku: string;
     handle: string;
     image_urls?: string[];
-    imageFiles: { uri: string }[];
+    mainImage: { uri: string };
+    extraImages?: { uri: string }[];
   }): Promise<{ status: boolean; message?: string; data: AdminProductCreated }> => {
     const formData = new FormData();
     formData.append('name', params.name);
@@ -331,15 +332,88 @@ export const adminService = {
     if (params.image_urls?.length) {
       formData.append('image_urls', JSON.stringify(params.image_urls));
     }
-    params.imageFiles.forEach((file, index) => {
+    formData.append('main_image', {
+      uri: params.mainImage.uri,
+      type: 'image/jpeg',
+      name: 'main-image.jpg',
+    } as any);
+    (params.extraImages ?? []).forEach((file, index) => {
       formData.append('images[]', {
         uri: file.uri,
         type: 'image/jpeg',
-        name: `product-image-${index}.jpg`,
+        name: `image-${index}.jpg`,
       } as any);
     });
-    // 2 min timeout for multipart upload (images can be slow on mobile networks)
     const response = await apiClient.post('/admin/products', formData, { timeout: 120000 });
+    return response.data;
+  },
+
+  // Update product (PUT /admin/products/:id, Bearer token) – JSON body
+  updateProduct: async (
+    productId: number,
+    body: {
+      name?: string;
+      description?: string;
+      price?: number;
+      stock?: number;
+      status?: string;
+      category_id?: number | null;
+      weight_unit?: string;
+      sku?: string;
+      handle?: string;
+      image_urls?: string[];
+    }
+  ): Promise<{ status: boolean; message?: string; updated_fields?: string[]; data: AdminProductCreated }> => {
+    const response = await apiClient.put(`/admin/products/${productId}`, body, { timeout: 60000 });
+    return response.data;
+  },
+
+  // Update product with image files (PUT /admin/products/:id, multipart). API: main_image (optional) + images[] (replace extra).
+  updateProductWithImages: async (
+    productId: number,
+    params: {
+      name?: string;
+      description?: string;
+      price?: number;
+      stock?: number;
+      status?: string;
+      category_id?: number | null;
+      weight_unit?: string;
+      sku?: string;
+      handle?: string;
+      image_urls?: string[];
+      mainImage?: { uri: string };
+      extraImages?: { uri: string }[];
+    }
+  ): Promise<{ status: boolean; message?: string; updated_fields?: string[]; data: AdminProductCreated }> => {
+    const formData = new FormData();
+    if (params.name !== undefined) formData.append('name', params.name);
+    if (params.description !== undefined) formData.append('description', params.description ?? '');
+    if (params.price !== undefined) formData.append('price', String(params.price));
+    if (params.stock !== undefined) formData.append('stock', String(params.stock));
+    if (params.status !== undefined) formData.append('status', params.status);
+    if (params.category_id != null) formData.append('category_id', String(params.category_id));
+    if (params.weight_unit) formData.append('weight_unit', params.weight_unit);
+    if (params.sku !== undefined) formData.append('sku', params.sku);
+    if (params.handle !== undefined) formData.append('handle', params.handle);
+    if (params.image_urls?.length) {
+      formData.append('image_urls', JSON.stringify(params.image_urls));
+    }
+    if (params.mainImage) {
+      formData.append('main_image', {
+        uri: params.mainImage.uri,
+        type: 'image/jpeg',
+        name: 'main-image.jpg',
+      } as any);
+    }
+    (params.extraImages ?? []).forEach((file, index) => {
+      formData.append('images[]', {
+        uri: file.uri,
+        type: 'image/jpeg',
+        name: `image-${index}.jpg`,
+      } as any);
+    });
+    const response = await apiClient.put(`/admin/products/${productId}`, formData, { timeout: 120000 });
     return response.data;
   },
 
@@ -348,7 +422,45 @@ export const adminService = {
     const response = await apiClient.delete(`/admin/products/${productId}`);
     return response.data;
   },
+
+  // Categories (GET /admin/categories, Bearer token)
+  getCategories: async (params?: { page?: number; per_page?: number }): Promise<AdminCategoriesResponse> => {
+    const response = await apiClient.get<AdminCategoriesResponse>('/admin/categories', { params });
+    return response.data;
+  },
 };
+
+export interface AdminCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  image?: string | null;
+  image_url?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  products_count?: number;
+}
+
+export interface AdminCategoriesResponse {
+  success: boolean;
+  message?: string;
+  data: {
+    current_page: number;
+    data: AdminCategory[];
+    first_page_url?: string;
+    from?: number;
+    last_page: number;
+    last_page_url?: string;
+    links?: Array<{ url: string | null; label: string; page: number | null; active: boolean }>;
+    next_page_url?: string | null;
+    path?: string;
+    per_page: number;
+    prev_page_url?: string | null;
+    to?: number;
+    total: number;
+  };
+}
 
 // Admin product (for list from GET /admin/products)
 export interface AdminProduct {
@@ -362,13 +474,15 @@ export interface AdminProduct {
   price: string;
   stock?: number;
   status?: string;
+  weight_unit?: string;
+  handle?: string;
   image?: string | null;
   image_url?: string | null;
   created_at?: string;
   updated_at?: string;
   category?: { id: number; name: string; slug?: string };
-  primary_image?: { id?: number; image_path?: string };
-  images?: Array<{ id?: number; image_path?: string; is_primary?: number }>;
+  primary_image?: { id?: number; image_path?: string; image_url?: string };
+  images?: Array<{ id?: number; image_path?: string; image_url?: string; is_primary?: number }>;
 }
 
 // Admin product create response (POST /admin/products – JSON or multipart)

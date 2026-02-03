@@ -14,41 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
-import { buildFullImageUrl } from '../../config/api';
 import { adminService, AdminProduct } from '../../services/adminService';
+import { getProductImageUri } from '../../utils/productImage';
+import { getPendingProductImage, clearPendingProductImage } from './pendingProductImage';
 
 const PER_PAGE = 15;
-
-// Pick first/primary image for list. Prefer thumbnail_url if API provides it (faster load). Else image_url, etc.
-function getProductImageUri(item: AdminProduct): string | null {
-  const o = item as Record<string, unknown>;
-  const thumbnailUrl = (typeof o['thumbnail_url'] === 'string' && (o['thumbnail_url'] as string).trim()) ? (o['thumbnail_url'] as string) : null;
-  const imageUrl = o['image_url'] ?? item.image_url;
-  const image = o['image'] ?? item.image;
-  const primary = o['primary_image'] as { image_path?: string; image_url?: string; thumbnail_url?: string } | null;
-  const primaryUrl = primary?.image_url;
-  const primaryThumb = primary?.thumbnail_url;
-  const primaryPath = primary?.image_path ?? item.primary_image?.image_path;
-  const imagesArr = (o['images'] as Array<{ image_path?: string; image_url?: string; thumbnail_url?: string; is_primary?: number }> | null) ?? item.images;
-  const firstImg = imagesArr?.length
-    ? (imagesArr.find((i) => i.is_primary === 1 || i.is_primary === true) ?? imagesArr[0])
-    : null;
-  const firstImgUrl = firstImg?.image_url;
-  const firstImgThumb = firstImg?.thumbnail_url;
-  const firstImgPath = firstImg?.image_path;
-  const raw =
-    (thumbnailUrl ? thumbnailUrl : null) ??
-    (typeof imageUrl === 'string' && imageUrl.trim() ? imageUrl : null) ??
-    (typeof primaryThumb === 'string' && primaryThumb.trim() ? primaryThumb : null) ??
-    (typeof primaryUrl === 'string' && primaryUrl.trim() ? primaryUrl : null) ??
-    (typeof image === 'string' && image.trim() ? image : null) ??
-    (typeof primaryPath === 'string' && primaryPath.trim() ? primaryPath : null) ??
-    (typeof firstImgThumb === 'string' && firstImgThumb.trim() ? firstImgThumb : null) ??
-    (typeof firstImgUrl === 'string' && firstImgUrl.trim() ? firstImgUrl : null) ??
-    (typeof firstImgPath === 'string' && firstImgPath.trim() ? firstImgPath : null);
-  if (!raw || typeof raw !== 'string' || !raw.trim()) return null;
-  return buildFullImageUrl(raw);
-}
 
 // Prefetch first N image URIs with expo-image (disk cache) so list shows images faster
 const PREFETCH_COUNT = 15;
@@ -158,7 +128,8 @@ const AdminProductsScreen: React.FC = () => {
   }, []);
 
   const renderProduct = ({ item }: { item: AdminProduct }) => {
-    const imageUri = getProductImageUri(item);
+    const pendingUri = getPendingProductImage(item.id);
+    const imageUri = pendingUri ?? getProductImageUri(item);
     const isDeleting = deletingId === item.id;
     return (
     <View style={styles.row}>
@@ -174,7 +145,10 @@ const AdminProductsScreen: React.FC = () => {
         </View>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.smallBtn}>
+        <TouchableOpacity
+          style={styles.smallBtn}
+          onPress={() => navigation.navigate('AdminEditProduct' as never, { product: item } as never)}
+        >
           <Ionicons name="create-outline" size={18} color={COLORS.primary} />
         </TouchableOpacity>
         <TouchableOpacity

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { adminService, AdminActivity } from '../../services/adminService';
 
@@ -48,6 +49,7 @@ type ActivityItem = { id: string; message: string; timestamp: string; icon: stri
 const LIMIT = 20;
 
 const AdminRecentActivitiesScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -122,14 +124,14 @@ const AdminRecentActivitiesScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Recent Activities</Text>
+        <Text style={styles.headerTitle}>{t('admin.recentActivities.title')}</Text>
         <View style={styles.headerRight} />
       </View>
 
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading activities…</Text>
+          <Text style={styles.loadingText}>{t('admin.recentActivities.loading')}</Text>
         </View>
       ) : (
         <FlatList
@@ -143,7 +145,7 @@ const AdminRecentActivitiesScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="list-outline" size={48} color={COLORS.textSecondary} />
-              <Text style={styles.emptyText}>No recent activities</Text>
+              <Text style={styles.emptyText}>{t('admin.recentActivities.noActivities')}</Text>
             </View>
           }
         />

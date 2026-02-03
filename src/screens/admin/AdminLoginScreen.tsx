@@ -12,12 +12,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { Button } from '../../components/common/Button';
 import { authService } from '../../services/authService';
 import { useAppStore } from '../../store';
 
 const AdminLoginScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const { setUser, setAuthenticated } = useAppStore();
   const [email, setEmail] = useState('');
@@ -28,7 +30,7 @@ const AdminLoginScreen: React.FC = () => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter your email and password');
+      Alert.alert(t('admin.users.error'), t('admin.login.errorEnterCredentials'));
       return;
     }
 
@@ -75,18 +77,14 @@ const AdminLoginScreen: React.FC = () => {
       console.error('Error response:', err.response?.data);
       console.error('Error status:', err.response?.status);
       
-      const errorMessage = 
-        err.response?.data?.message || 
+      const errorMessage =
+        err.response?.data?.message ||
         err.response?.data?.error ||
-        err.message || 
-        'Login failed. Please check your credentials and try again.';
-      
+        err.message ||
+        t('admin.login.loginFailed');
+
       setError(errorMessage);
-      Alert.alert(
-        'Login Error',
-        errorMessage,
-        [{ text: 'OK' }]
-      );
+      Alert.alert(t('admin.login.loginError'), errorMessage, [{ text: 'OK' }]);
     } finally {
       setIsLoading(false);
     }
@@ -106,11 +104,10 @@ const AdminLoginScreen: React.FC = () => {
           <View style={styles.iconCircle}>
             <Ionicons name="shield-checkmark" size={64} color={COLORS.primary} />
           </View>
-          <Text style={styles.title}>Admin Login</Text>
-          <Text style={styles.subtitle}>Executive Management Access</Text>
+          <Text style={styles.title}>{t('admin.login.title')}</Text>
+          <Text style={styles.subtitle}>{t('admin.login.subtitle')}</Text>
         </View>
 
-        {/* Login Form */}
         <View style={styles.formContainer}>
           {error && (
             <View style={styles.errorContainer}>
@@ -118,14 +115,13 @@ const AdminLoginScreen: React.FC = () => {
             </View>
           )}
 
-          {/* Email Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('admin.login.email')}</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="mail-outline" size={20} color={COLORS.textSecondary} />
               <TextInput
                 style={styles.input}
-                placeholder="Enter your email"
+                placeholder={t('admin.login.emailPlaceholder')}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -138,14 +134,13 @@ const AdminLoginScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Password Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>{t('admin.login.password')}</Text>
             <View style={styles.inputWrapper}>
               <Ionicons name="lock-closed-outline" size={20} color={COLORS.textSecondary} />
               <TextInput
                 style={styles.input}
-                placeholder="Enter your password"
+                placeholder={t('admin.login.passwordPlaceholder')}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -164,34 +159,27 @@ const AdminLoginScreen: React.FC = () => {
             </View>
           </View>
 
-          {/* Forgot Password */}
           <TouchableOpacity style={styles.forgotPassword}>
-            <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+            <Text style={styles.forgotPasswordText}>{t('admin.login.forgotPassword')}</Text>
           </TouchableOpacity>
 
-          {/* Login Button */}
           <Button
-            title={isLoading ? 'Signing in...' : 'Sign In'}
+            title={isLoading ? t('admin.login.signingIn') : t('admin.login.signIn')}
             onPress={handleLogin}
             loading={isLoading}
             disabled={isLoading}
             style={styles.loginButton}
           />
 
-          {/* Info Box */}
           <View style={styles.infoBox}>
             <Ionicons name="information-circle-outline" size={20} color={COLORS.info} />
-            <Text style={styles.infoText}>
-              Full control panel - manage all system operations
-            </Text>
+            <Text style={styles.infoText}>{t('admin.login.infoText')}</Text>
           </View>
         </View>
 
-        {/* Back to Role Selection */}
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
-            // Navigate to root navigator's RoleSelection
             let rootNavigator = navigation;
             while (rootNavigator.getParent()) {
               rootNavigator = rootNavigator.getParent() as any;
@@ -200,7 +188,7 @@ const AdminLoginScreen: React.FC = () => {
           }}
         >
           <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
-          <Text style={styles.backText}>Back to Role Selection</Text>
+          <Text style={styles.backText}>{t('admin.login.backToRoles')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

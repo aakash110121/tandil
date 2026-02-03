@@ -11,14 +11,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { adminService } from '../../services/adminService';
 
 const AddUserScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
-  
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -28,65 +30,55 @@ const AddUserScreen: React.FC = () => {
   const [status, setStatus] = useState<string>('active');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  
-  // Dropdown states
+
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   const roles = [
-    { value: 'client', label: 'Client' },
-    { value: 'technician', label: 'Technician' },
-    { value: 'supervisor', label: 'Supervisor' },
-    { value: 'area_manager', label: 'Area manager' },
-    { value: 'hr', label: 'Hr' },
-    { value: 'admin', label: 'Admin' },
+    { value: 'client', labelKey: 'admin.addUser.roleClient' },
+    { value: 'technician', labelKey: 'admin.addUser.roleTechnician' },
+    { value: 'supervisor', labelKey: 'admin.addUser.roleSupervisor' },
+    { value: 'area_manager', labelKey: 'admin.addUser.roleAreaManager' },
+    { value: 'hr', labelKey: 'admin.addUser.roleHr' },
+    { value: 'admin', labelKey: 'admin.addUser.roleAdmin' },
   ];
 
   const statuses = [
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
+    { value: 'active', labelKey: 'admin.addUser.statusActive' },
+    { value: 'inactive', labelKey: 'admin.addUser.statusInactive' },
   ];
 
   const getRoleLabel = (value: string) => {
-    return roles.find(r => r.value === value)?.label || 'Select a role';
+    const r = roles.find((x) => x.value === value);
+    return r ? t(r.labelKey) : t('admin.addUser.selectRole');
   };
 
   const getStatusLabel = (value: string) => {
-    return statuses.find(s => s.value === value)?.label || 'Active';
+    const s = statuses.find((x) => x.value === value);
+    return s ? t(s.labelKey) : t('admin.addUser.statusActive');
   };
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
 
-    if (!name.trim()) {
-      newErrors.name = 'Full Name is required';
-    }
-
+    if (!name.trim()) newErrors.name = t('admin.addUser.errorFullName');
     if (!email.trim()) {
-      newErrors.email = 'Email Address is required';
+      newErrors.email = t('admin.addUser.errorEmail');
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = t('admin.addUser.errorEmailInvalid');
     }
-
     if (!password.trim()) {
-      newErrors.password = 'Password is required';
+      newErrors.password = t('admin.addUser.errorPassword');
     } else if (password.length < 8) {
-      newErrors.password = 'Must be at least 8 characters long';
+      newErrors.password = t('admin.addUser.errorPasswordLength');
     }
-
     if (!confirmPassword.trim()) {
-      newErrors.confirmPassword = 'Confirm Password is required';
+      newErrors.confirmPassword = t('admin.addUser.errorConfirmPassword');
     } else if (password !== confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      newErrors.confirmPassword = t('admin.addUser.errorPasswordsMatch');
     }
-
-    if (!role) {
-      newErrors.role = 'User Role is required';
-    }
-
-    if (!status) {
-      newErrors.status = 'Account Status is required';
-    }
+    if (!role) newErrors.role = t('admin.addUser.errorRole');
+    if (!status) newErrors.status = t('admin.addUser.errorStatus');
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -110,8 +102,8 @@ const AddUserScreen: React.FC = () => {
       });
 
       Alert.alert(
-        'Success',
-        'User created successfully',
+        t('admin.users.success'),
+        t('admin.addUser.success'),
         [
           {
             text: 'OK',
@@ -133,11 +125,11 @@ const AddUserScreen: React.FC = () => {
       );
     } catch (err: any) {
       console.error('Error creating user:', err);
-      const errorMessage = 
-        err.response?.data?.message || 
+      const errorMessage =
+        err.response?.data?.message ||
         err.response?.data?.error ||
-        err.message || 
-        'Failed to create user. Please try again.';
+        err.message ||
+        t('admin.addUser.createFailed');
       
       // Handle validation errors from API
       if (err.response?.data?.errors) {
@@ -247,7 +239,7 @@ const AddUserScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add New User</Text>
+        <Text style={styles.headerTitle}>{t('admin.addUser.title')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -256,13 +248,11 @@ const AddUserScreen: React.FC = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Personal Information Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Personal Information</Text>
-          
+          <Text style={styles.sectionTitle}>{t('admin.addUser.personalInfo')}</Text>
           <Input
-            label="Full Name *"
-            placeholder="Enter full name"
+            label={t('admin.addUser.fullName')}
+            placeholder={t('admin.addUser.fullNamePlaceholder')}
             value={name}
             onChangeText={(text) => {
               setName(text);
@@ -271,10 +261,9 @@ const AddUserScreen: React.FC = () => {
             leftIcon="person-outline"
             error={errors.name}
           />
-
           <Input
-            label="Email Address *"
-            placeholder="Enter email address"
+            label={t('admin.addUser.email')}
+            placeholder={t('admin.addUser.emailPlaceholder')}
             value={email}
             onChangeText={(text) => {
               setEmail(text);
@@ -285,10 +274,9 @@ const AddUserScreen: React.FC = () => {
             leftIcon="mail-outline"
             error={errors.email}
           />
-
           <Input
-            label="Phone Number"
-            placeholder="+971 XX XXX XXXX"
+            label={t('admin.addUser.phone')}
+            placeholder={t('admin.addUser.phonePlaceholder')}
             value={phone}
             onChangeText={(text) => {
               setPhone(text);
@@ -300,13 +288,11 @@ const AddUserScreen: React.FC = () => {
           />
         </View>
 
-        {/* Security Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Security</Text>
-          
+          <Text style={styles.sectionTitle}>{t('admin.addUser.security')}</Text>
           <Input
-            label="Password *"
-            placeholder="Enter password"
+            label={t('admin.addUser.password')}
+            placeholder={t('admin.addUser.passwordPlaceholder')}
             value={password}
             onChangeText={(text) => {
               setPassword(text);
@@ -317,12 +303,11 @@ const AddUserScreen: React.FC = () => {
             error={errors.password}
           />
           {!errors.password && password && (
-            <Text style={styles.hint}>Must be at least 8 characters long</Text>
+            <Text style={styles.hint}>{t('admin.addUser.errorPasswordLength')}</Text>
           )}
-
           <Input
-            label="Confirm Password *"
-            placeholder="Re-enter password"
+            label={t('admin.addUser.confirmPassword')}
+            placeholder={t('admin.addUser.confirmPasswordPlaceholder')}
             value={confirmPassword}
             onChangeText={(text) => {
               setConfirmPassword(text);
@@ -334,12 +319,10 @@ const AddUserScreen: React.FC = () => {
           />
         </View>
 
-        {/* Role & Status Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Role & Status</Text>
-          
+          <Text style={styles.sectionTitle}>{t('admin.addUser.roleAndStatus')}</Text>
           {renderDropdown(
-            'User Role *',
+            t('admin.addUser.userRole'),
             role,
             roles,
             showRoleDropdown,
@@ -351,11 +334,12 @@ const AddUserScreen: React.FC = () => {
               setRole(value);
               if (errors.role) setErrors({ ...errors, role: '' });
             },
-            errors.role
+            errors.role,
+            undefined,
+            'admin.addUser.selectRole'
           )}
-
           {renderDropdown(
-            'Account Status *',
+            t('admin.addUser.accountStatus'),
             status,
             statuses,
             showStatusDropdown,
@@ -368,21 +352,21 @@ const AddUserScreen: React.FC = () => {
               if (errors.status) setErrors({ ...errors, status: '' });
             },
             errors.status,
-            'Set the initial account status'
+            t('admin.addUser.statusHint'),
+            'admin.addUser.selectStatus'
           )}
         </View>
 
-        {/* Action Buttons */}
         <View style={styles.buttonContainer}>
           <Button
-            title="Cancel"
+            title={t('admin.addUser.cancel')}
             onPress={() => navigation.goBack()}
             variant="outline"
             style={styles.cancelButton}
             icon={<Ionicons name="close" size={20} color={COLORS.primary} style={styles.buttonIcon} />}
           />
           <Button
-            title="Create User"
+            title={t('admin.addUser.createUser')}
             onPress={handleCreateUser}
             loading={loading}
             style={styles.createButton}

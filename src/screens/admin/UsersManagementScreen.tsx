@@ -13,20 +13,17 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { adminService, AdminUser } from '../../services/adminService';
 
-// Map API role to display name
-const getRoleDisplayName = (role: string): string => {
-  const roleMap: { [key: string]: string } = {
-    'technician': 'Field Worker',
-    'supervisor': 'Supervisor',
-    'area_manager': 'Area Manager',
-    'hr': 'HR Manager',
-    'client': 'Client',
-    'admin': 'Admin',
-  };
-  return roleMap[role] || role;
+const ROLE_KEYS: Record<string, string> = {
+  technician: 'admin.users.roleFieldWorker',
+  supervisor: 'admin.users.roleSupervisor',
+  area_manager: 'admin.users.roleAreaManager',
+  hr: 'admin.users.roleHrManager',
+  client: 'admin.users.roleClient',
+  admin: 'admin.users.roleAdmin',
 };
 
 // Generate employee ID based on role and user ID
@@ -44,6 +41,7 @@ const generateEmployeeId = (role: string, userId: number): string => {
 };
 
 const UsersManagementScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -61,14 +59,6 @@ const UsersManagementScreen: React.FC = () => {
     managers: number;
     clients?: number;
   } | null>(null);
-
-  const filters = [
-    { id: 'all', label: 'All Users' },
-    { id: 'worker', label: 'Workers' },
-    { id: 'supervisor', label: 'Supervisors' },
-    { id: 'manager', label: 'Managers' },
-    { id: 'client', label: 'Clients' },
-  ];
 
   // Fetch user statistics
   const fetchUserStatistics = useCallback(async () => {
@@ -116,12 +106,12 @@ const UsersManagementScreen: React.FC = () => {
         setUsers(usersArray);
       } else {
         setUsers([]);
-        setError('No users found or invalid response format');
+        setError(t('admin.users.noUsersOrInvalid'));
       }
     } catch (err: any) {
       console.error('Error fetching users:', err);
       console.error('Error response:', err.response?.data);
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load users';
+      const errorMessage = err.response?.data?.message || err.message || t('admin.users.loadFailed');
       setError(errorMessage);
       setUsers([]);
     } finally {
@@ -129,7 +119,7 @@ const UsersManagementScreen: React.FC = () => {
       setRefreshing(false);
       setIsInitialLoad(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchUsers();
@@ -186,32 +176,29 @@ const UsersManagementScreen: React.FC = () => {
 
   const handleDelete = () => {
     if (!selectedUser) return;
-    
     Alert.alert(
-      'Delete User',
-      `Are you sure you want to delete ${selectedUser.name}? This action cannot be undone.`,
+      t('admin.users.deleteTitle'),
+      t('admin.users.deleteMessage', { name: selectedUser.name }),
       [
         {
-          text: 'Cancel',
+          text: t('admin.users.cancel'),
           style: 'cancel',
           onPress: () => setShowMenu(false),
         },
         {
-          text: 'Delete',
+          text: t('admin.users.delete'),
           style: 'destructive',
           onPress: async () => {
             setShowMenu(false);
             try {
               await adminService.deleteUser(selectedUser.id);
-              Alert.alert('Success', 'User deleted successfully');
+              Alert.alert(t('admin.users.success'), t('admin.users.deleteSuccess'));
               fetchUsers(false);
             } catch (err: any) {
               console.error('Error deleting user:', err);
-              const errorMessage = 
-                err.response?.data?.message || 
-                err.message || 
-                'Failed to delete user. Please try again.';
-              Alert.alert('Error', errorMessage);
+              const errorMessage =
+                err.response?.data?.message || err.message || t('admin.users.deleteFailed');
+              Alert.alert(t('admin.users.error'), errorMessage);
             }
           },
         },
@@ -221,7 +208,7 @@ const UsersManagementScreen: React.FC = () => {
 
   const renderUser = ({ item }: { item: AdminUser }) => {
     const employeeId = generateEmployeeId(item.role, item.id);
-    const roleDisplayName = getRoleDisplayName(item.role);
+    const roleDisplayName = t(ROLE_KEYS[item.role] || item.role);
     const avatarInitial = item.name.charAt(0).toUpperCase();
 
     return (
@@ -274,35 +261,35 @@ const UsersManagementScreen: React.FC = () => {
           style={[styles.statCard, selectedFilter === 'all' && styles.statCardActive]}
           onPress={() => setSelectedFilter('all')}
         >
-          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'all' && styles.statLabelActive]}>All Users</Text>
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'all' && styles.statLabelActive]}>{t('admin.users.allUsers')}</Text>
           <Text style={[styles.statValue, selectedFilter === 'all' && styles.statValueActive]}>{userStats.all_users.toLocaleString('en-US')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.statCard, selectedFilter === 'worker' && styles.statCardActive]}
           onPress={() => setSelectedFilter('worker')}
         >
-          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'worker' && styles.statLabelActive]}>Workers</Text>
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'worker' && styles.statLabelActive]}>{t('admin.users.workers')}</Text>
           <Text style={[styles.statValue, selectedFilter === 'worker' && styles.statValueActive]}>{userStats.workers.toLocaleString('en-US')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.statCard, selectedFilter === 'supervisor' && styles.statCardActive]}
           onPress={() => setSelectedFilter('supervisor')}
         >
-          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'supervisor' && styles.statLabelActive]}>Supervisors</Text>
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'supervisor' && styles.statLabelActive]}>{t('admin.users.supervisors')}</Text>
           <Text style={[styles.statValue, selectedFilter === 'supervisor' && styles.statValueActive]}>{userStats.supervisors.toLocaleString('en-US')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.statCard, selectedFilter === 'manager' && styles.statCardActive]}
           onPress={() => setSelectedFilter('manager')}
         >
-          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'manager' && styles.statLabelActive]}>Managers</Text>
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'manager' && styles.statLabelActive]}>{t('admin.users.managers')}</Text>
           <Text style={[styles.statValue, selectedFilter === 'manager' && styles.statValueActive]}>{userStats.managers.toLocaleString('en-US')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.statCard, selectedFilter === 'client' && styles.statCardActive]}
           onPress={() => setSelectedFilter('client')}
         >
-          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'client' && styles.statLabelActive]}>Clients</Text>
+          <Text numberOfLines={1} style={[styles.statLabel, selectedFilter === 'client' && styles.statLabelActive]}>{t('admin.users.clients')}</Text>
           <Text style={[styles.statValue, selectedFilter === 'client' && styles.statValueActive]}>{(userStats.clients ?? 0).toLocaleString('en-US')}</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -313,8 +300,8 @@ const UsersManagementScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>User Management</Text>
-        <TouchableOpacity 
+        <Text style={styles.headerTitle}>{t('admin.users.title')}</Text>
+        <TouchableOpacity
           style={styles.addButton}
           onPress={() => navigation.navigate('AddUser' as never)}
         >
@@ -327,7 +314,7 @@ const UsersManagementScreen: React.FC = () => {
         <Ionicons name="search" size={20} color={COLORS.textSecondary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search users..."
+          placeholder={t('admin.users.searchPlaceholder')}
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor={COLORS.textSecondary}
@@ -338,14 +325,14 @@ const UsersManagementScreen: React.FC = () => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading users...</Text>
+          <Text style={styles.loadingText}>{t('admin.users.loading')}</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => fetchUsers()}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t('admin.users.retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -366,7 +353,7 @@ const UsersManagementScreen: React.FC = () => {
             {filteredUsers.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="people-outline" size={64} color={COLORS.textSecondary} />
-                <Text style={styles.emptyText}>No users found</Text>
+                <Text style={styles.emptyText}>{t('admin.users.noUsers')}</Text>
               </View>
             ) : (
               filteredUsers.map((item) => (
@@ -395,14 +382,14 @@ const UsersManagementScreen: React.FC = () => {
               onPress={handleEdit}
             >
               <Ionicons name="create-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.menuItemText}>Edit</Text>
+              <Text style={styles.menuItemText}>{t('admin.users.edit')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.menuItem, styles.menuItemDanger]}
               onPress={handleDelete}
             >
               <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-              <Text style={[styles.menuItemText, styles.menuItemTextDanger]}>Delete</Text>
+              <Text style={[styles.menuItemText, styles.menuItemTextDanger]}>{t('admin.users.delete')}</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

@@ -19,8 +19,10 @@ import EditSubscriptionScreen from '../screens/admin/EditSubscriptionScreen';
 import AdminTipsScreen from '../screens/admin/AdminTipsScreen';
 import AdminProductsScreen from '../screens/admin/AdminProductsScreen';
 import AdminAddProductScreen from '../screens/admin/AdminAddProductScreen';
+import AdminEditProductScreen from '../screens/admin/AdminEditProductScreen';
 import AdminPendingReportsScreen from '../screens/admin/AdminPendingReportsScreen';
 import AdminRecentActivitiesScreen from '../screens/admin/AdminRecentActivitiesScreen';
+import AdminCategoriesScreen from '../screens/admin/AdminCategoriesScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -100,8 +102,10 @@ const AdminAppNavigator = () => {
         <Stack.Screen name="AdminTips" component={AdminTipsScreen} />
         <Stack.Screen name="AdminProducts" component={AdminProductsScreen} />
         <Stack.Screen name="AdminAddProduct" component={AdminAddProductScreen} />
+        <Stack.Screen name="AdminEditProduct" component={AdminEditProductScreen} />
         <Stack.Screen name="PendingReports" component={AdminPendingReportsScreen} />
         <Stack.Screen name="RecentActivities" component={AdminRecentActivitiesScreen} />
+        <Stack.Screen name="AdminCategories" component={AdminCategoriesScreen} />
       </Stack.Navigator>
     </SafeAreaView>
   );
