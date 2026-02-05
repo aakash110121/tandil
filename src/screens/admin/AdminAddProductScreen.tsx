@@ -22,6 +22,7 @@ import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { adminService } from '../../services/adminService';
 import { setPendingProductImage } from './pendingProductImage';
+import { compressImageForUpload, compressImagesForUpload } from '../../utils/compressImage';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -85,7 +86,8 @@ const AdminAddProductScreen: React.FC = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets?.[0]) {
-        setMainImage({ uri: result.assets[0].uri });
+        const uri = await compressImageForUpload(result.assets[0].uri);
+        setMainImage({ uri });
       }
     } catch (err: any) {
       const message = err?.message || err?.code || 'Could not open photo library.';
@@ -122,7 +124,8 @@ const AdminAddProductScreen: React.FC = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets?.length) {
-        setExtraImages((prev) => [...prev, ...result.assets!.map((a) => ({ uri: a.uri }))]);
+        const uris = await compressImagesForUpload(result.assets!.map((a) => a.uri));
+        setExtraImages((prev) => [...prev, ...uris.map((uri) => ({ uri }))]);
       }
     } catch (err: any) {
       const message = err?.message || err?.code || 'Could not open photo library.';

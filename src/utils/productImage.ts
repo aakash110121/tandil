@@ -1,6 +1,12 @@
 import { buildFullImageUrl } from '../config/api';
 import type { AdminProduct } from '../services/adminService';
 
+function withCacheBuster(url: string, version: string | number | null | undefined): string {
+  if (version == null || String(version).trim() === '') return url;
+  const sep = url.includes('?') ? '&' : '?';
+  return `${url}${sep}v=${encodeURIComponent(String(version))}`;
+}
+
 /**
  * Resolve the primary/first product image URL from API response (list or single product).
  * Handles image_url, primary_image, images[], thumbnail_url, etc.
@@ -44,5 +50,16 @@ export function getProductImageUri(item: AdminProduct | null | undefined): strin
     (typeof firstImgUrl === 'string' && firstImgUrl.trim() ? firstImgUrl : null) ??
     (typeof firstImgPath === 'string' && firstImgPath.trim() ? firstImgPath : null);
   if (!raw || typeof raw !== 'string' || !raw.trim()) return null;
-  return buildFullImageUrl(raw);
+  const fullUrl = buildFullImageUrl(raw);
+  const version =
+    // Prefer image-level updated_at when available (some endpoints include it)
+    (o['primary_image'] as any)?.updated_at ??
+    (o['updated_at'] as any) ??
+    (item as any)?.updated_at ??
+    // Fallback to ids (changes when a new image record is created)
+    (o['primary_image'] as any)?.id ??
+    (item.primary_image as any)?.id ??
+    (firstImg as any)?.id ??
+    null;
+  return withCacheBuster(fullUrl, version);
 }

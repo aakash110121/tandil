@@ -283,6 +283,15 @@ export const adminService = {
     return response.data;
   },
 
+  // Admin product details (GET /admin/products/:id)
+  // Response shape can vary across backends, so we keep it flexible.
+  getProductById: async (
+    productId: number
+  ): Promise<{ status?: boolean; success?: boolean; message?: string; data: AdminProduct }> => {
+    const response = await apiClient.get(`/admin/products/${productId}`);
+    return response.data;
+  },
+
   // Create product (POST /admin/products, Bearer token) – JSON body
   createProduct: async (body: {
     name: string;
@@ -344,7 +353,7 @@ export const adminService = {
         name: `image-${index}.jpg`,
       } as any);
     });
-    const response = await apiClient.post('/admin/products', formData, { timeout: 120000 });
+    const response = await apiClient.post('/admin/products', formData, { timeout: 300000 });
     return response.data;
   },
 
@@ -413,7 +422,7 @@ export const adminService = {
         name: `image-${index}.jpg`,
       } as any);
     });
-    const response = await apiClient.put(`/admin/products/${productId}`, formData, { timeout: 120000 });
+    const response = await apiClient.put(`/admin/products/${productId}`, formData, { timeout: 300000 });
     return response.data;
   },
 

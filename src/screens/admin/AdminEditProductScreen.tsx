@@ -15,7 +15,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { buildFullImageUrl } from '../../config/api';
 import { getProductImageUri } from '../../utils/productImage';
@@ -23,6 +23,7 @@ import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { adminService, AdminProduct } from '../../services/adminService';
 import { setPendingProductImage } from './pendingProductImage';
+import { compressImageForUpload, compressImagesForUpload } from '../../utils/compressImage';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
@@ -65,7 +66,13 @@ type AdminEditProductParams = { product: AdminProduct };
 const AdminEditProductScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: AdminEditProductParams }, 'params'>>();
-  const product = route.params?.product;
+  const initialProduct = route.params?.product;
+  const productId = initialProduct?.id;
+  const [productDetails, setProductDetails] = useState<AdminProduct | null>(initialProduct ?? null);
+  const [loadingProduct, setLoadingProduct] = useState(false);
+  const [hasUserEdited, setHasUserEdited] = useState(false);
+  /** Key that changes on each product fetch so image URLs get a new cache-buster and show updated images */
+  const [imageFetchKey, setImageFetchKey] = useState(() => Date.now());
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -88,17 +95,56 @@ const AdminEditProductScreen: React.FC = () => {
   const [pickingExtra, setPickingExtra] = useState(false);
 
   useEffect(() => {
-    if (!product) return;
-    setName(product.name ?? '');
-    setDescription(product.description ?? '');
-    setPrice(typeof product.price === 'string' ? product.price : String(product.price ?? ''));
-    setStock(String(product.stock ?? ''));
-    setStatus((product.status as string) ?? 'active');
-    setCategoryId(product.category_id != null ? String(product.category_id) : '');
-    setWeightUnit(product.weight_unit ?? 'kg');
-    setSku(product.sku ?? '');
-    setHandle(product.handle ?? '');
-  }, [product]);
+    if (!productDetails || hasUserEdited) return;
+    setName(productDetails.name ?? '');
+    setDescription(productDetails.description ?? '');
+    setPrice(
+      typeof productDetails.price === 'string'
+        ? productDetails.price
+        : String(productDetails.price ?? '')
+    );
+    setStock(String(productDetails.stock ?? ''));
+    setStatus((productDetails.status as string) ?? 'active');
+    setCategoryId(productDetails.category_id != null ? String(productDetails.category_id) : '');
+    setWeightUnit(productDetails.weight_unit ?? 'kg');
+    setSku(productDetails.sku ?? '');
+    setHandle(productDetails.handle ?? '');
+  }, [productDetails, hasUserEdited]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!productId) return;
+      let alive = true;
+      setLoadingProduct(true);
+      adminService
+        .getProductById(productId)
+        .then((res) => {
+          if (!alive) return;
+          // Response shape can vary:
+          // - { id, ...product }
+          // - { status/success, data: { id, ...product } }
+          // - { status/success, data: { data: { id, ...product } } }
+          const candidate =
+            (res as any)?.id != null ? (res as any) :
+            (res as any)?.data?.id != null ? (res as any).data :
+            (res as any)?.data?.data?.id != null ? (res as any).data.data :
+            null;
+          if (candidate) {
+            setProductDetails(candidate);
+            setImageFetchKey(Date.now());
+          }
+        })
+        .catch(() => {
+          // Ignore: we still have initialProduct from navigation
+        })
+        .finally(() => {
+          if (alive) setLoadingProduct(false);
+        });
+      return () => {
+        alive = false;
+      };
+    }, [productId])
+  );
 
   const pickMainImageFromDevice = async () => {
     if (pickingMain) return;
@@ -119,7 +165,8 @@ const AdminEditProductScreen: React.FC = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets?.[0]) {
-        setMainImage({ uri: result.assets[0].uri });
+        const uri = await compressImageForUpload(result.assets[0].uri);
+        setMainImage({ uri });
       }
     } catch (err: any) {
       Alert.alert('Unable to open photos', err?.message ?? 'Could not open photo library.', [{ text: 'OK' }]);
@@ -147,7 +194,8 @@ const AdminEditProductScreen: React.FC = () => {
         quality: 0.8,
       });
       if (!result.canceled && result.assets?.length) {
-        setExtraImages((prev) => [...prev, ...result.assets!.map((a) => ({ uri: a.uri }))]);
+        const uris = await compressImagesForUpload(result.assets!.map((a) => a.uri));
+        setExtraImages((prev) => [...prev, ...uris.map((uri) => ({ uri }))]);
       }
     } catch (err: any) {
       Alert.alert('Unable to open photos', err?.message ?? 'Could not open photo library.', [{ text: 'OK' }]);
@@ -188,7 +236,7 @@ const AdminEditProductScreen: React.FC = () => {
   };
 
   const handleUpdateProduct = async () => {
-    if (!product?.id) {
+    if (!productId) {
       Alert.alert('Error', 'Product not found.');
       return;
     }
@@ -223,14 +271,14 @@ const AdminEditProductScreen: React.FC = () => {
       let updatedData: { image_url?: string; image?: string; primary_image?: { image_url?: string; image_path?: string }; images?: Array<{ image_url?: string; image_path?: string }> } | undefined;
 
       if (hasMainFile || hasExtraFiles) {
-        const res = await adminService.updateProductWithImages(product.id, {
+        const res = await adminService.updateProductWithImages(productId, {
           ...payload,
           mainImage: mainImage ?? undefined,
           extraImages: extraImages.map((i) => ({ uri: i.uri })),
         });
         updatedData = res.data;
       } else {
-        const res = await adminService.updateProduct(product.id, payload);
+        const res = await adminService.updateProduct(productId, payload);
         updatedData = res.data;
       }
 
@@ -247,7 +295,7 @@ const AdminEditProductScreen: React.FC = () => {
       }
 
       if (mainImage) {
-        setPendingProductImage(product.id, mainImage.uri);
+        setPendingProductImage(productId, mainImage.uri);
       }
 
       Alert.alert(
@@ -322,19 +370,33 @@ const AdminEditProductScreen: React.FC = () => {
     </View>
   );
 
-  const existingMainUri = product ? getProductImageUri(product) : null;
+  const existingMainUri = (() => {
+    const base = productDetails ? getProductImageUri(productDetails) : null;
+    if (!base) return null;
+    const sep = base.includes('?') ? '&' : '?';
+    return `${base}${sep}fk=${imageFetchKey}`;
+  })();
   const existingExtraUris: string[] = (() => {
-    if (!product) return [];
-    const arr = (product as Record<string, unknown>)['images'] as Array<{ image_url?: string; image_path?: string; is_primary?: number }> | undefined;
+    if (!productDetails) return [];
+    const cacheBuster =
+      (productDetails as any)?.updated_at ??
+      (productDetails as any)?.primary_image?.updated_at ??
+      (productDetails as any)?.primary_image?.id ??
+      null;
+    const arr = (productDetails as Record<string, unknown>)['images'] as Array<{ image_url?: string; image_path?: string; is_primary?: number }> | undefined;
     if (!Array.isArray(arr)) return [];
     const nonPrimary = arr.filter((i) => i.is_primary !== 1 && i.is_primary !== true);
+    const sep = (url: string) => (url.includes('?') ? '&' : '?');
     return nonPrimary.map((i) => {
       const raw = (typeof i.image_url === 'string' && i.image_url.trim() ? i.image_url : null) ?? (typeof i.image_path === 'string' ? i.image_path : null);
-      return raw ? buildFullImageUrl(raw) : '';
+      if (!raw) return '';
+      const url = buildFullImageUrl(raw);
+      const v = cacheBuster ? `${url}${sep(url)}v=${encodeURIComponent(String(cacheBuster))}` : url;
+      return `${v}${sep(v)}fk=${imageFetchKey}`;
     }).filter(Boolean);
   })();
 
-  if (!product) {
+  if (!productId) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
