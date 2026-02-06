@@ -12,7 +12,6 @@ import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import UsersManagementScreen from '../screens/admin/UsersManagementScreen';
 import AddUserScreen from '../screens/admin/AddUserScreen';
 import EditUserScreen from '../screens/admin/EditUserScreen';
-import ReportsScreen from '../screens/admin/ReportsScreen';
 import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
 import AdminSubscriptionsScreen from '../screens/admin/AdminSubscriptionsScreen';
 import EditSubscriptionScreen from '../screens/admin/EditSubscriptionScreen';
@@ -67,7 +66,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="ReportsTab"
-        component={ReportsScreen}
+        component={AdminPendingReportsScreen}
         options={{
           tabBarLabel: t('admin.tabs.reports'),
           tabBarIcon: ({ color, size }) => (

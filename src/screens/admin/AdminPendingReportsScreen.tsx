@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { Button } from '../../components/common/Button';
@@ -38,6 +38,8 @@ const REPORT_TYPE_KEYS = ['financial', 'performance', 'user', 'subscription'] as
 const AdminPendingReportsScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
+  const route = useRoute();
+  const showBackButton = (route as { name?: string }).name !== 'ReportsTab';
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [meta, setMeta] = useState<ReportsMeta | null>(null);
   const [page, setPage] = useState(1);
@@ -423,12 +425,16 @@ const AdminPendingReportsScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-        </TouchableOpacity>
+        {showBackButton ? (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backButton} />
+        )}
         <Text style={styles.headerTitle}>{t('admin.reportsManagement.title')}</Text>
         <TouchableOpacity
           style={styles.addButton}
