@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -16,28 +15,30 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { buildFullImageUrl } from '../../config/api';
 import { getProductImageUri } from '../../utils/productImage';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
-import { adminService, AdminProduct } from '../../services/adminService';
+import { adminService, AdminProduct, AdminCategory } from '../../services/adminService';
 import { setPendingProductImage } from './pendingProductImage';
 import { compressImageForUpload, compressImagesForUpload } from '../../utils/compressImage';
 
-const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'archived', label: 'Archived' },
-];
+const STATUS_VALUES = ['active', 'draft', 'archived'] as const;
+const WEIGHT_VALUES = ['kg', 'g', 'lb', 'oz'] as const;
 
-const CurrentProductImage: React.FC<{ uri: string }> = ({ uri }) => {
+const CurrentProductImage: React.FC<{
+  uri: string;
+  couldNotLoadLabel?: string;
+  noImageLabel?: string;
+}> = ({ uri, couldNotLoadLabel = 'Could not load', noImageLabel = 'No image' }) => {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
       <View style={[styles.thumbWrap, styles.currentImagePlaceholder]}>
         <Ionicons name="broken-image-outline" size={32} color={COLORS.textSecondary} />
-        <Text style={styles.placeholderLabel}>Could not load</Text>
+        <Text style={styles.placeholderLabel}>{couldNotLoadLabel}</Text>
       </View>
     );
   }
@@ -54,16 +55,10 @@ const CurrentProductImage: React.FC<{ uri: string }> = ({ uri }) => {
   );
 };
 
-const WEIGHT_UNITS = [
-  { value: 'kg', label: 'kg' },
-  { value: 'g', label: 'g' },
-  { value: 'lb', label: 'lb' },
-  { value: 'oz', label: 'oz' },
-];
-
 type AdminEditProductParams = { product: AdminProduct };
 
 const AdminEditProductScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: AdminEditProductParams }, 'params'>>();
   const initialProduct = route.params?.product;
@@ -71,7 +66,6 @@ const AdminEditProductScreen: React.FC = () => {
   const [productDetails, setProductDetails] = useState<AdminProduct | null>(initialProduct ?? null);
   const [loadingProduct, setLoadingProduct] = useState(false);
   const [hasUserEdited, setHasUserEdited] = useState(false);
-  /** Key that changes on each product fetch so image URLs get a new cache-buster and show updated images */
   const [imageFetchKey, setImageFetchKey] = useState(() => Date.now());
 
   const [name, setName] = useState('');
@@ -84,15 +78,54 @@ const AdminEditProductScreen: React.FC = () => {
   const [sku, setSku] = useState('');
   const [handle, setHandle] = useState('');
   const [mainImage, setMainImage] = useState<{ uri: string } | null>(null);
-  const [mainImageUrl, setMainImageUrl] = useState('');
   const [extraImages, setExtraImages] = useState<{ uri: string }[]>([]);
-  const [extraImageUrls, setExtraImageUrls] = useState<string[]>(['']);
+  const [removedGalleryImageIds, setRemovedGalleryImageIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showWeightUnitDropdown, setShowWeightUnitDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [pickingMain, setPickingMain] = useState(false);
   const [pickingExtra, setPickingExtra] = useState(false);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await adminService.getCategories({ page: 1, per_page: 100 });
+      const list = Array.isArray(res.data) ? res.data : (res.data as any)?.data ?? [];
+      setCategories(Array.isArray(list) ? list : []);
+    } catch (_) {
+      setCategories([]);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { fetchCategories(); }, [fetchCategories]));
+
+  const categoryOptions = useMemo(
+    () => [
+      { value: '', label: t('admin.editProduct.noCategory') },
+      ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+    ],
+    [categories, t]
+  );
+
+  const statusOptions = useMemo(
+    () =>
+      STATUS_VALUES.map((v) => ({
+        value: v,
+        label: t(`admin.editProduct.status.${v}`),
+      })),
+    [t]
+  );
+
+  const weightUnitOptions = useMemo(
+    () =>
+      WEIGHT_VALUES.map((v) => ({
+        value: v,
+        label: t(`admin.editProduct.weightUnits.${v}`),
+      })),
+    [t]
+  );
 
   useEffect(() => {
     if (!productDetails || hasUserEdited) return;
@@ -132,6 +165,7 @@ const AdminEditProductScreen: React.FC = () => {
           if (candidate) {
             setProductDetails(candidate);
             setImageFetchKey(Date.now());
+            setRemovedGalleryImageIds([]);
           }
         })
         .catch(() => {
@@ -152,11 +186,11 @@ const AdminEditProductScreen: React.FC = () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Allow access to your photos to update the main image.', [{ text: 'OK' }]);
+        Alert.alert(t('admin.editProduct.permissionNeeded'), t('admin.editProduct.permissionMessageMain'), [{ text: 'OK' }]);
         return;
       }
       if (typeof ImagePicker.launchImageLibraryAsync !== 'function') {
-        Alert.alert('Not available', 'Image picker is not available in this environment.', [{ text: 'OK' }]);
+        Alert.alert(t('admin.editProduct.notAvailable'), t('admin.editProduct.notAvailableMessage'), [{ text: 'OK' }]);
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -169,7 +203,7 @@ const AdminEditProductScreen: React.FC = () => {
         setMainImage({ uri });
       }
     } catch (err: any) {
-      Alert.alert('Unable to open photos', err?.message ?? 'Could not open photo library.', [{ text: 'OK' }]);
+      Alert.alert(t('admin.editProduct.unableToOpenPhotos'), err?.message ?? t('admin.editProduct.unableToOpenPhotos'), [{ text: 'OK' }]);
     } finally {
       setPickingMain(false);
     }
@@ -181,11 +215,11 @@ const AdminEditProductScreen: React.FC = () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Allow access to your photos to update extra images.', [{ text: 'OK' }]);
+        Alert.alert(t('admin.editProduct.permissionNeeded'), t('admin.editProduct.permissionMessageExtra'), [{ text: 'OK' }]);
         return;
       }
       if (typeof ImagePicker.launchImageLibraryAsync !== 'function') {
-        Alert.alert('Not available', 'Image picker is not available in this environment.', [{ text: 'OK' }]);
+        Alert.alert(t('admin.editProduct.notAvailable'), t('admin.editProduct.notAvailableMessage'), [{ text: 'OK' }]);
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -198,7 +232,7 @@ const AdminEditProductScreen: React.FC = () => {
         setExtraImages((prev) => [...prev, ...uris.map((uri) => ({ uri }))]);
       }
     } catch (err: any) {
-      Alert.alert('Unable to open photos', err?.message ?? 'Could not open photo library.', [{ text: 'OK' }]);
+      Alert.alert(t('admin.editProduct.unableToOpenPhotos'), err?.message ?? t('admin.editProduct.unableToOpenPhotos'), [{ text: 'OK' }]);
     } finally {
       setPickingExtra(false);
     }
@@ -209,41 +243,35 @@ const AdminEditProductScreen: React.FC = () => {
     setExtraImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const addExtraImageUrl = () => setExtraImageUrls((prev) => [...prev, '']);
-  const removeExtraImageUrl = (index: number) => setExtraImageUrls((prev) => prev.filter((_, i) => i !== index));
-  const updateExtraImageUrl = (index: number, value: string) => {
-    setExtraImageUrls((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      return next;
-    });
+  const removeExistingGalleryImage = (imageId: number) => {
+    setRemovedGalleryImageIds((prev) => (prev.includes(imageId) ? prev : [...prev, imageId]));
   };
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
-    if (!name.trim()) newErrors.name = 'Product name is required';
+    if (!name.trim()) newErrors.name = t('admin.editProduct.errorNameRequired');
     const priceNum = parseFloat(price);
-    if (!price.trim()) newErrors.price = 'Price is required';
-    else if (isNaN(priceNum) || priceNum < 0) newErrors.price = 'Enter a valid price';
+    if (!price.trim()) newErrors.price = t('admin.editProduct.errorPriceRequired');
+    else if (isNaN(priceNum) || priceNum < 0) newErrors.price = t('admin.editProduct.errorPriceInvalid');
     const stockNum = parseInt(stock, 10);
-    if (!stock.trim()) newErrors.stock = 'Stock is required';
-    else if (isNaN(stockNum) || stockNum < 0) newErrors.stock = 'Enter a valid stock number';
-    if (!status) newErrors.status = 'Status is required';
-    if (!sku.trim()) newErrors.sku = 'SKU is required';
-    if (!handle.trim()) newErrors.handle = 'Handle is required';
+    if (!stock.trim()) newErrors.stock = t('admin.editProduct.errorStockRequired');
+    else if (isNaN(stockNum) || stockNum < 0) newErrors.stock = t('admin.editProduct.errorStockInvalid');
+    if (!status) newErrors.status = t('admin.editProduct.errorStatusRequired');
+    if (!sku.trim()) newErrors.sku = t('admin.editProduct.errorSkuRequired');
+    if (!handle.trim()) newErrors.handle = t('admin.editProduct.errorHandleRequired');
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleUpdateProduct = async () => {
     if (!productId) {
-      Alert.alert('Error', 'Product not found.');
+      Alert.alert(t('admin.users.error'), t('admin.editProduct.productNotFound'));
       return;
     }
     if (!validateForm()) {
       Alert.alert(
-        'Missing required fields',
-        'Please fill in all required fields (Name, Price, Stock, SKU, Handle) and fix any errors.',
+        t('admin.editProduct.missingFieldsTitle'),
+        t('admin.editProduct.missingFieldsMessage'),
         [{ text: 'OK' }]
       );
       return;
@@ -252,7 +280,6 @@ const AdminEditProductScreen: React.FC = () => {
     setLoading(true);
     try {
       const categoryIdNum = categoryId.trim() ? parseInt(categoryId, 10) : undefined;
-      const urlList: string[] = [mainImageUrl, ...extraImageUrls].filter((u) => u.trim().length > 0);
       const payload = {
         name: name.trim(),
         description: description.trim() || undefined,
@@ -263,16 +290,24 @@ const AdminEditProductScreen: React.FC = () => {
         weight_unit: weightUnit,
         sku: sku.trim(),
         handle: handle.trim(),
-        image_urls: urlList.length > 0 ? urlList : undefined,
+        image_ids_to_remove: removedGalleryImageIds.length > 0 ? removedGalleryImageIds : undefined,
       };
 
       const hasMainFile = mainImage != null;
       const hasExtraFiles = extraImages.length > 0;
-      let updatedData: { image_url?: string; image?: string; primary_image?: { image_url?: string; image_path?: string }; images?: Array<{ image_url?: string; image_path?: string }> } | undefined;
+      let updatedData: {
+        image_url?: string;
+        image?: string;
+        primary_image?: { image_url?: string; image_path?: string };
+        main_image?: { image_url?: string; image_path?: string };
+        images?: Array<{ image_url?: string; image_path?: string }>;
+        gallery_images?: Array<{ image_url?: string; image_path?: string }>;
+      } | undefined;
 
       if (hasMainFile || hasExtraFiles) {
         const res = await adminService.updateProductWithImages(productId, {
           ...payload,
+          image_ids_to_remove: removedGalleryImageIds.length > 0 ? removedGalleryImageIds : undefined,
           mainImage: mainImage ?? undefined,
           extraImages: extraImages.map((i) => ({ uri: i.uri })),
         });
@@ -285,10 +320,14 @@ const AdminEditProductScreen: React.FC = () => {
       const rawImageUrl =
         (typeof updatedData?.image_url === 'string' && updatedData.image_url.trim() ? updatedData.image_url : null) ??
         (typeof updatedData?.primary_image?.image_url === 'string' && updatedData.primary_image.image_url.trim() ? updatedData.primary_image.image_url : null) ??
+        (typeof updatedData?.main_image?.image_url === 'string' && updatedData.main_image.image_url.trim() ? updatedData.main_image.image_url : null) ??
         (updatedData?.images?.length && typeof updatedData.images[0]?.image_url === 'string' ? updatedData.images[0].image_url : null) ??
+        (updatedData?.gallery_images?.length && typeof updatedData.gallery_images[0]?.image_url === 'string' ? updatedData.gallery_images[0].image_url : null) ??
         (typeof updatedData?.image === 'string' && updatedData.image.trim() ? updatedData.image : null) ??
         (typeof updatedData?.primary_image?.image_path === 'string' ? updatedData.primary_image.image_path : null) ??
-        (updatedData?.images?.[0]?.image_path ?? null);
+        (typeof updatedData?.main_image?.image_path === 'string' ? updatedData.main_image.image_path : null) ??
+        (updatedData?.images?.[0]?.image_path ?? null) ??
+        (updatedData?.gallery_images?.[0]?.image_path ?? null);
       if (rawImageUrl) {
         const fullUrl = buildFullImageUrl(rawImageUrl);
         Image.prefetch(fullUrl, { cachePolicy: 'disk' }).catch(() => {});
@@ -299,8 +338,8 @@ const AdminEditProductScreen: React.FC = () => {
       }
 
       Alert.alert(
-        'Success',
-        'Product updated successfully.',
+        t('admin.users.success'),
+        t('admin.editProduct.success'),
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
@@ -308,7 +347,7 @@ const AdminEditProductScreen: React.FC = () => {
         err.response?.data?.message ||
         err.response?.data?.error ||
         err.message ||
-        'Failed to update product. Please try again.';
+        t('admin.editProduct.updateFailed');
       if (err.response?.data?.errors) {
         const apiErrors: { [key: string]: string } = {};
         Object.keys(err.response.data.errors).forEach((key) => {
@@ -316,7 +355,7 @@ const AdminEditProductScreen: React.FC = () => {
         });
         setErrors(apiErrors);
       } else {
-        Alert.alert('Error', errorMessage);
+        Alert.alert(t('admin.users.error'), errorMessage);
       }
     } finally {
       setLoading(false);
@@ -339,7 +378,7 @@ const AdminEditProductScreen: React.FC = () => {
         onPress={onToggle}
       >
         <Text style={[styles.dropdownText, !value && styles.dropdownPlaceholder]}>
-          {options.find((o) => o.value === value)?.label || `Select ${label}`}
+          {options.find((o) => o.value === value)?.label || label}
         </Text>
         <Ionicons name={show ? 'chevron-up' : 'chevron-down'} size={20} color={COLORS.textSecondary} />
       </TouchableOpacity>
@@ -347,22 +386,37 @@ const AdminEditProductScreen: React.FC = () => {
       {show && (
         <Modal transparent visible={show} animationType="fade" onRequestClose={onToggle}>
           <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onToggle}>
-            <View style={styles.dropdownList}>
-              {options.map((opt) => (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[styles.dropdownItem, value === opt.value && styles.dropdownItemSelected]}
-                  onPress={() => {
-                    onSelect(opt.value);
-                    onToggle();
-                  }}
+            <View style={styles.dropdownListWrap} onStartShouldSetResponder={() => true}>
+              <View style={styles.dropdownList}>
+                <Text style={styles.dropdownListTitle} numberOfLines={1}>
+                  {label}
+                </Text>
+                <ScrollView
+                  style={styles.dropdownScroll}
+                  nestedScrollEnabled
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={true}
                 >
-                  <Text style={[styles.dropdownItemText, value === opt.value && styles.dropdownItemTextSelected]}>
-                    {opt.label}
-                  </Text>
-                  {value === opt.value && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
-                </TouchableOpacity>
-              ))}
+                  {options.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.dropdownItem, value === opt.value && styles.dropdownItemSelected]}
+                      onPress={() => {
+                        onSelect(opt.value);
+                        onToggle();
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.dropdownItemText, value === opt.value && styles.dropdownItemTextSelected]} numberOfLines={1}>
+                        {opt.label}
+                      </Text>
+                      {value === opt.value ? (
+                        <Ionicons name="checkmark-circle" size={22} color={COLORS.primary} />
+                      ) : null}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -376,24 +430,34 @@ const AdminEditProductScreen: React.FC = () => {
     const sep = base.includes('?') ? '&' : '?';
     return `${base}${sep}fk=${imageFetchKey}`;
   })();
-  const existingExtraUris: string[] = (() => {
+  type ExtraImageItem = { uri: string; id?: number };
+  const existingExtraItems: ExtraImageItem[] = (() => {
     if (!productDetails) return [];
+    const pd = productDetails as Record<string, unknown>;
     const cacheBuster =
       (productDetails as any)?.updated_at ??
       (productDetails as any)?.primary_image?.updated_at ??
       (productDetails as any)?.primary_image?.id ??
+      (productDetails as any)?.main_image?.updated_at ??
+      (productDetails as any)?.main_image?.id ??
       null;
-    const arr = (productDetails as Record<string, unknown>)['images'] as Array<{ image_url?: string; image_path?: string; is_primary?: number }> | undefined;
-    if (!Array.isArray(arr)) return [];
-    const nonPrimary = arr.filter((i) => i.is_primary !== 1 && i.is_primary !== true);
+    const imagesArr = (pd['images'] ?? pd['gallery_images']) as Array<{ id?: number; image_url?: string; image_path?: string; is_primary?: number }> | undefined;
+    if (!Array.isArray(imagesArr) || imagesArr.length === 0) return [];
+    const nonPrimary =
+      pd['gallery_images'] != null
+        ? imagesArr
+        : imagesArr.filter((i) => i.is_primary !== 1 && i.is_primary !== true);
     const sep = (url: string) => (url.includes('?') ? '&' : '?');
-    return nonPrimary.map((i) => {
-      const raw = (typeof i.image_url === 'string' && i.image_url.trim() ? i.image_url : null) ?? (typeof i.image_path === 'string' ? i.image_path : null);
-      if (!raw) return '';
-      const url = buildFullImageUrl(raw);
-      const v = cacheBuster ? `${url}${sep(url)}v=${encodeURIComponent(String(cacheBuster))}` : url;
-      return `${v}${sep(v)}fk=${imageFetchKey}`;
-    }).filter(Boolean);
+    return nonPrimary
+      .filter((i) => i.id == null || !removedGalleryImageIds.includes(i.id))
+      .map((i) => {
+        const raw = (typeof i.image_url === 'string' && i.image_url.trim() ? i.image_url : null) ?? (typeof i.image_path === 'string' ? i.image_path : null);
+        if (!raw) return null;
+        const url = buildFullImageUrl(raw);
+        const v = cacheBuster ? `${url}${sep(url)}v=${encodeURIComponent(String(cacheBuster))}` : url;
+        return { uri: `${v}${sep(v)}fk=${imageFetchKey}`, id: i.id };
+      })
+      .filter((x): x is ExtraImageItem => x != null);
   })();
 
   if (!productId) {
@@ -403,10 +467,10 @@ const AdminEditProductScreen: React.FC = () => {
           <TouchableOpacity onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Product</Text>
+          <Text style={styles.headerTitle}>{t('admin.editProduct.title')}</Text>
         </View>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={styles.errorText}>Product not found.</Text>
+          <Text style={styles.errorText}>{t('admin.editProduct.productNotFound')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -418,7 +482,7 @@ const AdminEditProductScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Product</Text>
+        <Text style={styles.headerTitle}>{t('admin.editProduct.title')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -434,19 +498,19 @@ const AdminEditProductScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Product details</Text>
+            <Text style={styles.sectionTitle}>{t('admin.editProduct.productDetails')}</Text>
 
             <Input
-              label="Name *"
-              placeholder="e.g. Test Product"
+              label={t('admin.editProduct.nameLabel')}
+              placeholder={t('admin.editProduct.namePlaceholder')}
               value={name}
-              onChangeText={(t) => { setName(t); if (errors.name) setErrors({ ...errors, name: '' }); }}
+              onChangeText={(txt) => { setName(txt); if (errors.name) setErrors({ ...errors, name: '' }); }}
               leftIcon="pricetag-outline"
               error={errors.name}
             />
             <Input
-              label="Description"
-              placeholder="Description here"
+              label={t('admin.editProduct.descriptionLabel')}
+              placeholder={t('admin.editProduct.descriptionPlaceholder')}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -454,77 +518,82 @@ const AdminEditProductScreen: React.FC = () => {
               error={errors.description}
             />
             <Input
-              label="Price *"
-              placeholder="e.g. 99.99"
+              label={t('admin.editProduct.priceLabel')}
+              placeholder={t('admin.editProduct.pricePlaceholder')}
               value={price}
-              onChangeText={(t) => { setPrice(t); if (errors.price) setErrors({ ...errors, price: '' }); }}
+              onChangeText={(txt) => { setPrice(txt); if (errors.price) setErrors({ ...errors, price: '' }); }}
               keyboardType="numeric"
               leftIcon="cash-outline"
               error={errors.price}
             />
             <Input
-              label="Stock *"
-              placeholder="e.g. 10"
+              label={t('admin.editProduct.stockLabel')}
+              placeholder={t('admin.editProduct.stockPlaceholder')}
               value={stock}
-              onChangeText={(t) => { setStock(t); if (errors.stock) setErrors({ ...errors, stock: '' }); }}
+              onChangeText={(txt) => { setStock(txt); if (errors.stock) setErrors({ ...errors, stock: '' }); }}
               keyboardType="number-pad"
               leftIcon="cube-outline"
               error={errors.stock}
             />
             {renderDropdown(
-              'Status',
+              t('admin.editProduct.statusLabel'),
               status,
-              STATUS_OPTIONS,
+              statusOptions,
               showStatusDropdown,
               () => setShowStatusDropdown((v) => !v),
               (v) => { setStatus(v); if (errors.status) setErrors({ ...errors, status: '' }); },
               errors.status
             )}
-            <Input
-              label="Category ID (optional)"
-              placeholder="e.g. 2"
-              value={categoryId}
-              onChangeText={setCategoryId}
-              keyboardType="numeric"
-              error={errors.category_id}
-            />
             {renderDropdown(
-              'Weight unit',
+              t('admin.editProduct.categoryLabel'),
+              categoryId,
+              categoryOptions,
+              showCategoryDropdown,
+              () => setShowCategoryDropdown((v) => !v),
+              (v) => { setCategoryId(v); if (errors.category_id) setErrors({ ...errors, category_id: '' }); },
+              errors.category_id
+            )}
+            {renderDropdown(
+              t('admin.editProduct.weightUnitLabel'),
               weightUnit,
-              WEIGHT_UNITS,
+              weightUnitOptions,
               showWeightUnitDropdown,
               () => setShowWeightUnitDropdown((v) => !v),
               setWeightUnit
             )}
             <Input
-              label="SKU *"
-              placeholder="e.g. SKU-UNIQUE-002"
+              label={t('admin.editProduct.skuLabel')}
+              placeholder={t('admin.editProduct.skuPlaceholder')}
               value={sku}
-              onChangeText={(t) => { setSku(t); if (errors.sku) setErrors({ ...errors, sku: '' }); }}
+              onChangeText={(txt) => { setSku(txt); if (errors.sku) setErrors({ ...errors, sku: '' }); }}
               error={errors.sku}
             />
             <Input
-              label="Handle *"
-              placeholder="e.g. test-product-unique"
+              label={t('admin.editProduct.handleLabel')}
+              placeholder={t('admin.editProduct.handlePlaceholder')}
               value={handle}
-              onChangeText={(t) => { setHandle(t); if (errors.handle) setErrors({ ...errors, handle: '' }); }}
+              onChangeText={(txt) => { setHandle(txt); if (errors.handle) setErrors({ ...errors, handle: '' }); }}
               autoCapitalize="none"
               error={errors.handle}
             />
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Main image</Text>
-            <Text style={styles.uploadedHint}>Shows on the product list. Upload to replace.</Text>
+            <Text style={styles.sectionTitle}>{t('admin.editProduct.mainImageTitle')}</Text>
+            <Text style={styles.uploadedHint}>{t('admin.editProduct.mainImageHint')}</Text>
             {!mainImage && (
               <View style={styles.uploadedPreviewWrap}>
-                <Text style={styles.uploadedLabel}>Current main image</Text>
+                <Text style={styles.uploadedLabel}>{t('admin.editProduct.currentMainImage')}</Text>
                 {existingMainUri ? (
-                  <CurrentProductImage uri={existingMainUri} />
+                  <CurrentProductImage
+                    uri={existingMainUri}
+                    couldNotLoadLabel={t('admin.editProduct.couldNotLoad')}
+                    noImageLabel={t('admin.editProduct.noImage')}
+                  />
                 ) : (
                   <View style={[styles.thumbWrap, styles.currentImagePlaceholder]}>
                     <Ionicons name="image-outline" size={32} color={COLORS.textSecondary} />
-                    <Text style={styles.placeholderLabel}>No image</Text>
+                    <Text style={styles.placeholderLabel}>{t('admin.editProduct.noImage')}</Text>
                   </View>
                 )}
               </View>
@@ -538,27 +607,16 @@ const AdminEditProductScreen: React.FC = () => {
             >
               <Ionicons name="image-outline" size={24} color={COLORS.primary} />
               <Text style={styles.uploadFromDeviceText}>
-                {pickingMain ? 'Opening…' : 'Upload from device'}
+                {pickingMain ? t('admin.editProduct.opening') : t('admin.editProduct.uploadFromDevice')}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.uploadedLabel, { marginTop: SPACING.sm }]}>Or paste image URL</Text>
-            <TextInput
-              style={styles.urlInput}
-              placeholder="https://example.com/main-image.jpg"
-              placeholderTextColor={COLORS.textSecondary}
-              value={mainImageUrl}
-              onChangeText={setMainImageUrl}
-              keyboardType="url"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
             {mainImage && (
               <View style={styles.uploadedPreviewWrap}>
                 <View style={[styles.thumbWrap, styles.primaryThumbWrap]}>
                   <Image source={{ uri: mainImage.uri }} style={styles.thumb} contentFit="cover" />
                   <View style={styles.primaryBadge}>
                     <Ionicons name="star" size={12} color={COLORS.background} />
-                    <Text style={styles.primaryBadgeText}>Main</Text>
+                    <Text style={styles.primaryBadgeText}>{t('admin.editProduct.mainBadge')}</Text>
                   </View>
                   <TouchableOpacity style={styles.thumbRemove} onPress={removeMainImage}>
                     <Ionicons name="close-circle" size={24} color={COLORS.error} />
@@ -569,16 +627,28 @@ const AdminEditProductScreen: React.FC = () => {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Extra images</Text>
-            <Text style={styles.uploadedHint}>Additional product images (gallery). Upload to replace all.</Text>
-            {extraImages.length === 0 && existingExtraUris.length > 0 && (
-              <View style={styles.uploadedPreviewWrap}>
-                <Text style={styles.uploadedLabel}>Current extra images</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbScroll}>
-                  {existingExtraUris.map((uri, index) => (
-                    <CurrentProductImage key={index} uri={uri} />
+            <Text style={styles.sectionTitle}>{t('admin.editProduct.extraImagesTitle')}</Text>
+            <Text style={styles.uploadedHint}>{t('admin.editProduct.extraImagesHint')}</Text>
+            {extraImages.length === 0 && existingExtraItems.length > 0 && (
+              <View style={styles.extraImagesCard}>
+                <Text style={styles.extraImagesCardTitle}>{t('admin.editProduct.currentGalleryImages')}</Text>
+                <View style={styles.extraImagesGrid}>
+                  {existingExtraItems.map((item, index) => (
+                    <View key={item.id ?? index} style={styles.extraImageCard}>
+                      <CurrentProductImage
+                        uri={item.uri}
+                        couldNotLoadLabel={t('admin.editProduct.couldNotLoad')}
+                        noImageLabel={t('admin.editProduct.noImage')}
+                      />
+                      <TouchableOpacity
+                        style={styles.extraImageRemoveBtn}
+                        onPress={() => item.id != null && removeExistingGalleryImage(item.id)}
+                      >
+                        <Ionicons name="close-circle" size={26} color={COLORS.error} />
+                      </TouchableOpacity>
+                    </View>
                   ))}
-                </ScrollView>
+                </View>
               </View>
             )}
             <TouchableOpacity
@@ -590,44 +660,12 @@ const AdminEditProductScreen: React.FC = () => {
             >
               <Ionicons name="images-outline" size={24} color={COLORS.primary} />
               <Text style={styles.uploadFromDeviceText}>
-                {pickingExtra ? 'Opening…' : 'Upload from device'}
+                {pickingExtra ? t('admin.editProduct.opening') : t('admin.editProduct.uploadFromDevice')}
               </Text>
             </TouchableOpacity>
-            <View style={styles.imageUrlsHeader}>
-              <Text style={[styles.uploadedLabel, { marginTop: SPACING.sm }]}>Or add image URLs</Text>
-              <TouchableOpacity style={styles.addUrlBtn} onPress={addExtraImageUrl}>
-                <Ionicons name="add-circle-outline" size={22} color={COLORS.primary} />
-                <Text style={styles.addUrlText}>Add URL</Text>
-              </TouchableOpacity>
-            </View>
-            {extraImageUrls.map((url, index) => (
-              <View key={index} style={styles.imageUrlRow}>
-                <TextInput
-                  style={styles.urlInput}
-                  placeholder="https://example.com/image.jpg"
-                  placeholderTextColor={COLORS.textSecondary}
-                  value={url}
-                  onChangeText={(t) => updateExtraImageUrl(index, t)}
-                  keyboardType="url"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  style={styles.removeUrlBtn}
-                  onPress={() => removeExtraImageUrl(index)}
-                  disabled={extraImageUrls.length <= 1}
-                >
-                  <Ionicons
-                    name="close-circle"
-                    size={24}
-                    color={extraImageUrls.length <= 1 ? COLORS.textSecondary : COLORS.error}
-                  />
-                </TouchableOpacity>
-              </View>
-            ))}
             {extraImages.length > 0 && (
               <View style={styles.uploadedPreviewWrap}>
-                <Text style={styles.uploadedLabel}>New extra images</Text>
+                <Text style={styles.uploadedLabel}>{t('admin.editProduct.newExtraImages')}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbScroll}>
                   {extraImages.map((img, index) => (
                     <View key={index} style={styles.thumbWrap}>
@@ -643,7 +681,7 @@ const AdminEditProductScreen: React.FC = () => {
           </View>
 
           <Button
-            title="Update Product"
+            title={t('admin.editProduct.updateProduct')}
             onPress={handleUpdateProduct}
             disabled={loading}
             loading={loading}
@@ -702,30 +740,57 @@ const styles = StyleSheet.create({
   dropdownError: { borderColor: COLORS.error },
   dropdownText: { fontSize: FONT_SIZES.md, color: COLORS.text },
   dropdownPlaceholder: { color: COLORS.textSecondary },
+  dropdownListWrap: {
+    width: '100%',
+    paddingHorizontal: SPACING.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   dropdownList: {
     backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.md,
-    marginHorizontal: SPACING.lg,
-    marginTop: 120,
-    maxHeight: 280,
+    borderRadius: BORDER_RADIUS.lg,
+    width: '100%',
+    maxWidth: 340,
+    maxHeight: 320,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  dropdownListTitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  dropdownScroll: {
+    maxHeight: 272,
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
+    paddingVertical: SPACING.md + 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.border,
   },
-  dropdownItemSelected: { backgroundColor: COLORS.primary + '12' },
-  dropdownItemText: { fontSize: FONT_SIZES.md, color: COLORS.text },
+  dropdownItemSelected: { backgroundColor: COLORS.primary + '18' },
+  dropdownItemText: { fontSize: FONT_SIZES.md, color: COLORS.text, flex: 1 },
   dropdownItemTextSelected: { fontWeight: FONT_WEIGHTS.semiBold, color: COLORS.primary },
   errorText: { fontSize: FONT_SIZES.xs, color: COLORS.error, marginTop: SPACING.xs },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    paddingVertical: SPACING.xl,
   },
   uploadRow: { marginBottom: SPACING.md },
   uploadFromDeviceBtn: {
@@ -759,6 +824,38 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   thumbScroll: { marginHorizontal: -SPACING.lg },
+  extraImagesCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: SPACING.md,
+    marginTop: SPACING.sm,
+  },
+  extraImagesCardTitle: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+  },
+  extraImagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  extraImageCard: {
+    width: 88,
+    position: 'relative',
+    borderRadius: BORDER_RADIUS.sm,
+    overflow: 'hidden',
+  },
+  extraImageRemoveBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: COLORS.background,
+    borderRadius: 14,
+  },
   thumbWrap: {
     width: 80,
     height: 80,

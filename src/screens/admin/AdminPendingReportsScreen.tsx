@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
@@ -32,7 +33,10 @@ function formatDateToYYYYMMDD(date: Date): string {
 
 const PER_PAGE = 15;
 
+const REPORT_TYPE_KEYS = ['financial', 'performance', 'user', 'subscription'] as const;
+
 const AdminPendingReportsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [meta, setMeta] = useState<ReportsMeta | null>(null);
@@ -65,12 +69,15 @@ const AdminPendingReportsScreen: React.FC = () => {
   const [generateSubmitting, setGenerateSubmitting] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState<'start' | 'end' | null>(null);
 
-  const reportTypes = [
-    { value: 'financial', label: 'Financial Report', description: 'Revenue, expenses, and profit analysis' },
-    { value: 'performance', label: 'Performance Report', description: 'Worker productivity and ratings' },
-    { value: 'user', label: 'User Report', description: 'User statistics and activity' },
-    { value: 'subscription', label: 'Subscription Report', description: 'Subscription analytics and trends' },
-  ];
+  const reportTypes = useMemo(
+    () =>
+      REPORT_TYPE_KEYS.map((value) => ({
+        value,
+        label: t(`admin.reportsManagement.reportTypes.${value}.label`),
+        description: t(`admin.reportsManagement.reportTypes.${value}.description`),
+      })),
+    [t]
+  );
 
   const fetchReports = useCallback(async (pageNum: number = 1, isRefresh: boolean = false) => {
     if (isRefresh) setRefreshing(true);
@@ -93,13 +100,13 @@ const AdminPendingReportsScreen: React.FC = () => {
     } catch (error: any) {
       console.error('Error fetching reports:', error);
       if (pageNum === 1) setReports([]);
-      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to load reports');
+      Alert.alert(t('admin.users.error'), error.response?.data?.message || error.message || t('admin.reportsManagement.errorLoadReports'));
     } finally {
       setLoading(false);
       setRefreshing(false);
       setLoadingMore(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchReports(1);
@@ -129,20 +136,20 @@ const AdminPendingReportsScreen: React.FC = () => {
     if (!selectedReport?.id) return;
     setShowActionMenu(false);
     Alert.alert(
-      'Delete Report',
-      'Are you sure you want to delete this report? This action cannot be undone.',
+      t('admin.reportsManagement.deleteReportTitle'),
+      t('admin.reportsManagement.deleteReportMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('admin.reportsManagement.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('admin.reportsManagement.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               await adminService.deleteReport(selectedReport.id!);
-              Alert.alert('Success', 'Report deleted successfully');
+              Alert.alert(t('admin.users.success'), t('admin.reportsManagement.successDeleted'));
               fetchReports(1);
             } catch (error: any) {
-              Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to delete report');
+              Alert.alert(t('admin.users.error'), error.response?.data?.message || error.message || t('admin.reportsManagement.errorDeleteReport'));
             }
           },
         },
@@ -163,12 +170,12 @@ const AdminPendingReportsScreen: React.FC = () => {
 
   const handleGenerateReport = async () => {
     if (!reportType) {
-      Alert.alert('Error', 'Please select a report type');
+      Alert.alert(t('admin.users.error'), t('admin.reportsManagement.errorSelectType'));
       return;
     }
-    const title = generateTitle.trim() || (reportTypes.find(t => t.value === reportType)?.label ?? 'Report');
+    const title = generateTitle.trim() || (reportTypes.find((r) => r.value === reportType)?.label ?? 'Report');
     if (!startDate || !endDate) {
-      Alert.alert('Error', 'Please enter start date and end date (YYYY-MM-DD)');
+      Alert.alert(t('admin.users.error'), t('admin.reportsManagement.errorStartEndDate'));
       return;
     }
 
@@ -185,13 +192,13 @@ const AdminPendingReportsScreen: React.FC = () => {
           include_details: includeDetails,
         },
       });
-      Alert.alert('Success', response.message ?? 'Report generation started. You will be notified when it\'s ready.');
+      Alert.alert(t('admin.users.success'), response.message ?? t('admin.reportsManagement.successGenerated'));
       setShowGenerateModal(false);
       resetGenerateForm();
       fetchReports(1);
     } catch (error: any) {
       console.error('Error generating report:', error);
-      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to generate report');
+      Alert.alert(t('admin.users.error'), error.response?.data?.message || error.message || t('admin.reportsManagement.errorGenerateReport'));
     } finally {
       setGenerateSubmitting(false);
     }
@@ -199,7 +206,7 @@ const AdminPendingReportsScreen: React.FC = () => {
 
   const handleShareReport = async (report: AdminReport) => {
     if (!report.file_url) {
-      Alert.alert('Error', 'Report file not available');
+      Alert.alert(t('admin.users.error'), t('admin.reportsManagement.errorReportFileNotAvailable'));
       return;
     }
 
@@ -212,7 +219,7 @@ const AdminPendingReportsScreen: React.FC = () => {
       setShowActionMenu(false);
     } catch (error: any) {
       console.error('Error sharing report:', error);
-      Alert.alert('Error', 'Failed to share report');
+      Alert.alert(t('admin.users.error'), t('admin.reportsManagement.errorShareReport'));
     }
   };
 
@@ -238,14 +245,14 @@ const AdminPendingReportsScreen: React.FC = () => {
 
   const handleScheduleReport = async () => {
     if (!reportType || !scheduleDate || !scheduleTime) {
-      Alert.alert('Error', 'Please select report type, schedule date and time');
+      Alert.alert(t('admin.users.error'), t('admin.reportsManagement.errorScheduleDateTime'));
       return;
     }
     if (!scheduleParamStartDate || !scheduleParamEndDate) {
-      Alert.alert('Error', 'Please enter report start date and end date (parameters)');
+      Alert.alert(t('admin.users.error'), t('admin.reportsManagement.errorParamDates'));
       return;
     }
-    const title = scheduleTitle.trim() || (reportTypes.find(t => t.value === reportType)?.label ?? 'Scheduled Report');
+    const title = scheduleTitle.trim() || (reportTypes.find((r) => r.value === reportType)?.label ?? 'Scheduled Report');
     const scheduled_at = `${scheduleDate} ${formatTimeToHHMMSS(scheduleTime)}`;
 
     setScheduleSubmitting(true);
@@ -262,13 +269,13 @@ const AdminPendingReportsScreen: React.FC = () => {
           include_charts: scheduleIncludeCharts,
         },
       });
-      Alert.alert('Success', response.message ?? 'Report scheduled successfully');
+      Alert.alert(t('admin.users.success'), response.message ?? t('admin.reportsManagement.successScheduled'));
       setShowScheduleModal(false);
       resetScheduleForm();
       fetchReports(1);
     } catch (error: any) {
       console.error('Error scheduling report:', error);
-      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to schedule report');
+      Alert.alert(t('admin.users.error'), error.response?.data?.message || error.message || t('admin.reportsManagement.errorScheduleReport'));
     } finally {
       setScheduleSubmitting(false);
     }
@@ -276,17 +283,17 @@ const AdminPendingReportsScreen: React.FC = () => {
 
   const handleDownloadReport = async (report: AdminReport) => {
     if (!report.file_url) {
-      Alert.alert('Error', 'Report file not available');
+      Alert.alert(t('admin.users.error'), t('admin.reportsManagement.errorReportFileNotAvailable'));
       return;
     }
 
     try {
       // TODO: Implement download functionality
-      Alert.alert('Success', 'Report download started');
+      Alert.alert(t('admin.users.success'), t('admin.reportsManagement.successDownloadStarted'));
       setShowActionMenu(false);
     } catch (error: any) {
       console.error('Error downloading report:', error);
-      Alert.alert('Error', 'Failed to download report');
+      Alert.alert(t('admin.users.error'), t('admin.reportsManagement.errorDownloadReport'));
     }
   };
 
@@ -306,11 +313,11 @@ const AdminPendingReportsScreen: React.FC = () => {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'Pending';
+        return t('admin.reportsManagement.statusPending');
       case 'generated':
-        return 'Generated';
+        return t('admin.reportsManagement.statusGenerated');
       case 'scheduled':
-        return 'Scheduled';
+        return t('admin.reportsManagement.statusScheduled');
       default:
         return status;
     }
@@ -362,24 +369,24 @@ const AdminPendingReportsScreen: React.FC = () => {
         <View style={styles.reportMeta}>
           <View style={styles.metaItem}>
             <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
-            <Text style={styles.metaText}>Created: {formatDate(item.created_at ?? '')}</Text>
+            <Text style={styles.metaText}>{t('admin.reportsManagement.created')}: {formatDate(item.created_at ?? '')}</Text>
           </View>
           {item.scheduled_at && (
             <View style={styles.metaItem}>
               <Ionicons name="calendar-outline" size={14} color={COLORS.textSecondary} />
-              <Text style={styles.metaText}>Scheduled: {formatDate(item.scheduled_at)}</Text>
+              <Text style={styles.metaText}>{t('admin.reportsManagement.scheduled')}: {formatDate(item.scheduled_at)}</Text>
             </View>
           )}
           {item.generated_at && (
             <View style={styles.metaItem}>
               <Ionicons name="checkmark-circle-outline" size={14} color={COLORS.success} />
-              <Text style={styles.metaText}>Generated: {formatDate(item.generated_at)}</Text>
+              <Text style={styles.metaText}>{t('admin.reportsManagement.generated')}: {formatDate(item.generated_at)}</Text>
             </View>
           )}
           {item.created_by?.name && (
             <View style={styles.metaItem}>
               <Ionicons name="person-outline" size={14} color={COLORS.textSecondary} />
-              <Text style={styles.metaText}>By {item.created_by.name}</Text>
+              <Text style={styles.metaText}>{t('admin.reportsManagement.by')} {item.created_by.name}</Text>
             </View>
           )}
         </View>
@@ -394,7 +401,7 @@ const AdminPendingReportsScreen: React.FC = () => {
               <View style={styles.actionCardIconWrap}>
                 <Ionicons name="download-outline" size={28} color={COLORS.primary} />
               </View>
-              <Text style={styles.actionCardText}>Download Report</Text>
+              <Text style={styles.actionCardText}>{t('admin.reportsManagement.downloadReport')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionCard}
@@ -404,7 +411,7 @@ const AdminPendingReportsScreen: React.FC = () => {
               <View style={styles.actionCardIconWrap}>
                 <Ionicons name="share-outline" size={28} color={COLORS.primary} />
               </View>
-              <Text style={styles.actionCardText}>Share Report</Text>
+              <Text style={styles.actionCardText}>{t('admin.reportsManagement.shareReport')}</Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -422,7 +429,7 @@ const AdminPendingReportsScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reports Management</Text>
+        <Text style={styles.headerTitle}>{t('admin.reportsManagement.title')}</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => setShowGenerateModal(true)}
@@ -438,14 +445,14 @@ const AdminPendingReportsScreen: React.FC = () => {
           onPress={() => setShowGenerateModal(true)}
         >
           <Ionicons name="document-text-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.actionBarButtonText}>Generate Report</Text>
+          <Text style={styles.actionBarButtonText}>{t('admin.reportsManagement.generateReport')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.actionBarButton}
           onPress={() => setShowScheduleModal(true)}
         >
           <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.actionBarButtonText}>Schedule Report</Text>
+          <Text style={styles.actionBarButtonText}>{t('admin.reportsManagement.scheduleReport')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -453,7 +460,7 @@ const AdminPendingReportsScreen: React.FC = () => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading reports...</Text>
+          <Text style={styles.loadingText}>{t('admin.reportsManagement.loading')}</Text>
         </View>
       ) : (
         <FlatList
@@ -476,7 +483,7 @@ const AdminPendingReportsScreen: React.FC = () => {
                 {loadingMore ? (
                   <ActivityIndicator size="small" color={COLORS.primary} />
                 ) : (
-                  <Text style={styles.loadMoreText}>Load more</Text>
+                  <Text style={styles.loadMoreText}>{t('admin.reportsManagement.loadMore')}</Text>
                 )}
               </TouchableOpacity>
             ) : null
@@ -484,9 +491,9 @@ const AdminPendingReportsScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="document-text-outline" size={64} color={COLORS.textSecondary} />
-              <Text style={styles.emptyText}>No reports found</Text>
+              <Text style={styles.emptyText}>{t('admin.reportsManagement.noReports')}</Text>
               <Button
-                title="Generate New Report"
+                title={t('admin.reportsManagement.generateNewReport')}
                 onPress={() => setShowGenerateModal(true)}
                 style={styles.emptyButton}
               />
@@ -505,14 +512,14 @@ const AdminPendingReportsScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Generate Report</Text>
+              <Text style={styles.modalTitle}>{t('admin.reportsManagement.generateReport')}</Text>
               <TouchableOpacity onPress={() => { setShowGenerateModal(false); resetGenerateForm(); }}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-              <Text style={styles.modalLabel}>Report Type *</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.reportType')}</Text>
               {reportTypes.map((type) => (
                 <TouchableOpacity
                   key={type.value}
@@ -537,34 +544,34 @@ const AdminPendingReportsScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
 
-              <Text style={styles.modalLabel}>Title *</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.titleLabel')}</Text>
               <Input
-                placeholder="e.g. Monthly Financial Report"
+                placeholder={t('admin.reportsManagement.titlePlaceholder')}
                 value={generateTitle}
                 onChangeText={setGenerateTitle}
                 style={styles.generateInput}
               />
 
-              <Text style={styles.modalLabel}>Start Date *</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.startDate')}</Text>
               <TouchableOpacity
                 style={styles.dateInputRow}
                 onPress={() => setDatePickerOpen('start')}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.dateInputText, !startDate && styles.dateInputPlaceholder]}>
-                  {startDate || 'Select start date'}
+                  {startDate || t('admin.reportsManagement.selectStartDate')}
                 </Text>
                 <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
               </TouchableOpacity>
 
-              <Text style={styles.modalLabel}>End Date *</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.endDate')}</Text>
               <TouchableOpacity
                 style={styles.dateInputRow}
                 onPress={() => setDatePickerOpen('end')}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.dateInputText, !endDate && styles.dateInputPlaceholder]}>
-                  {endDate || 'Select end date'}
+                  {endDate || t('admin.reportsManagement.selectEndDate')}
                 </Text>
                 <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
               </TouchableOpacity>
@@ -593,11 +600,11 @@ const AdminPendingReportsScreen: React.FC = () => {
               )}
               {Platform.OS === 'ios' && datePickerOpen !== null && (
                 <TouchableOpacity style={styles.datePickerDone} onPress={() => setDatePickerOpen(null)}>
-                  <Text style={styles.datePickerDoneText}>Done</Text>
+                  <Text style={styles.datePickerDoneText}>{t('admin.reportsManagement.done')}</Text>
                 </TouchableOpacity>
               )}
 
-              <Text style={styles.modalLabel}>Format</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.format')}</Text>
               <View style={styles.formatRow}>
                 <TouchableOpacity
                   style={[styles.formatOption, format === 'pdf' && styles.formatOptionActive]}
@@ -620,7 +627,7 @@ const AdminPendingReportsScreen: React.FC = () => {
               </View>
 
               <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>Include charts</Text>
+                <Text style={styles.switchLabel}>{t('admin.reportsManagement.includeCharts')}</Text>
                 <Switch
                   value={includeCharts}
                   onValueChange={setIncludeCharts}
@@ -629,7 +636,7 @@ const AdminPendingReportsScreen: React.FC = () => {
                 />
               </View>
               <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>Include details</Text>
+                <Text style={styles.switchLabel}>{t('admin.reportsManagement.includeDetails')}</Text>
                 <Switch
                   value={includeDetails}
                   onValueChange={setIncludeDetails}
@@ -641,7 +648,7 @@ const AdminPendingReportsScreen: React.FC = () => {
 
             <View style={styles.modalFooter}>
               <Button
-                title="Cancel"
+                title={t('admin.reportsManagement.cancel')}
                 onPress={() => {
                   setShowGenerateModal(false);
                   resetGenerateForm();
@@ -651,7 +658,7 @@ const AdminPendingReportsScreen: React.FC = () => {
                 disabled={generateSubmitting}
               />
               <Button
-                title={generateSubmitting ? 'Generating…' : 'Generate'}
+                title={generateSubmitting ? t('admin.reportsManagement.generating') : t('admin.reportsManagement.generate')}
                 onPress={handleGenerateReport}
                 style={styles.modalButton}
                 disabled={generateSubmitting}
@@ -671,14 +678,14 @@ const AdminPendingReportsScreen: React.FC = () => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Schedule Report</Text>
+              <Text style={styles.modalTitle}>{t('admin.reportsManagement.scheduleReport')}</Text>
               <TouchableOpacity onPress={() => { setShowScheduleModal(false); resetScheduleForm(); }}>
                 <Ionicons name="close" size={24} color={COLORS.text} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalScroll} keyboardShouldPersistTaps="handled">
-              <Text style={styles.modalLabel}>Report Type *</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.reportType')}</Text>
               {reportTypes.map((type) => (
                 <TouchableOpacity
                   key={type.value}
@@ -703,31 +710,31 @@ const AdminPendingReportsScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
 
-              <Text style={styles.modalLabel}>Title *</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.titleLabel')}</Text>
               <Input
-                placeholder="e.g. Weekly Financial Report"
+                placeholder={t('admin.reportsManagement.titlePlaceholderSchedule')}
                 value={scheduleTitle}
                 onChangeText={setScheduleTitle}
                 style={styles.generateInput}
               />
 
-              <Text style={styles.modalLabel}>Schedule Date *</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.scheduleDate')}</Text>
               <TouchableOpacity style={styles.dateInputRow} onPress={() => setScheduleDatePickerOpen('date')} activeOpacity={0.7}>
                 <Text style={[styles.dateInputText, !scheduleDate && styles.dateInputPlaceholder]}>
-                  {scheduleDate || 'Select schedule date'}
+                  {scheduleDate || t('admin.reportsManagement.selectScheduleDate')}
                 </Text>
                 <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
               </TouchableOpacity>
 
-              <Text style={styles.modalLabel}>Schedule Time *</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.scheduleTime')}</Text>
               <TouchableOpacity style={styles.dateInputRow} onPress={() => setScheduleDatePickerOpen('time')} activeOpacity={0.7}>
                 <Text style={[styles.dateInputText, !scheduleTime && styles.dateInputPlaceholder]}>
-                  {scheduleTime || 'Select schedule time'}
+                  {scheduleTime || t('admin.reportsManagement.selectScheduleTime')}
                 </Text>
                 <Ionicons name="time-outline" size={22} color={COLORS.primary} />
               </TouchableOpacity>
 
-              <Text style={styles.modalLabel}>Recurrence</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.recurrence')}</Text>
               <View style={styles.recurrenceRow}>
                 {(['', 'daily', 'weekly', 'monthly', 'yearly'] as const).map((rec) => (
                   <TouchableOpacity
@@ -736,29 +743,29 @@ const AdminPendingReportsScreen: React.FC = () => {
                     onPress={() => setScheduleRecurrence(rec)}
                   >
                     <Text style={[styles.recurrenceChipText, scheduleRecurrence === rec && styles.recurrenceChipTextActive]}>
-                      {rec === '' ? 'One-time' : rec.charAt(0).toUpperCase() + rec.slice(1)}
+                      {rec === '' ? t('admin.reportsManagement.oneTime') : t(`admin.reportsManagement.${rec}`)}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.modalLabel}>Report data range (parameters) *</Text>
-              <Text style={styles.modalLabelSmall}>Start Date</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.reportDataRange')}</Text>
+              <Text style={styles.modalLabelSmall}>{t('admin.reportsManagement.startDate')}</Text>
               <TouchableOpacity style={styles.dateInputRow} onPress={() => setScheduleDatePickerOpen('paramStart')} activeOpacity={0.7}>
                 <Text style={[styles.dateInputText, !scheduleParamStartDate && styles.dateInputPlaceholder]}>
-                  {scheduleParamStartDate || 'Select start date'}
+                  {scheduleParamStartDate || t('admin.reportsManagement.selectStartDate')}
                 </Text>
                 <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
               </TouchableOpacity>
-              <Text style={styles.modalLabelSmall}>End Date</Text>
+              <Text style={styles.modalLabelSmall}>{t('admin.reportsManagement.endDate')}</Text>
               <TouchableOpacity style={styles.dateInputRow} onPress={() => setScheduleDatePickerOpen('paramEnd')} activeOpacity={0.7}>
                 <Text style={[styles.dateInputText, !scheduleParamEndDate && styles.dateInputPlaceholder]}>
-                  {scheduleParamEndDate || 'Select end date'}
+                  {scheduleParamEndDate || t('admin.reportsManagement.selectEndDate')}
                 </Text>
                 <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
               </TouchableOpacity>
 
-              <Text style={styles.modalLabel}>Format</Text>
+              <Text style={styles.modalLabel}>{t('admin.reportsManagement.format')}</Text>
               <View style={styles.formatRow}>
                 <TouchableOpacity style={[styles.formatOption, scheduleFormat === 'pdf' && styles.formatOptionActive]} onPress={() => setScheduleFormat('pdf')}>
                   <Text style={[styles.formatOptionText, scheduleFormat === 'pdf' && styles.formatOptionTextActive]}>PDF</Text>
@@ -772,7 +779,7 @@ const AdminPendingReportsScreen: React.FC = () => {
               </View>
 
               <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>Include charts</Text>
+                <Text style={styles.switchLabel}>{t('admin.reportsManagement.includeCharts')}</Text>
                 <Switch
                   value={scheduleIncludeCharts}
                   onValueChange={setScheduleIncludeCharts}
@@ -821,20 +828,20 @@ const AdminPendingReportsScreen: React.FC = () => {
             )}
             {Platform.OS === 'ios' && scheduleDatePickerOpen !== null && (
               <TouchableOpacity style={styles.datePickerDone} onPress={() => setScheduleDatePickerOpen(null)}>
-                <Text style={styles.datePickerDoneText}>Done</Text>
+                <Text style={styles.datePickerDoneText}>{t('admin.reportsManagement.done')}</Text>
               </TouchableOpacity>
             )}
 
             <View style={styles.modalFooter}>
               <Button
-                title="Cancel"
+                title={t('admin.reportsManagement.cancel')}
                 onPress={() => { setShowScheduleModal(false); resetScheduleForm(); }}
                 variant="outline"
                 style={styles.modalButton}
                 disabled={scheduleSubmitting}
               />
               <Button
-                title={scheduleSubmitting ? 'Scheduling…' : 'Schedule'}
+                title={scheduleSubmitting ? t('admin.reportsManagement.scheduling') : t('admin.reportsManagement.schedule')}
                 onPress={handleScheduleReport}
                 style={styles.modalButton}
                 disabled={scheduleSubmitting}
@@ -886,26 +893,30 @@ const AdminPendingReportsScreen: React.FC = () => {
                 style={styles.menuItem}
                 onPress={() => {
                   setShowActionMenu(false);
-                  Alert.alert('Cancel Schedule', 'Are you sure you want to cancel this scheduled report?', [
-                    { text: 'No', style: 'cancel' },
-                    {
-                      text: 'Yes',
-                      style: 'destructive',
-                      onPress: async () => {
-                        try {
-                          await adminService.cancelScheduledReport(selectedReport.id!);
-                          Alert.alert('Success', 'Scheduled report cancelled successfully');
-                          fetchReports(1);
-                        } catch (error: any) {
-                          Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to cancel scheduled report');
-                        }
+                  Alert.alert(
+                    t('admin.reportsManagement.cancelScheduleTitle'),
+                    t('admin.reportsManagement.cancelScheduleMessage'),
+                    [
+                      { text: t('admin.reportsManagement.no'), style: 'cancel' },
+                      {
+                        text: t('admin.reportsManagement.yes'),
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            await adminService.cancelScheduledReport(selectedReport.id!);
+                            Alert.alert(t('admin.users.success'), t('admin.reportsManagement.successScheduleCancelled'));
+                            fetchReports(1);
+                          } catch (error: any) {
+                            Alert.alert(t('admin.users.error'), error.response?.data?.message || error.message || t('admin.reportsManagement.errorCancelSchedule'));
+                          }
+                        },
                       },
-                    },
-                  ]);
+                    ]
+                  );
                 }}
               >
                 <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
-                <Text style={[styles.menuItemText, { color: COLORS.error }]}>Cancel Schedule</Text>
+                <Text style={[styles.menuItemText, { color: COLORS.error }]}>{t('admin.reportsManagement.cancelSchedule')}</Text>
               </TouchableOpacity>
             )}
             {selectedReport?.id != null && selectedReport?.status !== 'scheduled' && (
@@ -914,7 +925,7 @@ const AdminPendingReportsScreen: React.FC = () => {
                 onPress={handleDeleteReport}
               >
                 <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-                <Text style={[styles.menuItemText, { color: COLORS.error }]}>Delete</Text>
+                <Text style={[styles.menuItemText, { color: COLORS.error }]}>{t('admin.reportsManagement.delete')}</Text>
               </TouchableOpacity>
             )}
           </View>

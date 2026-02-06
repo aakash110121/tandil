@@ -32,4 +32,3 @@ export function buildFullImageUrl(raw: string): string {
     : `storage/${path}`;
   return `${origin}/${fullPath}`;
 }
-

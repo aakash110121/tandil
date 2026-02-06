@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Alert,
   Modal,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -15,29 +14,21 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { buildFullImageUrl } from '../../config/api';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
-import { adminService } from '../../services/adminService';
+import { adminService, AdminCategory } from '../../services/adminService';
 import { setPendingProductImage } from './pendingProductImage';
 import { compressImageForUpload, compressImagesForUpload } from '../../utils/compressImage';
 
-const STATUS_OPTIONS = [
-  { value: 'active', label: 'Active' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'archived', label: 'Archived' },
-];
-
-const WEIGHT_UNITS = [
-  { value: 'kg', label: 'kg' },
-  { value: 'g', label: 'g' },
-  { value: 'lb', label: 'lb' },
-  { value: 'oz', label: 'oz' },
-];
+const STATUS_VALUES = ['active', 'draft', 'archived'] as const;
+const WEIGHT_UNITS = ['kg', 'g', 'lb', 'oz'] as const;
 
 const AdminAddProductScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -49,15 +40,53 @@ const AdminAddProductScreen: React.FC = () => {
   const [sku, setSku] = useState('');
   const [handle, setHandle] = useState('');
   const [mainImage, setMainImage] = useState<{ uri: string } | null>(null);
-  const [mainImageUrl, setMainImageUrl] = useState('');
   const [extraImages, setExtraImages] = useState<{ uri: string }[]>([]);
-  const [extraImageUrls, setExtraImageUrls] = useState<string[]>(['']);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showWeightUnitDropdown, setShowWeightUnitDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [categories, setCategories] = useState<AdminCategory[]>([]);
   const [pickingMain, setPickingMain] = useState(false);
   const [pickingExtra, setPickingExtra] = useState(false);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await adminService.getCategories({ page: 1, per_page: 100 });
+      const list = Array.isArray(res.data) ? res.data : (res.data as any)?.data ?? [];
+      setCategories(Array.isArray(list) ? list : []);
+    } catch (_) {
+      setCategories([]);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { fetchCategories(); }, [fetchCategories]));
+
+  const categoryOptions = useMemo(
+    () => [
+      { value: '', label: t('admin.addProduct.noCategory') },
+      ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+    ],
+    [categories, t]
+  );
+
+  const statusOptions = useMemo(
+    () =>
+      STATUS_VALUES.map((v) => ({
+        value: v,
+        label: t(`admin.addProduct.status.${v}`),
+      })),
+    [t]
+  );
+
+  const weightUnitOptions = useMemo(
+    () =>
+      WEIGHT_UNITS.map((v) => ({
+        value: v,
+        label: t(`admin.addProduct.weightUnits.${v}`),
+      })),
+    [t]
+  );
 
   const pickMainImageFromDevice = async () => {
     if (pickingMain) return;
@@ -140,30 +169,18 @@ const AdminAddProductScreen: React.FC = () => {
     setExtraImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const addExtraImageUrl = () => setExtraImageUrls((prev) => [...prev, '']);
-  const removeExtraImageUrl = (index: number) => {
-    setExtraImageUrls((prev) => prev.filter((_, i) => i !== index));
-  };
-  const updateExtraImageUrl = (index: number, value: string) => {
-    setExtraImageUrls((prev) => {
-      const next = [...prev];
-      next[index] = value;
-      return next;
-    });
-  };
-
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
-    if (!name.trim()) newErrors.name = 'Product name is required';
+    if (!name.trim()) newErrors.name = t('admin.addProduct.errorNameRequired');
     const priceNum = parseFloat(price);
-    if (!price.trim()) newErrors.price = 'Price is required';
-    else if (isNaN(priceNum) || priceNum < 0) newErrors.price = 'Enter a valid price';
+    if (!price.trim()) newErrors.price = t('admin.addProduct.errorPriceRequired');
+    else if (isNaN(priceNum) || priceNum < 0) newErrors.price = t('admin.addProduct.errorPriceInvalid');
     const stockNum = parseInt(stock, 10);
-    if (!stock.trim()) newErrors.stock = 'Stock is required';
-    else if (isNaN(stockNum) || stockNum < 0) newErrors.stock = 'Enter a valid stock number';
-    if (!status) newErrors.status = 'Status is required';
-    if (!sku.trim()) newErrors.sku = 'SKU is required';
-    if (!handle.trim()) newErrors.handle = 'Handle is required';
+    if (!stock.trim()) newErrors.stock = t('admin.addProduct.errorStockRequired');
+    else if (isNaN(stockNum) || stockNum < 0) newErrors.stock = t('admin.addProduct.errorStockInvalid');
+    if (!status) newErrors.status = t('admin.addProduct.errorStatusRequired');
+    if (!sku.trim()) newErrors.sku = t('admin.addProduct.errorSkuRequired');
+    if (!handle.trim()) newErrors.handle = t('admin.addProduct.errorHandleRequired');
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -171,9 +188,9 @@ const AdminAddProductScreen: React.FC = () => {
   const handleCreateProduct = async () => {
     if (!validateForm()) {
       Alert.alert(
-        'Missing required fields',
-        'Please fill in all required fields (Name, Price, Stock, SKU, Handle) and fix any errors before creating the product.',
-        [{ text: 'OK' }]
+        t('admin.addProduct.missingFieldsTitle'),
+        t('admin.addProduct.missingFieldsMessage'),
+        [{ text: t('common.done') }]
       );
       return;
     }
@@ -181,7 +198,6 @@ const AdminAddProductScreen: React.FC = () => {
     setLoading(true);
     try {
       const categoryIdNum = categoryId.trim() ? parseInt(categoryId, 10) : undefined;
-      const urlList: string[] = [mainImageUrl, ...extraImageUrls].filter((u) => u.trim().length > 0);
       let createdData: { image_url?: string | null; image?: string | null; primary_image?: { image_url?: string; image_path?: string }; images?: Array<{ image_url?: string; image_path?: string }> } | undefined;
 
       const hasMainFile = mainImage != null;
@@ -201,7 +217,6 @@ const AdminAddProductScreen: React.FC = () => {
             weight_unit: weightUnit,
             sku: sku.trim(),
             handle: handle.trim(),
-            image_urls: urlList.length > 0 ? urlList : undefined,
             mainImage: mainFile,
             extraImages: extraFiles.map((i) => ({ uri: i.uri })),
           });
@@ -219,7 +234,6 @@ const AdminAddProductScreen: React.FC = () => {
           weight_unit: weightUnit,
           sku: sku.trim(),
           handle: handle.trim(),
-          image_urls: urlList.length > 0 ? urlList : undefined,
         });
         createdData = res.data;
       }
@@ -242,8 +256,8 @@ const AdminAddProductScreen: React.FC = () => {
       }
 
       Alert.alert(
-        'Success',
-        'Product created successfully.',
+        t('admin.users.success'),
+        t('admin.addProduct.success'),
         [
           {
             text: 'OK',
@@ -258,9 +272,7 @@ const AdminAddProductScreen: React.FC = () => {
               setSku('');
               setHandle('');
               setMainImage(null);
-              setMainImageUrl('');
               setExtraImages([]);
-              setExtraImageUrls(['']);
               setErrors({});
               navigation.goBack();
             },
@@ -272,7 +284,7 @@ const AdminAddProductScreen: React.FC = () => {
         err.response?.data?.message ||
         err.response?.data?.error ||
         err.message ||
-        'Failed to create product. Please try again.';
+        t('admin.addProduct.createFailed');
       if (err.response?.data?.errors) {
         const apiErrors: { [key: string]: string } = {};
         Object.keys(err.response.data.errors).forEach((key) => {
@@ -280,7 +292,7 @@ const AdminAddProductScreen: React.FC = () => {
         });
         setErrors(apiErrors);
       } else {
-        Alert.alert('Error', errorMessage);
+        Alert.alert(t('admin.users.error'), errorMessage);
       }
     } finally {
       setLoading(false);
@@ -303,30 +315,49 @@ const AdminAddProductScreen: React.FC = () => {
         onPress={onToggle}
       >
         <Text style={[styles.dropdownText, !value && styles.dropdownPlaceholder]}>
-          {options.find((o) => o.value === value)?.label || `Select ${label}`}
+          {options.find((o) => o.value === value)?.label || t('admin.addUser.selectStatus')}
         </Text>
         <Ionicons name={show ? 'chevron-up' : 'chevron-down'} size={20} color={COLORS.textSecondary} />
       </TouchableOpacity>
       {error && <Text style={styles.errorText}>{error}</Text>}
       {show && (
         <Modal transparent visible={show} animationType="fade" onRequestClose={onToggle}>
-          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onToggle}>
-            <View style={styles.dropdownList}>
-              {options.map((opt) => (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[styles.dropdownItem, value === opt.value && styles.dropdownItemSelected]}
-                  onPress={() => {
-                    onSelect(opt.value);
-                    onToggle();
-                  }}
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={onToggle}
+          >
+            <View style={styles.dropdownListWrap} onStartShouldSetResponder={() => true}>
+              <View style={styles.dropdownList}>
+                <Text style={styles.dropdownListTitle} numberOfLines={1}>
+                  {label}
+                </Text>
+                <ScrollView
+                  style={styles.dropdownScroll}
+                  nestedScrollEnabled
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={true}
                 >
-                  <Text style={[styles.dropdownItemText, value === opt.value && styles.dropdownItemTextSelected]}>
-                    {opt.label}
-                  </Text>
-                  {value === opt.value && <Ionicons name="checkmark" size={20} color={COLORS.primary} />}
-                </TouchableOpacity>
-              ))}
+                  {options.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      style={[styles.dropdownItem, value === opt.value && styles.dropdownItemSelected]}
+                      onPress={() => {
+                        onSelect(opt.value);
+                        onToggle();
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.dropdownItemText, value === opt.value && styles.dropdownItemTextSelected]} numberOfLines={1}>
+                        {opt.label}
+                      </Text>
+                      {value === opt.value ? (
+                        <Ionicons name="checkmark-circle" size={22} color={COLORS.primary} />
+                      ) : null}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
             </View>
           </TouchableOpacity>
         </Modal>
@@ -340,7 +371,7 @@ const AdminAddProductScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Product</Text>
+        <Text style={styles.headerTitle}>{t('admin.addProduct.title')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -356,11 +387,11 @@ const AdminAddProductScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Product details</Text>
+            <Text style={styles.sectionTitle}>{t('admin.addProduct.productDetails')}</Text>
 
             <Input
-              label="Name *"
-              placeholder="e.g. Test Product"
+              label={t('admin.addProduct.nameLabel')}
+              placeholder={t('admin.addProduct.namePlaceholder')}
               value={name}
               onChangeText={(t) => { setName(t); if (errors.name) setErrors({ ...errors, name: '' }); }}
               leftIcon="pricetag-outline"
@@ -368,8 +399,8 @@ const AdminAddProductScreen: React.FC = () => {
             />
 
             <Input
-              label="Description"
-              placeholder="Description here"
+              label={t('admin.addProduct.descriptionLabel')}
+              placeholder={t('admin.addProduct.descriptionPlaceholder')}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -378,8 +409,8 @@ const AdminAddProductScreen: React.FC = () => {
             />
 
             <Input
-              label="Price *"
-              placeholder="e.g. 99.99"
+              label={t('admin.addProduct.priceLabel')}
+              placeholder={t('admin.addProduct.pricePlaceholder')}
               value={price}
               onChangeText={(t) => { setPrice(t); if (errors.price) setErrors({ ...errors, price: '' }); }}
               keyboardType="numeric"
@@ -388,8 +419,8 @@ const AdminAddProductScreen: React.FC = () => {
             />
 
             <Input
-              label="Stock *"
-              placeholder="e.g. 10"
+              label={t('admin.addProduct.stockLabel')}
+              placeholder={t('admin.addProduct.stockPlaceholder')}
               value={stock}
               onChangeText={(t) => { setStock(t); if (errors.stock) setErrors({ ...errors, stock: '' }); }}
               keyboardType="number-pad"
@@ -398,44 +429,45 @@ const AdminAddProductScreen: React.FC = () => {
             />
 
             {renderDropdown(
-              'Status',
+              t('admin.addProduct.statusLabel'),
               status,
-              STATUS_OPTIONS,
+              statusOptions,
               showStatusDropdown,
               () => setShowStatusDropdown((v) => !v),
               (v) => { setStatus(v); if (errors.status) setErrors({ ...errors, status: '' }); },
               errors.status
             )}
 
-            <Input
-              label="Category ID (optional)"
-              placeholder="e.g. 2"
-              value={categoryId}
-              onChangeText={setCategoryId}
-              keyboardType="numeric"
-              error={errors.category_id}
-            />
+            {renderDropdown(
+              t('admin.addProduct.categoryLabel'),
+              categoryId,
+              categoryOptions,
+              showCategoryDropdown,
+              () => setShowCategoryDropdown((v) => !v),
+              (v) => { setCategoryId(v); if (errors.category_id) setErrors({ ...errors, category_id: '' }); },
+              errors.category_id
+            )}
 
             {renderDropdown(
-              'Weight unit',
+              t('admin.addProduct.weightUnitLabel'),
               weightUnit,
-              WEIGHT_UNITS,
+              weightUnitOptions,
               showWeightUnitDropdown,
               () => setShowWeightUnitDropdown((v) => !v),
               setWeightUnit
             )}
 
             <Input
-              label="SKU *"
-              placeholder="e.g. SKU-UNIQUE-002"
+              label={t('admin.addProduct.skuLabel')}
+              placeholder={t('admin.addProduct.skuPlaceholder')}
               value={sku}
               onChangeText={(t) => { setSku(t); if (errors.sku) setErrors({ ...errors, sku: '' }); }}
               error={errors.sku}
             />
 
             <Input
-              label="Handle *"
-              placeholder="e.g. test-product-unique"
+              label={t('admin.addProduct.handleLabel')}
+              placeholder={t('admin.addProduct.handlePlaceholder')}
               value={handle}
               onChangeText={(t) => { setHandle(t); if (errors.handle) setErrors({ ...errors, handle: '' }); }}
               autoCapitalize="none"
@@ -444,8 +476,8 @@ const AdminAddProductScreen: React.FC = () => {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Main image</Text>
-            <Text style={styles.uploadedHint}>Shows on the product list. One image.</Text>
+            <Text style={styles.sectionTitle}>{t('admin.addProduct.mainImageTitle')}</Text>
+            <Text style={styles.uploadedHint}>{t('admin.addProduct.mainImageHint')}</Text>
             <TouchableOpacity
               style={[styles.uploadFromDeviceBtn, pickingMain && styles.uploadFromDeviceBtnDisabled]}
               onPress={pickMainImageFromDevice}
@@ -455,27 +487,16 @@ const AdminAddProductScreen: React.FC = () => {
             >
               <Ionicons name="image-outline" size={24} color={COLORS.primary} />
               <Text style={styles.uploadFromDeviceText}>
-                {pickingMain ? 'Opening…' : 'Upload from device'}
+                {pickingMain ? t('admin.addProduct.opening') : t('admin.addProduct.uploadFromDevice')}
               </Text>
             </TouchableOpacity>
-            <Text style={[styles.uploadedLabel, { marginTop: SPACING.sm }]}>Or paste image URL</Text>
-            <TextInput
-              style={styles.urlInput}
-              placeholder="https://example.com/main-image.jpg"
-              placeholderTextColor={COLORS.textSecondary}
-              value={mainImageUrl}
-              onChangeText={setMainImageUrl}
-              keyboardType="url"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
             {mainImage && (
               <View style={styles.uploadedPreviewWrap}>
                 <View style={[styles.thumbWrap, styles.mainThumbWrap]}>
                   <Image source={{ uri: mainImage.uri }} style={styles.thumb} resizeMode="cover" />
                   <View style={styles.mainBadge}>
                     <Ionicons name="star" size={12} color={COLORS.background} />
-                    <Text style={styles.mainBadgeText}>Main</Text>
+                    <Text style={styles.mainBadgeText}>{t('admin.addProduct.mainBadge')}</Text>
                   </View>
                   <TouchableOpacity style={styles.thumbRemove} onPress={removeMainImage}>
                     <Ionicons name="close-circle" size={24} color={COLORS.error} />
@@ -486,8 +507,8 @@ const AdminAddProductScreen: React.FC = () => {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Extra images</Text>
-            <Text style={styles.uploadedHint}>Additional product images (gallery). Optional.</Text>
+            <Text style={styles.sectionTitle}>{t('admin.addProduct.extraImagesTitle')}</Text>
+            <Text style={styles.uploadedHint}>{t('admin.addProduct.extraImagesHint')}</Text>
             <TouchableOpacity
               style={[styles.uploadFromDeviceBtn, pickingExtra && styles.uploadFromDeviceBtnDisabled]}
               onPress={pickExtraImagesFromDevice}
@@ -497,41 +518,9 @@ const AdminAddProductScreen: React.FC = () => {
             >
               <Ionicons name="images-outline" size={24} color={COLORS.primary} />
               <Text style={styles.uploadFromDeviceText}>
-                {pickingExtra ? 'Opening…' : 'Upload from device'}
+                {pickingExtra ? t('admin.addProduct.opening') : t('admin.addProduct.uploadFromDevice')}
               </Text>
             </TouchableOpacity>
-            <View style={styles.imageUrlsHeader}>
-              <Text style={[styles.uploadedLabel, { marginTop: SPACING.sm }]}>Or add image URLs</Text>
-              <TouchableOpacity style={styles.addUrlBtn} onPress={addExtraImageUrl}>
-                <Ionicons name="add-circle-outline" size={22} color={COLORS.primary} />
-                <Text style={styles.addUrlText}>Add URL</Text>
-              </TouchableOpacity>
-            </View>
-            {extraImageUrls.map((url, index) => (
-              <View key={index} style={styles.imageUrlRow}>
-                <TextInput
-                  style={styles.urlInput}
-                  placeholder="https://example.com/image.jpg"
-                  placeholderTextColor={COLORS.textSecondary}
-                  value={url}
-                  onChangeText={(t) => updateExtraImageUrl(index, t)}
-                  keyboardType="url"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  style={styles.removeUrlBtn}
-                  onPress={() => removeExtraImageUrl(index)}
-                  disabled={extraImageUrls.length <= 1}
-                >
-                  <Ionicons
-                    name="close-circle"
-                    size={24}
-                    color={extraImageUrls.length <= 1 ? COLORS.textSecondary : COLORS.error}
-                  />
-                </TouchableOpacity>
-              </View>
-            ))}
             {extraImages.length > 0 && (
               <View style={styles.uploadedPreviewWrap}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbScroll}>
@@ -608,30 +597,57 @@ const styles = StyleSheet.create({
   dropdownError: { borderColor: COLORS.error },
   dropdownText: { fontSize: FONT_SIZES.md, color: COLORS.text },
   dropdownPlaceholder: { color: COLORS.textSecondary },
+  dropdownListWrap: {
+    width: '100%',
+    paddingHorizontal: SPACING.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   dropdownList: {
     backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.md,
-    marginHorizontal: SPACING.lg,
-    marginTop: 120,
-    maxHeight: 280,
+    borderRadius: BORDER_RADIUS.lg,
+    width: '100%',
+    maxWidth: 340,
+    maxHeight: 320,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+  },
+  dropdownListTitle: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  dropdownScroll: {
+    maxHeight: 272,
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
+    paddingVertical: SPACING.md + 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.border,
   },
-  dropdownItemSelected: { backgroundColor: COLORS.primary + '12' },
-  dropdownItemText: { fontSize: FONT_SIZES.md, color: COLORS.text },
+  dropdownItemSelected: { backgroundColor: COLORS.primary + '18' },
+  dropdownItemText: { fontSize: FONT_SIZES.md, color: COLORS.text, flex: 1 },
   dropdownItemTextSelected: { fontWeight: FONT_WEIGHTS.semiBold, color: COLORS.primary },
   errorText: { fontSize: FONT_SIZES.xs, color: COLORS.error, marginTop: SPACING.xs },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    paddingVertical: SPACING.xl,
   },
   uploadRow: { marginBottom: SPACING.md },
   uploadFromDeviceBtn: {
@@ -706,36 +722,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderRadius: 12,
   },
-  imageUrlsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
-  },
-  addUrlBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  addUrlText: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: FONT_WEIGHTS.medium },
-  imageUrlRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-    gap: SPACING.sm,
-  },
-  urlInput: {
-    flex: 1,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    fontSize: FONT_SIZES.md,
-    color: COLORS.text,
-  },
-  removeUrlBtn: { padding: SPACING.xs },
   submitButton: { marginTop: SPACING.md },
   bottomPad: { height: SPACING.xl * 2 },
 });

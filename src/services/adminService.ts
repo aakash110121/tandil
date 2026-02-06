@@ -371,13 +371,14 @@ export const adminService = {
       sku?: string;
       handle?: string;
       image_urls?: string[];
+      image_ids_to_remove?: number[];
     }
   ): Promise<{ status: boolean; message?: string; updated_fields?: string[]; data: AdminProductCreated }> => {
     const response = await apiClient.put(`/admin/products/${productId}`, body, { timeout: 60000 });
     return response.data;
   },
 
-  // Update product with image files (PUT /admin/products/:id, multipart). API: main_image (optional) + images[] (replace extra).
+  // Update product with image files (PUT /admin/products/:id, multipart). API: main_image (optional) + images[] + image_ids_to_remove.
   updateProductWithImages: async (
     productId: number,
     params: {
@@ -391,6 +392,7 @@ export const adminService = {
       sku?: string;
       handle?: string;
       image_urls?: string[];
+      image_ids_to_remove?: number[];
       mainImage?: { uri: string };
       extraImages?: { uri: string }[];
     }
@@ -407,6 +409,9 @@ export const adminService = {
     if (params.handle !== undefined) formData.append('handle', params.handle);
     if (params.image_urls?.length) {
       formData.append('image_urls', JSON.stringify(params.image_urls));
+    }
+    if (params.image_ids_to_remove?.length) {
+      formData.append('image_ids_to_remove', JSON.stringify(params.image_ids_to_remove));
     }
     if (params.mainImage) {
       formData.append('main_image', {
@@ -437,7 +442,103 @@ export const adminService = {
     const response = await apiClient.get<AdminCategoriesResponse>('/admin/categories', { params });
     return response.data;
   },
+
+  // Create category (POST /admin/categories, multipart: name, slug?, description?, image?)
+  createCategory: async (params: {
+    name: string;
+    slug?: string;
+    description?: string;
+    image?: { uri: string };
+  }): Promise<{ status?: boolean; success?: boolean; message?: string; data: AdminCategory }> => {
+    const formData = new FormData();
+    formData.append('name', params.name.trim());
+    if (params.slug != null && String(params.slug).trim()) {
+      formData.append('slug', params.slug.trim());
+    }
+    if (params.description != null && String(params.description).trim()) {
+      formData.append('description', params.description.trim());
+    }
+    if (params.image?.uri) {
+      formData.append('image', {
+        uri: params.image.uri,
+        type: 'image/jpeg',
+        name: 'category-image.jpg',
+      } as any);
+    }
+    const response = await apiClient.post('/admin/categories', formData, { timeout: 60000 });
+    return response.data;
+  },
+
+  // Update category (POST /admin/categories/:id, multipart: name, slug?, description?, image?)
+  updateCategory: async (
+    categoryId: number,
+    params: {
+      name: string;
+      slug?: string;
+      description?: string;
+      image?: { uri: string };
+    }
+  ): Promise<{ status?: boolean; success?: boolean; message?: string; data: AdminCategory }> => {
+    const formData = new FormData();
+    formData.append('name', params.name.trim());
+    if (params.slug != null && String(params.slug).trim()) {
+      formData.append('slug', params.slug.trim());
+    }
+    if (params.description != null && String(params.description).trim()) {
+      formData.append('description', params.description.trim());
+    }
+    if (params.image?.uri) {
+      formData.append('image', {
+        uri: params.image.uri,
+        type: 'image/jpeg',
+        name: 'category-image.jpg',
+      } as any);
+    }
+    const response = await apiClient.post(`/admin/categories/${categoryId}`, formData, { timeout: 60000 });
+    return response.data;
+  },
+
+  // Delete category (DELETE /admin/categories/:id)
+  deleteCategory: async (categoryId: number): Promise<{ status?: boolean; success?: boolean; message?: string }> => {
+    const response = await apiClient.delete(`/admin/categories/${categoryId}`);
+    return response.data;
+  },
+
+  // Tips: send/create tip (POST /api/tips, JSON: title, description)
+  sendTip: async (params: { title: string; description: string }): Promise<{ status?: boolean; success?: boolean; message?: string; data?: Tip }> => {
+    const response = await apiClient.post('/tips', {
+      title: params.title.trim(),
+      description: params.description.trim(),
+    }, { timeout: 15000 });
+    return response.data;
+  },
+
+  // Get tips list (GET /api/tips). Uses apiClient so Authorization: Bearer <token> and Accept: application/json are sent automatically.
+  getTips: async (): Promise<{ data: Tip[] }> => {
+    try {
+      const response = await apiClient.get('/tips', { timeout: 15000 });
+      const body = response?.data ?? response;
+      const list = Array.isArray(body?.data) ? body.data : Array.isArray(body?.tips) ? body.tips : Array.isArray(body) ? body : [];
+      return { data: list };
+    } catch (_) {
+      return { data: [] };
+    }
+  },
+
+  // Delete tip (DELETE /api/tips/:tip_id)
+  deleteTip: async (tipId: number | string): Promise<{ status?: boolean; success?: boolean; message?: string }> => {
+    const response = await apiClient.delete(`/tips/${tipId}`, { timeout: 15000 });
+    return response.data;
+  },
 };
+
+export interface Tip {
+  id: number | string;
+  title: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface AdminCategory {
   id: number;
@@ -451,24 +552,34 @@ export interface AdminCategory {
   products_count?: number;
 }
 
+/** Pagination object when API returns data + pagination separately */
+export interface AdminCategoriesPagination {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
+/** API can return: { data: Category[] } (array) + { pagination } OR legacy { data: { data, current_page, ... } } */
 export interface AdminCategoriesResponse {
   success: boolean;
   message?: string;
-  data: {
+  data: AdminCategory[] | {
     current_page: number;
     data: AdminCategory[];
+    last_page: number;
+    per_page: number;
+    total: number;
     first_page_url?: string;
     from?: number;
-    last_page: number;
     last_page_url?: string;
     links?: Array<{ url: string | null; label: string; page: number | null; active: boolean }>;
     next_page_url?: string | null;
     path?: string;
-    per_page: number;
     prev_page_url?: string | null;
     to?: number;
-    total: number;
   };
+  pagination?: AdminCategoriesPagination;
 }
 
 // Admin product (for list from GET /admin/products)

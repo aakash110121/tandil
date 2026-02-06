@@ -97,10 +97,8 @@ const RoleSelectionScreen: React.FC = () => {
             <Ionicons name="person-outline" size={32} color={COLORS.primary} />
           </View>
           <View style={styles.roleContent}>
-            <Text style={styles.roleTitle}>Client (Customer)</Text>
-            <Text style={styles.roleDescription}>
-              Subscribe to plans, receive reports, and purchase agricultural products
-            </Text>
+            <Text style={styles.roleTitle}>{t('roleSelection.client.title')}</Text>
+            <Text style={styles.roleDescription}>{t('roleSelection.client.description')}</Text>
           </View>
         </TouchableOpacity>
 
@@ -113,10 +111,8 @@ const RoleSelectionScreen: React.FC = () => {
             <Ionicons name="leaf-outline" size={32} color={COLORS.primary} />
           </View>
           <View style={styles.roleContent}>
-            <Text style={styles.roleTitle}>Worker (Field Technician)</Text>
-            <Text style={styles.roleDescription}>
-              Perform watering, planting, cleaning tasks and submit field reports
-            </Text>
+            <Text style={styles.roleTitle}>{t('roleSelection.worker.title')}</Text>
+            <Text style={styles.roleDescription}>{t('roleSelection.worker.description')}</Text>
           </View>
         </TouchableOpacity>
 
@@ -129,10 +125,8 @@ const RoleSelectionScreen: React.FC = () => {
             <Ionicons name="people-outline" size={32} color={COLORS.primary} />
           </View>
           <View style={styles.roleContent}>
-            <Text style={styles.roleTitle}>Supervisor (Team Leader)</Text>
-            <Text style={styles.roleDescription}>
-              Manage workers, review reports, and submit final reports to clients
-            </Text>
+            <Text style={styles.roleTitle}>{t('roleSelection.supervisor.title')}</Text>
+            <Text style={styles.roleDescription}>{t('roleSelection.supervisor.description')}</Text>
           </View>
         </TouchableOpacity>
 
@@ -145,10 +139,8 @@ const RoleSelectionScreen: React.FC = () => {
             <Ionicons name="map-outline" size={32} color={COLORS.primary} />
           </View>
           <View style={styles.roleContent}>
-            <Text style={styles.roleTitle}>Area Manager</Text>
-            <Text style={styles.roleDescription}>
-              Oversee supervisors and technicians within a defined region
-            </Text>
+            <Text style={styles.roleTitle}>{t('roleSelection.areaManager.title')}</Text>
+            <Text style={styles.roleDescription}>{t('roleSelection.areaManager.description')}</Text>
           </View>
         </TouchableOpacity>
 
@@ -161,10 +153,8 @@ const RoleSelectionScreen: React.FC = () => {
             <Ionicons name="briefcase-outline" size={32} color={COLORS.primary} />
           </View>
           <View style={styles.roleContent}>
-            <Text style={styles.roleTitle}>HR Manager</Text>
-            <Text style={styles.roleDescription}>
-              Manage employee profiles, job IDs, schedules, and visit assignments
-            </Text>
+            <Text style={styles.roleTitle}>{t('roleSelection.hrManager.title')}</Text>
+            <Text style={styles.roleDescription}>{t('roleSelection.hrManager.description')}</Text>
           </View>
         </TouchableOpacity>
 
@@ -177,19 +167,15 @@ const RoleSelectionScreen: React.FC = () => {
             <Ionicons name="shield-checkmark-outline" size={32} color={COLORS.primary} />
           </View>
           <View style={styles.roleContent}>
-            <Text style={styles.roleTitle}>Admin (Executive Management)</Text>
-            <Text style={styles.roleDescription}>
-              Full control panel - manage users, subscriptions, tips, products, reports, and analytics
-            </Text>
+            <Text style={styles.roleTitle}>{t('roleSelection.admin.title')}</Text>
+            <Text style={styles.roleDescription}>{t('roleSelection.admin.description')}</Text>
           </View>
         </TouchableOpacity>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Select the panel that matches your role in Tandil
-          </Text>
+          <Text style={styles.footerText}>{t('roleSelection.footer')}</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

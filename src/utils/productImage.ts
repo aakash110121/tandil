@@ -20,19 +20,20 @@ export function getProductImageUri(item: AdminProduct | null | undefined): strin
       : null;
   const imageUrl = o['image_url'] ?? item.image_url;
   const image = o['image'] ?? item.image;
-  const primary = o['primary_image'] as
+  const primary = (o['primary_image'] ?? o['main_image']) as
     | { image_path?: string; image_url?: string; thumbnail_url?: string }
     | null;
   const primaryUrl = primary?.image_url;
   const primaryThumb = primary?.thumbnail_url;
   const primaryPath = primary?.image_path ?? item.primary_image?.image_path;
   const imagesArr =
-    (o['images'] as Array<{
+    (o['images'] ?? o['gallery_images']) as Array<{
       image_path?: string;
       image_url?: string;
       thumbnail_url?: string;
       is_primary?: number;
-    }> | null) ?? item.images;
+      sort_order?: number;
+    }> | null;
   const firstImg = imagesArr?.length
     ? (imagesArr.find((i) => i.is_primary === 1 || i.is_primary === true) ?? imagesArr[0])
     : null;
@@ -51,13 +52,12 @@ export function getProductImageUri(item: AdminProduct | null | undefined): strin
     (typeof firstImgPath === 'string' && firstImgPath.trim() ? firstImgPath : null);
   if (!raw || typeof raw !== 'string' || !raw.trim()) return null;
   const fullUrl = buildFullImageUrl(raw);
+  const primaryOrMain = o['primary_image'] ?? o['main_image'];
   const version =
-    // Prefer image-level updated_at when available (some endpoints include it)
-    (o['primary_image'] as any)?.updated_at ??
+    (primaryOrMain as any)?.updated_at ??
     (o['updated_at'] as any) ??
     (item as any)?.updated_at ??
-    // Fallback to ids (changes when a new image record is created)
-    (o['primary_image'] as any)?.id ??
+    (primaryOrMain as any)?.id ??
     (item.primary_image as any)?.id ??
     (firstImg as any)?.id ??
     null;

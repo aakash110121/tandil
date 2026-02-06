@@ -13,6 +13,7 @@ import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { adminService, AdminProduct } from '../../services/adminService';
 import { getProductImageUri } from '../../utils/productImage';
@@ -57,6 +58,7 @@ const ProductImage: React.FC<{ uri: string | null; productId: number }> = ({ uri
 };
 
 const AdminProductsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,12 +105,15 @@ const AdminProductsScreen: React.FC = () => {
 
   const handleDeleteProduct = useCallback((item: AdminProduct) => {
     Alert.alert(
-      'Delete product',
-      `Are you sure you want to delete "${item.name}"? This cannot be undone.`,
+      t('admin.productsAdmin.deleteTitle', 'Delete product'),
+      t(
+        'admin.productsAdmin.deleteMessage',
+        { name: item.name, defaultValue: `Are you sure you want to delete "${item.name}"? This cannot be undone.` }
+      ),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('admin.settings.cancel', 'Cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('admin.users.delete', 'Delete'),
           style: 'destructive',
           onPress: async () => {
             setDeletingId(item.id);
@@ -116,8 +121,11 @@ const AdminProductsScreen: React.FC = () => {
               await adminService.deleteProduct(item.id);
               setProducts((prev) => prev.filter((p) => p.id !== item.id));
             } catch (err: any) {
-              const msg = err.response?.data?.message ?? err.message ?? 'Failed to delete product';
-              Alert.alert('Error', msg);
+              const msg =
+                err.response?.data?.message ??
+                err.message ??
+                t('admin.productsAdmin.deleteFailed', 'Failed to delete product');
+              Alert.alert(t('admin.users.error', 'Error'), msg);
             } finally {
               setDeletingId(null);
             }
@@ -125,7 +133,7 @@ const AdminProductsScreen: React.FC = () => {
         },
       ]
     );
-  }, []);
+  }, [t]);
 
   const renderProduct = ({ item }: { item: AdminProduct }) => {
     const pendingUri = getPendingProductImage(item.id);
@@ -171,7 +179,7 @@ const AdminProductsScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Products</Text>
+        <Text style={styles.headerTitle}>{t('admin.dashboard.products', 'Products')}</Text>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => navigation.navigate('AdminAddProduct' as never)}
@@ -183,14 +191,18 @@ const AdminProductsScreen: React.FC = () => {
       {loading && !refreshing ? (
         <View style={styles.centerWrap}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading products…</Text>
+          <Text style={styles.loadingText}>
+            {t('admin.productsAdmin.loading', 'Loading products…')}
+          </Text>
         </View>
       ) : error && products.length === 0 ? (
         <View style={styles.centerWrap}>
           <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => fetchProducts()}>
-            <Text style={styles.retryBtnText}>Retry</Text>
+            <Text style={styles.retryBtnText}>
+              {t('admin.users.retry', 'Retry')}
+            </Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -204,7 +216,9 @@ const AdminProductsScreen: React.FC = () => {
           }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>No products found</Text>
+              <Text style={styles.emptyText}>
+                {t('admin.productsAdmin.empty', 'No products found')}
+              </Text>
             </View>
           }
         />
