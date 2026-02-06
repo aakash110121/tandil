@@ -21,17 +21,22 @@ const LoyaltyPointsScreen: React.FC = () => {
 
   const loyaltyPoints = user?.loyaltyPoints || 0;
   const availableRewards = [
-    { id: '1', name: 'Free Cleaning Service', points: 500, description: 'Get a free basic cleaning service' },
-    { id: '2', name: 'Premium Polish', points: 300, description: 'Upgrade to premium polish service' },
-    { id: '3', name: 'Express Service', points: 200, description: 'Get your service done in 2 hours' },
-    { id: '4', name: 'Waterproofing Treatment', points: 400, description: 'Add waterproofing to any service' },
-  ];
+    { id: '1', nameKey: 'loyaltyPoints.rewards.freeCleaning', points: 500 },
+    { id: '2', nameKey: 'loyaltyPoints.rewards.premiumPolish', points: 300 },
+    { id: '3', nameKey: 'loyaltyPoints.rewards.expressService', points: 200 },
+    { id: '4', nameKey: 'loyaltyPoints.rewards.waterproofing', points: 400 },
+  ].map(r => ({
+    id: r.id,
+    name: t(`${r.nameKey}.name`),
+    description: t(`${r.nameKey}.description`),
+    points: r.points,
+  }));
 
   const recentTransactions = [
-    { id: '1', type: 'earned', points: 50, description: 'Order #12345 completed', date: '2024-01-15' },
-    { id: '2', type: 'redeemed', points: -100, description: 'Redeemed Express Service', date: '2024-01-10' },
-    { id: '3', type: 'earned', points: 75, description: 'Order #12340 completed', date: '2024-01-08' },
-  ];
+    { id: '1', type: 'earned' as const, points: 50, descKey: 'loyaltyPoints.transactionOrderCompleted', descParams: { id: '12345' }, date: '2024-01-15' },
+    { id: '2', type: 'redeemed' as const, points: -100, descKey: 'loyaltyPoints.transactionRedeemed', descParams: { service: t('loyaltyPoints.rewards.expressService.name') }, date: '2024-01-10' },
+    { id: '3', type: 'earned' as const, points: 75, descKey: 'loyaltyPoints.transactionOrderCompleted', descParams: { id: '12340' }, date: '2024-01-08' },
+  ].map(tx => ({ ...tx, description: t(tx.descKey, tx.descParams) }));
 
   const renderReward = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.rewardCard}>

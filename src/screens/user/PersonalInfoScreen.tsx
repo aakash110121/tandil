@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 
 const PersonalInfoScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
 
   return (
@@ -14,20 +16,20 @@ const PersonalInfoScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Personal Information</Text>
+        <Text style={styles.headerTitle}>{t('personalInfo.title')}</Text>
         <View style={{ width: 22 }} />
       </View>
 
       <View style={styles.form}>
-        <Text style={styles.label}>Full Name</Text>
-        <TextInput style={styles.input} placeholder="Your name" placeholderTextColor={COLORS.textSecondary} />
-        <Text style={styles.label}>Email</Text>
-        <TextInput style={styles.input} placeholder="name@example.com" keyboardType="email-address" placeholderTextColor={COLORS.textSecondary} />
-        <Text style={styles.label}>Phone</Text>
-        <TextInput style={styles.input} placeholder="+9715XXXXXXXX" keyboardType="phone-pad" placeholderTextColor={COLORS.textSecondary} />
+        <Text style={styles.label}>{t('personalInfo.fullName')}</Text>
+        <TextInput style={styles.input} placeholder={t('personalInfo.placeholderName')} placeholderTextColor={COLORS.textSecondary} />
+        <Text style={styles.label}>{t('personalInfo.email')}</Text>
+        <TextInput style={styles.input} placeholder={t('personalInfo.placeholderEmail')} keyboardType="email-address" placeholderTextColor={COLORS.textSecondary} />
+        <Text style={styles.label}>{t('personalInfo.phone')}</Text>
+        <TextInput style={styles.input} placeholder={t('personalInfo.placeholderPhone')} keyboardType="phone-pad" placeholderTextColor={COLORS.textSecondary} />
 
         <TouchableOpacity style={styles.saveBtn}>
-          <Text style={styles.saveBtnText}>Save Changes</Text>
+          <Text style={styles.saveBtnText}>{t('personalInfo.saveChanges')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

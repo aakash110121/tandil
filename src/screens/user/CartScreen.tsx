@@ -117,7 +117,7 @@ const CartScreen: React.FC = () => {
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
-      Alert.alert('Empty Cart', 'Please add items to your cart before checkout.');
+      Alert.alert(t('cart.emptyCartTitle'), t('cart.emptyCartBody'));
       return;
     }
     navigation.navigate('Checkout', { cartItems, total: calculateTotal() });
@@ -132,8 +132,8 @@ const CartScreen: React.FC = () => {
         
         <View style={styles.itemDetails}>
           <View style={styles.itemSpecs}>
-            {item.category && <Text style={styles.itemSpec}>{t('cart.category', { defaultValue: 'Category' })}: {item.category}</Text>}
-            {item.brand && <Text style={styles.itemSpec}>{t('cart.brand', { defaultValue: 'Brand' })}: {item.brand}</Text>}
+            {item.category && <Text style={styles.itemSpec}>{t('cart.category')}: {item.category}</Text>}
+            {item.brand && <Text style={styles.itemSpec}>{t('cart.brand')}: {item.brand}</Text>}
           </View>
           
           <View style={styles.itemPrice}>

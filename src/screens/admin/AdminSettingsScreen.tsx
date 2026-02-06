@@ -69,7 +69,7 @@ const AdminSettingsScreen: React.FC = () => {
           titleKey: 'admin.settings.themeSettings.title',
           subtitleKey: 'admin.settings.themeSettings.subtitle',
           type: 'navigation',
-          onPress: () => Alert.alert(t('admin.settings.themeSettings.title'), t('admin.settings.themeSettings.subtitle')),
+          onPress: () => navigation.navigate('AdminBanners'),
         },
         {
           icon: 'language',

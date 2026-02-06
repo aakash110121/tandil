@@ -71,27 +71,27 @@ const CheckoutScreen: React.FC = () => {
     {
       id: 'card1',
       type: 'card',
-      name: 'Visa ending in 4242',
+      name: t('checkout.visaEndingIn', { last4: '4242' }),
       icon: 'card-outline',
       last4: '4242',
     },
     {
       id: 'card2',
       type: 'card',
-      name: 'Mastercard ending in 8888',
+      name: t('checkout.mastercardEndingIn', { last4: '8888' }),
       icon: 'card-outline',
       last4: '8888',
     },
     {
       id: 'paypal',
       type: 'paypal',
-      name: 'PayPal',
+      name: t('checkout.paypal'),
       icon: 'logo-paypal',
     },
     {
       id: 'cash',
       type: 'cash',
-      name: 'Cash on Delivery',
+      name: t('checkout.cashOnDelivery'),
       icon: 'cash-outline',
     },
   ];
@@ -257,9 +257,9 @@ const CheckoutScreen: React.FC = () => {
             <View style={styles.orderItemContent}>
               <Text style={styles.orderItemName}>{item.name}</Text>
               <Text style={styles.orderItemSpecs}>
-                Qty {item.quantity}
+                {t('checkout.qty')} {item.quantity}
               </Text>
-              <Text style={styles.orderItemPrice}>AED {(item.price * item.quantity).toFixed(2)}</Text>
+              <Text style={styles.orderItemPrice}>{t('orders.currency', { defaultValue: 'AED' })} {(item.price * item.quantity).toFixed(2)}</Text>
             </View>
           </View>
         ))}
@@ -267,7 +267,7 @@ const CheckoutScreen: React.FC = () => {
 
       {/* Shipping Address */}
       <View style={styles.reviewSection}>
-        <Text style={styles.reviewSectionTitle}>Shipping Address</Text>
+        <Text style={styles.reviewSectionTitle}>{t('checkout.reviewShippingAddress')}</Text>
         <Text style={styles.reviewText}>
           {shippingAddress.fullName}{'\n'}
           {shippingAddress.street}{'\n'}
@@ -279,7 +279,7 @@ const CheckoutScreen: React.FC = () => {
 
       {/* Payment Method */}
       <View style={styles.reviewSection}>
-        <Text style={styles.reviewSectionTitle}>Payment Method</Text>
+        <Text style={styles.reviewSectionTitle}>{t('checkout.reviewPaymentMethod')}</Text>
         <Text style={styles.reviewText}>
           {paymentMethods.find(m => m.id === selectedPaymentMethod)?.name}
         </Text>

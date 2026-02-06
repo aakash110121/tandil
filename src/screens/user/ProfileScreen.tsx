@@ -38,7 +38,7 @@ const ProfileScreen: React.FC = () => {
   };
 
   const menuItems = [
-    { icon: 'trophy-outline', title: 'Memberships', onPress: () => {
+    { icon: 'trophy-outline', title: t('profile.memberships'), onPress: () => {
       try {
         navigation.navigate('Memberships' as never);
       } catch (error) {
@@ -107,8 +107,8 @@ const ProfileScreen: React.FC = () => {
               <Ionicons name="camera" size={16} color={COLORS.background} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{user?.name || 'User Name'}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
+          <Text style={styles.userName}>{user?.name || t('profile.userNameDefault')}</Text>
+          <Text style={styles.userEmail}>{user?.email || t('profile.emailDefault')}</Text>
         </View>
 
         {/* Menu Items */}

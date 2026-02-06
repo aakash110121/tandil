@@ -62,7 +62,7 @@ const NotificationsScreen: React.FC = () => {
           onPress={() => navigation.navigate('Main' as never, { screen: 'Store' } as never)}
         >
           <Ionicons name="cart-outline" size={18} color={COLORS.background} />
-          <Text style={styles.buyProductsButtonText}>Buy Recommended Products</Text>
+          <Text style={styles.buyProductsButtonText}>{t('notifications.buyRecommendedProducts')}</Text>
         </TouchableOpacity>
       )}
     </View>

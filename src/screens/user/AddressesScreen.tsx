@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 
 const AddressesScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
 
   return (
@@ -14,18 +16,18 @@ const AddressesScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Addresses</Text>
+        <Text style={styles.headerTitle}>{t('addressesScreen.title')}</Text>
         <View style={{ width: 22 }} />
       </View>
 
       <View style={styles.card}>
         <View style={styles.row}>
           <Ionicons name="home-outline" size={18} color={COLORS.primary} />
-          <Text style={styles.addrTitle}>Home</Text>
+          <Text style={styles.addrTitle}>{t('addressesScreen.home')}</Text>
         </View>
-        <Text style={styles.addrText}>Sheikh Zayed Road, Dubai, UAE</Text>
+        <Text style={styles.addrText}>{t('addresses.sheikhZayedDubai')}</Text>
         <TouchableOpacity style={styles.primaryBtn}>
-          <Text style={styles.primaryBtnText}>Add New Address</Text>
+          <Text style={styles.primaryBtnText}>{t('addressesScreen.addNewAddress')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -1,48 +1,101 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
+import { shopService, ShopProduct } from '../../services/shopService';
 
 const { width: screenWidth } = Dimensions.get('window');
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1200&q=60';
+
+export type ProductDetailDisplay = {
+  id: string;
+  name: string;
+  price: number;
+  originalPrice: number;
+  rating: number;
+  reviews: number;
+  image: string;
+  badge: string;
+  inStock: boolean;
+  description?: string;
+  features?: string[];
+};
 
 interface ProductDetailScreenProps {
   route: {
     params: {
-      product: {
-        id: string;
-        name: string;
-        price: number;
-        originalPrice: number;
-        rating: number;
-        reviews: number;
-        image: string;
-        badge: string;
-        inStock: boolean;
-        description?: string;
-        features?: string[];
-      };
+      product: ProductDetailDisplay;
     };
+  };
+}
+
+function shopProductToDisplay(p: ShopProduct | null): ProductDetailDisplay | null {
+  if (!p) return null;
+  const priceNum = typeof p.price === 'string' ? parseFloat(p.price) || 0 : p.price;
+  const compareNum = typeof p.compare_at_price === 'string' ? parseFloat(p.compare_at_price) || 0 : (p.compare_at_price ?? 0);
+  const imageUrl = p.image_url ?? (p.main_image as any)?.image_url ?? p.image ?? FALLBACK_IMAGE;
+  const image = typeof imageUrl === 'string' ? imageUrl : FALLBACK_IMAGE;
+  return {
+    id: String(p.id),
+    name: p.name,
+    price: priceNum,
+    originalPrice: compareNum,
+    rating: 4.5,
+    reviews: 0,
+    image,
+    badge: '',
+    inStock: (p.stock ?? 0) > 0,
+    description: p.description ?? undefined,
+    features: [],
   };
 }
 
 const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
-  const { product } = route.params;
+  const { product: initialProduct } = route.params;
   const [quantity, setQuantity] = useState(1);
+  const [apiProduct, setApiProduct] = useState<ShopProduct | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const id = initialProduct?.id;
+    if (!id) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    shopService
+      .getProductById(id)
+      .then((data) => {
+        if (!cancelled) setApiProduct(data);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [initialProduct?.id]);
+
+  const product = useMemo(() => {
+    const fromApi = shopProductToDisplay(apiProduct);
+    if (fromApi) return fromApi;
+    return initialProduct;
+  }, [apiProduct, initialProduct]);
 
   const handleAddToCart = () => {
     if (!product.inStock) {
@@ -88,6 +141,18 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
     }
   };
 
+  if (!product) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <Header title={t('product.details')} showBack={true} showCart={true} />
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>{t('product.loading', { defaultValue: 'Loading…' })}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Header 
@@ -95,17 +160,20 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
         showBack={true}
         showCart={true}
       />
-      
+      {loading && (
+        <View style={styles.loadingBar}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+        </View>
+      )}
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Product Image */}
         <View style={styles.imageContainer}>
           <Image
-            source={{ uri: (product.image || (product as any).images?.[0] || 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1200&q=60') + `&v=agri` }}
+            source={{ uri: product.image || FALLBACK_IMAGE }}
             style={styles.productImage}
-            onError={({ nativeEvent }) => {
-              // Replace with agriculture fallback if image fails
-              (nativeEvent as any);
-            }}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="disk"
           />
           {product.badge && (
             <View style={styles.badgeContainer}>
@@ -188,20 +256,22 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
           <View style={styles.descriptionSection}>
             <Text style={styles.sectionTitle}>{t('product.description')}</Text>
             <Text style={styles.descriptionText}>
-              {t(`products.items.${product.id}.longDescription`, { defaultValue: t(`products.items.${product.id}.description`, { defaultValue: product.description }) })}
+              {product.description || t('product.noDescription', { defaultValue: 'No description available.' })}
             </Text>
           </View>
 
           {/* Features */}
+          {product.features && product.features.length > 0 && (
           <View style={styles.featuresSection}>
             <Text style={styles.sectionTitle}>{t('product.features')}</Text>
-            {(product as any).features && (product as any).features.map((feature: string, index: number) => (
+            {product.features.map((feature: string, index: number) => (
               <View key={index} style={styles.featureItem}>
                 <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
                 <Text style={styles.featureText}>{feature}</Text>
               </View>
             ))}
           </View>
+          )}
         </View>
       </ScrollView>
 
@@ -453,6 +523,21 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  loadingBar: {
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  loadingWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  loadingText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
   },
 });
 

@@ -62,6 +62,8 @@ const AdminDashboardScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [recentActivities, setRecentActivities] = useState<Array<{ id: string; message: string; timestamp: string; icon: string; color: string }>>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [pendingReportsCount, setPendingReportsCount] = useState(0);
+  const [newOrdersCount, setNewOrdersCount] = useState(0);
 
   const admin = {
     id: 'admin_001',
@@ -146,20 +148,42 @@ const AdminDashboardScreen: React.FC = () => {
     }
   }, []);
 
+  const fetchPendingReportsCount = useCallback(async () => {
+    try {
+      const res = await adminService.getReports({ status: 'pending', per_page: 1, page: 1 });
+      const total = res?.meta?.total ?? (Array.isArray(res?.data) ? res.data.length : 0);
+      setPendingReportsCount(typeof total === 'number' ? total : 0);
+    } catch (_) {
+      setPendingReportsCount(0);
+    }
+  }, []);
+
+  const fetchNewOrdersCount = useCallback(async () => {
+    try {
+      const res = await adminService.getOrders({ per_page: 1, page: 1 });
+      const total = res?.meta?.total ?? res?.total ?? (Array.isArray(res?.data) ? res.data.length : 0);
+      setNewOrdersCount(typeof total === 'number' ? total : 0);
+    } catch (_) {
+      setNewOrdersCount(0);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchStatistics();
       fetchRecentActivities();
-    }, [fetchStatistics, fetchRecentActivities])
+      fetchPendingReportsCount();
+      fetchNewOrdersCount();
+    }, [fetchStatistics, fetchRecentActivities, fetchPendingReportsCount, fetchNewOrdersCount])
   );
 
   const quickStats = useMemo(
     () => [
-      { id: 'pending_reports', labelKey: 'admin.dashboard.pendingReports', value: '12', actionKey: 'admin.dashboard.view', color: COLORS.warning, navTarget: 'PendingReports' as const },
-      { id: 'new_orders', labelKey: 'admin.dashboard.newOrders', value: '34', actionKey: 'admin.dashboard.manage', color: COLORS.success, navTarget: 'UsersTab' as const },
+      { id: 'pending_reports', labelKey: 'admin.dashboard.pendingReports', value: String(pendingReportsCount), actionKey: 'admin.dashboard.view', color: COLORS.warning, navTarget: 'PendingReports' as const },
+      { id: 'new_orders', labelKey: 'admin.dashboard.newOrders', value: String(newOrdersCount), actionKey: 'admin.dashboard.manage', color: COLORS.success, navTarget: 'AdminOrders' as const },
       { id: 'support_tickets', labelKey: 'admin.dashboard.supportTickets', value: '8', actionKey: 'admin.dashboard.respond', color: COLORS.error, navTarget: 'UsersTab' as const },
     ],
-    []
+    [pendingReportsCount, newOrdersCount]
   );
 
   const topProducts = [

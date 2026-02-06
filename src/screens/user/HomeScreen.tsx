@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,11 @@ import {
   TouchableOpacity,
   StatusBar,
   Dimensions,
-  Image,
   FlatList,
+  Linking,
+  Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +24,9 @@ import { mockServices, mockOrders } from '../../data/mockData';
 import Header from '../../components/common/Header';
 import BeforeAfter from '../../components/common/BeforeAfter';
 import { useTranslation } from 'react-i18next';
+import { getBanners, getBannerImageUrl, Banner } from '../../services/bannerService';
+import { shopService, ShopProductCategory } from '../../services/shopService';
+import { buildFullImageUrl } from '../../config/api';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -31,6 +36,10 @@ const HomeScreen: React.FC = () => {
   const { t } = useTranslation();
   const [currentSlide, setCurrentSlide] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const [banners, setBanners] = useState<Banner[]>([]);
+  const [bannersLoading, setBannersLoading] = useState(true);
+  const [productCategories, setProductCategories] = useState<Array<{ id: string; name: string; image: string; products_count?: number; coming_soon?: boolean }>>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
 
   const recentOrders = Array.isArray(orders) ? orders.slice(0, 3) : [];
   // Extract first order that has before/after photos in its tracking (if any)
@@ -129,30 +138,76 @@ const HomeScreen: React.FC = () => {
     }
   };
 
-  // Promotional slider data
-  const promotionalSlides = [
-    {
-      id: '1',
-      title: t('home.title'),
-      subtitle: t('home.learnMore'),
-      image: 'https://images.unsplash.com/photo-1461354464878-ad92f492a5a0?w=800', // planting
-      backgroundColor: COLORS.primary,
-    },
-    {
-      id: '2',
-      title: t('home.quickActions'),
-      subtitle: t('home.bookService'),
-      image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=800', // watering
-      backgroundColor: '#1c4b27',
-    },
-    {
-      id: '3',
-      title: t('home.loyaltyPoints'),
-      subtitle: t('home.viewRewards'),
-      image: 'https://images.unsplash.com/photo-1506806732259-39c2d0268443?w=800', // produce
-      backgroundColor: '#6D8F5B',
-    },
-  ];
+  // Fetch banners from API (priority-ordered); fallback slides when none; prefetch images for fast display
+  useEffect(() => {
+    let cancelled = false;
+    setBannersLoading(true);
+    getBanners()
+      .then((list) => {
+        if (!cancelled) {
+          setBanners(list);
+          const uris = list.map((b) => getBannerImageUrl(b)).filter(Boolean) as string[];
+          if (uris.length > 0) Image.prefetch(uris, { cachePolicy: 'disk' }).catch(() => {});
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setBannersLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch product categories for Shop by Category (GET /shop/products/categories)
+  const categoryPlaceholderImage = 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=60';
+  useEffect(() => {
+    let cancelled = false;
+    setCategoriesLoading(true);
+    shopService
+      .getProductCategories()
+      .then((list: ShopProductCategory[]) => {
+        if (!cancelled) {
+          const mapped = list.map((c) => ({
+            id: String(c.id),
+            name: c.name || '',
+            image: c.image_url || (c.image ? buildFullImageUrl(c.image) : categoryPlaceholderImage),
+            products_count: c.products_count ?? 0,
+            coming_soon: c.coming_soon ?? false,
+          }));
+          setProductCategories(mapped);
+          const uris = mapped.map((c) => c.image).filter(Boolean);
+          if (uris.length > 0) Image.prefetch(uris, { cachePolicy: 'disk' }).catch(() => {});
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCategoriesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Promotional slider: API banners (priority order) or fallback static slides
+  const promotionalSlides = (() => {
+    if (banners.length > 0) {
+      return banners.map((b) => ({
+        id: String(b.id),
+        title: b.title || t('home.title'),
+        subtitle: b.description || t('home.learnMore'),
+        buttonText: b.button_text || t('home.learnMore'),
+        buttonLink: b.button_link || null,
+        image: getBannerImageUrl(b) || 'https://images.unsplash.com/photo-1461354464878-ad92f492a5a0?w=800',
+        backgroundColor: COLORS.primary,
+      }));
+    }
+    return [
+      { id: '1', title: t('home.title'), subtitle: t('home.learnMore'), buttonText: t('home.learnMore'), buttonLink: null, image: 'https://images.unsplash.com/photo-1461354464878-ad92f492a5a0?w=800', backgroundColor: COLORS.primary },
+      { id: '2', title: t('home.quickActions'), subtitle: t('home.bookService'), buttonText: t('home.learnMore'), buttonLink: null, image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=800', backgroundColor: '#1c4b27' },
+      { id: '3', title: t('home.loyaltyPoints'), subtitle: t('home.viewRewards'), buttonText: t('home.learnMore'), buttonLink: null, image: 'https://images.unsplash.com/photo-1506806732259-39c2d0268443?w=800', backgroundColor: '#6D8F5B' },
+    ];
+  })();
+
+  const onBannerButtonPress = useCallback((buttonLink: string | null) => {
+    if (buttonLink && (buttonLink.startsWith('http://') || buttonLink.startsWith('https://'))) {
+      Linking.openURL(buttonLink).catch(() => {});
+    }
+  }, []);
 
   const scrollToSlide = (index: number) => {
     if (!flatListRef.current) return;
@@ -166,40 +221,33 @@ const HomeScreen: React.FC = () => {
   const goPrev = () => scrollToSlide(currentSlide - 1);
   const goNext = () => scrollToSlide(currentSlide + 1);
 
-  // Safe image component with fallback
-  const CategoryImage = ({ uri }: { uri: string }) => {
-    const initial = uri.includes('?') ? `${uri}&v=${Date.now()}` : `${uri}?v=${Date.now()}`;
-    const [currentUri, setCurrentUri] = useState(initial);
-    const fallback = 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=60&v=agri-fallback';
-    return (
-      <Image
-        source={{ uri: currentUri }}
-        style={styles.categoryImage}
-        onError={() => setCurrentUri(fallback)}
-      />
-    );
-  };
+  // Cached image components (expo-image uses disk cache for fast repeat loads)
+  const CategoryImage = ({ uri }: { uri: string }) => (
+    <Image
+      source={{ uri: uri || categoryPlaceholderImage }}
+      style={styles.categoryImage}
+      contentFit="cover"
+      transition={200}
+      cachePolicy="disk"
+    />
+  );
 
-  // Offer image with robust fallback and cache-busting
-  const OfferImage = ({ uri, style }: { uri: string; style: any }) => {
-    const withVersion = `${uri}${uri.includes('?') ? '&' : '?'}v=agri-${Date.now()}`;
-    const [currentUri, setCurrentUri] = useState(withVersion);
-    const fallback = 'https://images.unsplash.com/photo-1506806732259-39c2d0268443?auto=format&fit=crop&w=1200&q=60&v=agri-fallback';
-    return (
-      <Image
-        source={{ uri: currentUri }}
-        style={style}
-        onError={() => setCurrentUri(fallback)}
-      />
-    );
-  };
+  const OfferImage = ({ uri, style }: { uri: string; style: any }) => (
+    <Image
+      source={{ uri }}
+      style={style}
+      contentFit="cover"
+      transition={200}
+      cachePolicy="disk"
+    />
+  );
 
   // Featured services with better visuals
   const featuredServices = [
     {
       id: 'featured1',
-      name: 'Scheduled Watering',
-      description: 'Irrigation visit with moisture checks',
+      name: t('home.featuredItems.scheduledWatering.name'),
+      description: t('home.featuredItems.scheduledWatering.description'),
       price: 120,
       rating: 4.8,
       image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=400',
@@ -207,8 +255,8 @@ const HomeScreen: React.FC = () => {
     },
     {
       id: 'featured2',
-      name: 'Planting Service',
-      description: 'Soil preparation and planting',
+      name: t('home.featuredItems.plantingService.name'),
+      description: t('home.featuredItems.plantingService.description'),
       price: 200,
       rating: 4.9,
       image: 'https://images.unsplash.com/photo-1461354464878-ad92f492a5a0?w=400',
@@ -216,8 +264,8 @@ const HomeScreen: React.FC = () => {
     },
     {
       id: 'featured3',
-      name: 'Full Care Visit',
-      description: 'Pruning, fertilizing and seasonal maintenance',
+      name: t('home.featuredItems.fullCareVisit.name'),
+      description: t('home.featuredItems.fullCareVisit.description'),
       price: 260,
       rating: 4.7,
       image: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?auto=format&fit=crop&w=800&q=60',
@@ -225,14 +273,15 @@ const HomeScreen: React.FC = () => {
     },
   ];
 
-  // Product categories with images
-  const productCategories = [
-    { id: 'fertilizer', name: t('store.categories.fertilizer', { defaultValue: 'Fertilizer' }), image: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=60' },
-    { id: 'soil', name: t('store.categories.soil', { defaultValue: 'Soil' }), image: 'https://images.unsplash.com/photo-1457530378978-8bac673b8062?auto=format&fit=crop&w=800&q=60' },
-    { id: 'tools', name: t('store.categories.tools', { defaultValue: 'Tools' }), image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=800&q=60' },
-    { id: 'irrigation', name: t('store.categories.irrigation', { defaultValue: 'Irrigation' }), image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=800&q=60' },
-    { id: 'produce', name: t('store.categories.produce', { defaultValue: 'Produce' }), image: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?auto=format&fit=crop&w=800&q=60' },
+  // Shop by Category: use API categories when available, else static fallback
+  const staticCategoryFallback = [
+    { id: 'fertilizer', name: t('store.categories.fertilizer', { defaultValue: 'Fertilizer' }), image: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=60', products_count: 1, coming_soon: false },
+    { id: 'soil', name: t('store.categories.soil', { defaultValue: 'Soil' }), image: 'https://images.unsplash.com/photo-1457530378978-8bac673b8062?auto=format&fit=crop&w=800&q=60', products_count: 1, coming_soon: false },
+    { id: 'tools', name: t('store.categories.tools', { defaultValue: 'Tools' }), image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=800&q=60', products_count: 1, coming_soon: false },
+    { id: 'irrigation', name: t('store.categories.irrigation', { defaultValue: 'Irrigation' }), image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=800&q=60', products_count: 1, coming_soon: false },
+    { id: 'produce', name: t('store.categories.produce', { defaultValue: 'Produce' }), image: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?auto=format&fit=crop&w=800&q=60', products_count: 1, coming_soon: false },
   ];
+  const displayCategories = productCategories.length > 0 ? productCategories : staticCategoryFallback;
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -257,23 +306,29 @@ const HomeScreen: React.FC = () => {
             setCurrentSlide(index);
           }}
           renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[styles.slide, { backgroundColor: item.backgroundColor }]}
-              onPress={() => navigation.navigate('Main' as never, { screen: 'Services' } as never)}
-            >
+            <View style={[styles.slide, { backgroundColor: item.backgroundColor }]}>
               <View style={styles.slideContent}>
                 <View style={styles.slideTextContainer}>
                   <Text style={styles.slideTitle}>{item.title}</Text>
                   <Text style={styles.slideSubtitle}>{item.subtitle}</Text>
-                  <TouchableOpacity style={styles.slideButton}>
-                    <Text style={styles.slideButtonText}>{t('home.learnMore')}</Text>
+                  <TouchableOpacity
+                    style={styles.slideButton}
+                    onPress={() => onBannerButtonPress(item.buttonLink ?? null)}
+                  >
+                    <Text style={styles.slideButtonText}>{item.buttonText}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.slideImageContainer}>
-                  <Image source={{ uri: item.image }} style={styles.slideImage} />
+                  <Image
+                    source={{ uri: item.image }}
+                    style={styles.slideImage}
+                    contentFit="cover"
+                    transition={200}
+                    cachePolicy="disk"
+                  />
                 </View>
               </View>
-            </TouchableOpacity>
+            </View>
           )}
           keyExtractor={(item) => item.id}
         />
@@ -524,11 +579,21 @@ const HomeScreen: React.FC = () => {
         </View>
         
         <View style={styles.categoriesGrid}>
-          {productCategories.map((category) => (
+          {displayCategories.map((category) => (
             <TouchableOpacity
               key={category.id}
               style={styles.categoryCard}
-              onPress={() => navigation.navigate('CategoryProducts', { category })}
+              onPress={() => {
+                const noProducts = category.coming_soon || (category.products_count !== undefined && category.products_count === 0);
+                if (noProducts) {
+                  Alert.alert(
+                    t('category.comingSoon', { defaultValue: 'Coming Soon' }),
+                    t('category.comingSoonMessage', { defaultValue: 'Products in this category are coming soon.' })
+                  );
+                  return;
+                }
+                navigation.navigate('CategoryProducts', { category });
+              }}
             >
               <View style={styles.categoryImageContainer}>
                 <CategoryImage uri={category.image} />

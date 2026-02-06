@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 
 const PaymentMethodsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
 
   return (
@@ -14,18 +16,18 @@ const PaymentMethodsScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Payment Methods</Text>
+        <Text style={styles.headerTitle}>{t('paymentMethodsScreen.title')}</Text>
         <View style={{ width: 22 }} />
       </View>
 
       <View style={styles.card}>
         <View style={styles.row}>
           <Ionicons name="card-outline" size={18} color={COLORS.primary} />
-          <Text style={styles.pmTitle}>Visa •••• 4242</Text>
+          <Text style={styles.pmTitle}>{t('paymentMethodsScreen.cardMask', { last4: '4242' })}</Text>
         </View>
-        <Text style={styles.pmText}>Default card for payments</Text>
+        <Text style={styles.pmText}>{t('paymentMethodsScreen.defaultCard')}</Text>
         <TouchableOpacity style={styles.primaryBtn}>
-          <Text style={styles.primaryBtnText}>Add New Card</Text>
+          <Text style={styles.primaryBtnText}>{t('paymentMethodsScreen.addNewCard')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

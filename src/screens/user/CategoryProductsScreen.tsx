@@ -1,22 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   FlatList,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
+import { shopService, ShopProduct } from '../../services/shopService';
 
 const { width: screenWidth } = Dimensions.get('window');
+const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=60';
 
 interface CategoryProductsScreenProps {
   route: {
@@ -35,138 +38,102 @@ const CategoryProductsScreen: React.FC<CategoryProductsScreenProps> = ({ route }
   const { t } = useTranslation();
   const { category } = route.params;
 
-  // Fallback image component
-  const FallbackImage = ({ uri }: { uri: string }) => {
-    const [currentUri, setCurrentUri] = useState(uri);
-    const fallback = 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=60';
+  const [products, setProducts] = useState<ShopProduct[]>([]);
+  const [productCount, setProductCount] = useState(0);
+  const [categoryImage, setCategoryImage] = useState<string>(category.image || FALLBACK_IMAGE);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    shopService
+      .getProductsByCategory(category.id)
+      .then((data) => {
+        if (cancelled) return;
+        if (data) {
+          const list = data.products ?? [];
+          setProducts(list);
+          setProductCount(data.pagination?.total ?? list.length ?? 0);
+          if (data.category?.image_url) setCategoryImage(data.category.image_url);
+          const uris = list.map((p) => p.image_url ?? (p.main_image as any)?.image_url ?? p.image).filter(Boolean) as string[];
+          if (uris.length > 0) Image.prefetch(uris.slice(0, 12), { cachePolicy: 'disk' }).catch(() => {});
+        } else {
+          setProducts([]);
+          setError(t('category.errorLoading', { defaultValue: 'Failed to load products' }));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [category.id, t]);
+
+  const getProductImage = useCallback((p: ShopProduct) => {
+    return p.image_url ?? (p.main_image as any)?.image_url ?? p.image ?? FALLBACK_IMAGE;
+  }, []);
+
+  const toDetailProduct = useCallback((p: ShopProduct) => ({
+    id: String(p.id),
+    name: p.name,
+    price: typeof p.price === 'string' ? parseFloat(p.price) || 0 : p.price,
+    originalPrice: typeof p.compare_at_price === 'string' ? parseFloat(p.compare_at_price) || 0 : (p.compare_at_price ?? 0),
+    rating: 4.5,
+    reviews: 0,
+    image: getProductImage(p),
+    badge: '',
+    inStock: (p.stock ?? 0) > 0,
+    description: p.description,
+    features: [],
+  }), [getProductImage]);
+
+  const ProductImage = ({ uri }: { uri: string }) => (
+    <Image
+      source={{ uri: uri || FALLBACK_IMAGE }}
+      style={styles.productImage}
+      contentFit="cover"
+      transition={200}
+      cachePolicy="disk"
+    />
+  );
+
+  const renderProductCard = ({ item }: { item: ShopProduct }) => {
+    const detailProduct = toDetailProduct(item);
+    const imageUri = getProductImage(item);
+    const priceNum = typeof item.price === 'string' ? parseFloat(item.price) || 0 : item.price;
+    const originalNum = typeof item.compare_at_price === 'string' ? parseFloat(item.compare_at_price) || 0 : (item.compare_at_price ?? 0);
+    const inStock = (item.stock ?? 0) > 0;
     return (
-      <Image
-        source={{ uri: currentUri }}
-        style={styles.productImage}
-        onError={() => setCurrentUri(fallback)}
-      />
-    );
-  };
-
-  // Mock products data for the category
-  const [products] = useState([
-    {
-      id: 'product_001',
-      name: 'Organic Fertilizer 5kg',
-      description: 'Natural compost blend for fruit trees and palms',
-      price: 89.99,
-      originalPrice: 129.99,
-      rating: 4.8,
-      reviews: 124,
-      image: 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=800&q=60&v=fert1',
-      badge: 'Best Seller',
-      inStock: true,
-      features: ['Slow-release formula', 'Rich in nutrients', 'Improves soil health', 'Eco-friendly', 'For all plants'],
-    },
-    {
-      id: 'product_002',
-      name: 'Premium Potting Soil',
-      description: 'Nutrient-rich mix for container gardening',
-      price: 59.99,
-      originalPrice: 79.99,
-      rating: 4.6,
-      reviews: 89,
-      image: 'https://images.unsplash.com/photo-1583911860205-72f8ac8ddcbe?auto=format&fit=crop&w=800&q=60',
-      badge: 'New',
-      inStock: true,
-      features: ['Perfect pH balance', 'Excellent drainage', 'Moisture retention', 'Organic matter', '25L bag'],
-    },
-    {
-      id: 'product_003',
-      name: 'Professional Pruning Shears',
-      description: 'Sharp bypass pruners for precision trimming',
-      price: 149.99,
-      originalPrice: 199.99,
-      rating: 4.9,
-      reviews: 67,
-      image: 'https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?auto=format&fit=crop&w=800&q=60&v=shears1',
-      badge: 'Premium',
-      inStock: true,
-      features: ['Stainless steel blades', 'Ergonomic grip', 'Safety lock', 'Professional grade', '1 year warranty'],
-    },
-    {
-      id: 'product_004',
-      name: 'Drip Irrigation Kit',
-      description: 'Complete watering system for gardens',
-      price: 79.99,
-      originalPrice: 99.99,
-      rating: 4.7,
-      reviews: 156,
-      image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?auto=format&fit=crop&w=800&q=60',
-      badge: 'Sale',
-      inStock: true,
-      features: ['50m tubing included', 'Adjustable drippers', 'Water efficient', 'Easy installation', 'Timer compatible'],
-    },
-    {
-      id: 'product_005',
-      name: 'Garden Tool Set',
-      description: 'Complete toolkit for garden maintenance',
-      price: 119.99,
-      originalPrice: 159.99,
-      rating: 4.5,
-      reviews: 43,
-      image: 'https://images.unsplash.com/photo-1617576683096-00fc8eecb3af?auto=format&fit=crop&w=800&q=60&v=tools1',
-      badge: 'Limited',
-      inStock: true,
-      features: ['10 essential tools', 'Rust-resistant', 'Carrying case', 'Lifetime warranty', 'Professional quality'],
-    },
-    {
-      id: 'product_006',
-      name: 'Fresh Vegetables Box',
-      description: 'Mixed seasonal vegetables from local farms',
-      price: 39.99,
-      originalPrice: 59.99,
-      rating: 4.4,
-      reviews: 78,
-      image: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=800&q=60&v=veg1',
-      badge: 'Trending',
-      inStock: true,
-      features: ['Fresh daily', 'Organic certified', 'Local farms', 'Seasonal variety', 'Pesticide-free'],
-    },
-  ]);
-
-  const renderProductCard = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.productCard}
-      onPress={() => navigation.navigate('ProductDetail', { product: item })}
+      onPress={() => navigation.navigate('ProductDetail', { product: detailProduct })}
     >
       <View style={styles.productImageContainer}>
-        <FallbackImage uri={item.image} />
-        {item.badge && (
-          <View style={styles.badgeContainer}>
-            <Text style={styles.badgeText}>{item.badge}</Text>
-          </View>
-        )}
-        {!item.inStock && (
+        <ProductImage uri={imageUri} />
+        {!inStock && (
           <View style={styles.outOfStockOverlay}>
             <Text style={styles.outOfStockText}>Out of Stock</Text>
           </View>
         )}
       </View>
-      
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-        
         <View style={styles.ratingContainer}>
           <Ionicons name="star" size={14} color={COLORS.warning} />
-          <Text style={styles.ratingText}>{item.rating}</Text>
-            <Text style={styles.reviewsText}>({item.reviews} {t('product.reviews')})</Text>
+          <Text style={styles.ratingText}>{detailProduct.rating}</Text>
+          <Text style={styles.reviewsText}>({detailProduct.reviews} {t('product.reviews')})</Text>
         </View>
-        
         <View style={styles.priceContainer}>
-          <Text style={styles.currentPrice}>{t('orders.currency', { defaultValue: 'AED' })} {item.price}</Text>
-          {item.originalPrice > item.price && (
-             <Text style={styles.originalPrice}>{t('orders.currency', { defaultValue: 'AED' })} {item.originalPrice}</Text>
+          <Text style={styles.currentPrice}>{t('orders.currency', { defaultValue: 'AED' })} {priceNum}</Text>
+          {originalNum > priceNum && (
+            <Text style={styles.originalPrice}>{t('orders.currency', { defaultValue: 'AED' })} {originalNum}</Text>
           )}
         </View>
       </View>
     </TouchableOpacity>
   );
+  };
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -179,10 +146,16 @@ const CategoryProductsScreen: React.FC<CategoryProductsScreenProps> = ({ route }
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Category Header */}
         <View style={styles.categoryHeader}>
-          <Image source={{ uri: category.image }} style={styles.categoryImage} />
+          <Image
+            source={{ uri: categoryImage || FALLBACK_IMAGE }}
+            style={styles.categoryImage}
+            contentFit="cover"
+            transition={200}
+            cachePolicy="disk"
+          />
           <View style={styles.categoryInfo}>
             <Text style={styles.categoryTitle}>{category.name}</Text>
-            <Text style={styles.productCount}>{products.length} Products</Text>
+            <Text style={styles.productCount}>{productCount} {t('category.products', { defaultValue: 'Products' })}</Text>
           </View>
         </View>
 
@@ -194,16 +167,31 @@ const CategoryProductsScreen: React.FC<CategoryProductsScreenProps> = ({ route }
               <Text style={styles.filterText}>{t('category.filter')}</Text>
             </TouchableOpacity>
           </View>
-          
-          <FlatList
-            data={products}
-            renderItem={renderProductCard}
-            keyExtractor={(item) => item.id}
-            numColumns={2}
-            scrollEnabled={false}
-            columnWrapperStyle={styles.productRow}
-            showsVerticalScrollIndicator={false}
-          />
+          {loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.loadingText}>{t('category.loading', { defaultValue: 'Loading products…' })}</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.loadingWrap}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={products}
+              renderItem={renderProductCard}
+              keyExtractor={(item) => String(item.id)}
+              numColumns={2}
+              scrollEnabled={false}
+              columnWrapperStyle={styles.productRow}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                <View style={styles.loadingWrap}>
+                  <Text style={styles.emptyText}>{t('category.noProducts', { defaultValue: 'No products in this category' })}</Text>
+                </View>
+              }
+            />
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -244,6 +232,26 @@ const styles = StyleSheet.create({
   },
   productsContainer: {
     padding: SPACING.md,
+  },
+  loadingWrap: {
+    paddingVertical: SPACING.xl * 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
+  },
+  errorText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.error,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
   sectionHeader: {
     flexDirection: 'row',

@@ -266,6 +266,16 @@ export const adminService = {
     return response.data;
   },
 
+  // Shop orders list (GET /shop/orders – Bearer token, for admin order list)
+  getOrders: async (params?: {
+    page?: number;
+    per_page?: number;
+    status?: string;
+  }): Promise<OrdersListResponse> => {
+    const response = await apiClient.get<OrdersListResponse>('/shop/orders', { params });
+    return response.data;
+  },
+
   // Admin products list (uses Bearer token)
   getProducts: async (params?: {
     search?: string;
@@ -530,7 +540,139 @@ export const adminService = {
     const response = await apiClient.delete(`/tips/${tipId}`, { timeout: 15000 });
     return response.data;
   },
+
+  // Banners (GET /api/admin/banners) – slider/customer banners for theme
+  getBanners: async (): Promise<{ success?: boolean; message?: string; data: AdminBanner[] }> => {
+    const response = await apiClient.get('/admin/banners', { timeout: 15000 });
+    const body = response?.data ?? response;
+    const list = Array.isArray(body?.data) ? body.data : [];
+    return { success: body?.success, message: body?.message, data: list };
+  },
+
+  // Create banner (POST /api/admin/banners) – multipart/form-data (image optional)
+  createBanner: async (params: {
+    title: string;
+    description?: string;
+    button_text?: string;
+    button_link?: string;
+    priority?: number | string;
+    is_active?: boolean | number | string;
+    image?: { uri: string };
+  }): Promise<{ success?: boolean; status?: boolean; message?: string; data?: AdminBanner }> => {
+    const formData = new FormData();
+    formData.append('title', params.title.trim());
+    if (params.description != null && String(params.description).trim()) {
+      formData.append('description', String(params.description).trim());
+    }
+    if (params.button_text != null && String(params.button_text).trim()) {
+      formData.append('button_text', String(params.button_text).trim());
+    }
+    if (params.button_link != null && String(params.button_link).trim()) {
+      formData.append('button_link', String(params.button_link).trim());
+    }
+    if (params.priority != null && String(params.priority).trim() !== '') {
+      formData.append('priority', String(params.priority));
+    }
+    if (params.is_active != null) {
+      const v =
+        typeof params.is_active === 'boolean'
+          ? params.is_active
+            ? '1'
+            : '0'
+          : String(params.is_active);
+      formData.append('is_active', v === '1' || v.toLowerCase?.() === 'true' ? '1' : '0');
+    }
+    if (params.image?.uri) {
+      formData.append('image', {
+        uri: params.image.uri,
+        type: 'image/jpeg',
+        name: 'banner-image.jpg',
+      } as any);
+    }
+    const response = await apiClient.post('/admin/banners', formData, { timeout: 300000 });
+    return response.data;
+  },
+
+  // Update banner (POST /api/admin/banners/:id) – multipart/form-data (image optional, add/replace)
+  updateBanner: async (
+    bannerId: number,
+    params: {
+      title: string;
+      description?: string;
+      button_text?: string;
+      button_link?: string;
+      priority?: number | string;
+      is_active?: boolean | number | string;
+      image?: { uri: string };
+    }
+  ): Promise<{ success?: boolean; status?: boolean; message?: string; data?: AdminBanner }> => {
+    const formData = new FormData();
+    formData.append('title', params.title.trim());
+    if (params.description != null && String(params.description).trim()) {
+      formData.append('description', String(params.description).trim());
+    }
+    if (params.button_text != null && String(params.button_text).trim()) {
+      formData.append('button_text', String(params.button_text).trim());
+    }
+    if (params.button_link != null && String(params.button_link).trim()) {
+      formData.append('button_link', String(params.button_link).trim());
+    }
+    if (params.priority != null && String(params.priority).trim() !== '') {
+      formData.append('priority', String(params.priority));
+    }
+    if (params.is_active != null) {
+      const v =
+        typeof params.is_active === 'boolean'
+          ? params.is_active
+            ? '1'
+            : '0'
+          : String(params.is_active);
+      formData.append('is_active', v === '1' || v.toLowerCase?.() === 'true' ? '1' : '0');
+    }
+    if (params.image?.uri) {
+      formData.append('image', {
+        uri: params.image.uri,
+        type: 'image/jpeg',
+        name: 'banner-image.jpg',
+      } as any);
+    }
+    const response = await apiClient.post(`/admin/banners/${bannerId}`, formData, { timeout: 300000 });
+    return response.data;
+  },
+
+  // Toggle banner status (POST /api/admin/banners/:id/toggle-status) – no body
+  toggleBannerStatus: async (
+    bannerId: number
+  ): Promise<{ success?: boolean; message?: string; data?: { id: number; is_active: boolean } }> => {
+    const response = await apiClient.post(`/admin/banners/${bannerId}/toggle-status`, null, {
+      timeout: 15000,
+    });
+    return response.data;
+  },
+
+  // Delete banner (DELETE /api/admin/banners/:id)
+  deleteBanner: async (bannerId: number): Promise<{ success?: boolean; status?: boolean; message?: string }> => {
+    const response = await apiClient.delete(`/admin/banners/${bannerId}`, { timeout: 15000 });
+    return response.data;
+  },
 };
+
+export interface AdminBanner {
+  id: number;
+  title: string;
+  description?: string | null;
+  button_text?: string | null;
+  button_link?: string | null;
+  image?: string | null;
+  image_url?: string | null;
+  link?: string | null;
+  action_type?: string | null;
+  action_value?: string | null;
+  priority?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export interface Tip {
   id: number | string;
@@ -685,6 +827,28 @@ export interface ReportsListResponse {
   success?: boolean;
   data: AdminReport[];
   meta: ReportsMeta;
+}
+
+export interface ShopOrder {
+  id: number;
+  order_number?: string;
+  status?: string;
+  total?: number | string;
+  created_at?: string;
+  updated_at?: string;
+  user?: { id: number; name?: string; email?: string };
+  customer?: { id: number; name?: string; email?: string };
+  [key: string]: any;
+}
+
+export interface OrdersListResponse {
+  success?: boolean;
+  data?: ShopOrder[];
+  meta?: { current_page: number; last_page: number; per_page: number; total: number };
+  current_page?: number;
+  last_page?: number;
+  per_page?: number;
+  total?: number;
 }
 
 export interface AdminActivity {
