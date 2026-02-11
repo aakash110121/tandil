@@ -5,9 +5,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AppNavigator } from './src/navigation';
 import { useAppStore } from './src/store';
 import { authService } from './src/services/authService';
+import ErrorBoundary from './src/components/common/ErrorBoundary';
 import './src/i18n';
 
-export default function App() {
+function AppContent() {
   const { isAuthenticated, setUser, setAuthenticated } = useAppStore();
 
   useEffect(() => {
@@ -41,5 +42,13 @@ export default function App() {
         <AppNavigator />
       </SafeAreaProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }

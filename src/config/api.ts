@@ -2,9 +2,33 @@
 import Constants from 'expo-constants';
 
 // Get API base URL from app.json extra config
-// You can update it in app.json -> extra -> apiBaseUrl
-export const API_BASE_URL = Constants.expoConfig?.extra?.apiBaseUrl || 
-  'https://phpstack-1180784-6050385.cloudwaysapps.com/api';
+// Works in both development and production builds
+function getApiBaseUrl(): string {
+  const fallback = 'https://phpstack-1180784-6050385.cloudwaysapps.com/api';
+  
+  try {
+    // Try expoConfig first (works in development and some production builds)
+    if (Constants.expoConfig?.extra?.apiBaseUrl) {
+      return Constants.expoConfig.extra.apiBaseUrl as string;
+    }
+    
+    // Try manifest.extra (works in production builds)
+    if (Constants.manifest?.extra?.apiBaseUrl) {
+      return Constants.manifest.extra.apiBaseUrl as string;
+    }
+    
+    // Try manifest2 (newer Expo SDK)
+    if (Constants.manifest2?.extra?.expoConfig?.extra?.apiBaseUrl) {
+      return Constants.manifest2.extra.expoConfig.extra.apiBaseUrl as string;
+    }
+  } catch (error) {
+    console.error('Error reading API config from Constants:', error);
+  }
+  
+  return fallback;
+}
+
+export const API_BASE_URL = getApiBaseUrl();
 
 // For development, you can also use:
 // export const API_BASE_URL = __DEV__ 
