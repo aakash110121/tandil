@@ -15,6 +15,7 @@ import Header from '../../components/common/Header';
 import { useAppStore } from '../../store';
 import { useTranslation } from 'react-i18next';
 import { authService } from '../../services/authService';
+import { captureTestEvent, captureException } from '../../utils/sentry';
 
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -247,6 +248,70 @@ const SettingsScreen: React.FC = () => {
               t('settings.items.deleteAccount.title'),
               t('settings.items.deleteAccount.subtitle'),
               handleDeleteAccount
+            )}
+          </View>
+        </View>
+
+        {/* Developer: Generate errors to view in Sentry (staging/production builds only) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Developer</Text>
+          <View style={styles.settingsCard}>
+            {renderSettingItem(
+              'bug-outline',
+              'Send test error to Sentry',
+              __DEV__ ? 'Only in staging/production builds' : 'Sends a captured test error to Sentry',
+              () => {
+                const sent = captureTestEvent();
+                Alert.alert(
+                  sent ? 'Test error sent' : 'Not sent',
+                  sent
+                    ? 'Check Sentry → Issues for "Tandil Sentry test event".'
+                    : 'Sentry only runs in staging/production builds. Build with EAS and try again.'
+                );
+              }
+            )}
+            {renderSettingItem(
+              'warning-outline',
+              'Send another test error (with context)',
+              __DEV__ ? 'Only in staging/production builds' : 'Sends error with extra context to Sentry',
+              () => {
+                if (__DEV__) {
+                  Alert.alert('Not sent', 'Sentry only runs in staging/production builds.');
+                  return;
+                }
+                captureException(new Error('Sentry test: intentional error with context'), {
+                  tags: { source: 'settings', type: 'manual_test' },
+                  extra: { screen: 'Settings', timestamp: new Date().toISOString() },
+                });
+                Alert.alert('Error sent', 'Check Sentry → Issues for "intentional error with context".');
+              }
+            )}
+            {renderSettingItem(
+              'alert-circle-outline',
+              'Throw unhandled error',
+              __DEV__ ? 'Only in staging/production builds' : 'Throws an error so Sentry logs it as unhandled',
+              () => {
+                if (__DEV__) {
+                  Alert.alert('Skipped', 'Use a staging/production build to test unhandled errors in Sentry.');
+                  return;
+                }
+                Alert.alert(
+                  'Throw error?',
+                  'This will send an unhandled error to Sentry and may show the app error screen.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Throw',
+                      style: 'destructive',
+                      onPress: () => {
+                        setTimeout(() => {
+                          throw new Error('Sentry test: intentional unhandled error from Settings');
+                        }, 100);
+                      },
+                    },
+                  ]
+                );
+              }
             )}
           </View>
         </View>

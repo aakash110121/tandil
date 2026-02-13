@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { captureException } from '../../utils/sentry';
 import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from '../../constants';
 
 interface Props {
@@ -34,12 +35,13 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console (will show in development)
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    
-    // In production, you could send this to a crash reporting service
-    // Example: Sentry.captureException(error, { extra: errorInfo });
-    
+
+    captureException(error, {
+      tags: { source: 'ErrorBoundary' },
+      extra: { componentStack: errorInfo.componentStack },
+    });
+
     this.setState({
       error,
       errorInfo,

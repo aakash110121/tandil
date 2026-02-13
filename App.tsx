@@ -6,20 +6,23 @@ import { AppNavigator } from './src/navigation';
 import { useAppStore } from './src/store';
 import { authService } from './src/services/authService';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
+import { initSentry, captureException } from './src/utils/sentry';
 import './src/i18n';
 
 function AppContent() {
-  const { isAuthenticated, setUser, setAuthenticated } = useAppStore();
+  const { setUser, setAuthenticated } = useAppStore();
 
   useEffect(() => {
-    // Initialize app settings and check for existing authentication
+    initSentry();
+  }, []);
+
+  useEffect(() => {
     const initializeAuth = async () => {
       try {
         const token = await authService.getStoredToken();
         const user = await authService.getStoredUser();
         
         if (token && user) {
-          // Restore authentication state
           setUser(user);
           setAuthenticated(true);
           console.log('Auth restored from storage');
@@ -28,6 +31,7 @@ function AppContent() {
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+        captureException(error, { tags: { area: 'auth_init' } });
       }
     };
 
@@ -45,10 +49,12 @@ function AppContent() {
   );
 }
 
-export default function App() {
+function RootApp() {
   return (
     <ErrorBoundary>
       <AppContent />
     </ErrorBoundary>
   );
 }
+
+export default RootApp;
