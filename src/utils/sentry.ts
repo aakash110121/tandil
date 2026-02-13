@@ -2,10 +2,12 @@
  * Sentry is only loaded when not in __DEV__ (so staging and production EAS builds).
  * Local "npx expo start" / Expo Go keeps __DEV__ true → Sentry is disabled to avoid crashes.
  *
+ * IMPORTANT: initSentry() must be called from the app entry point (index.ts) before
+ * any other app code runs. That way crashes (e.g. white screen on launch) are captured.
+ *
  * Environments:
  * - EAS "preview" build → Sentry enabled, environment: 'staging'
  * - EAS "production" build → Sentry enabled, environment: 'production'
- * To verify: use a preview or production build, open Settings → "Send test error to Sentry".
  */
 
 import Constants from 'expo-constants';

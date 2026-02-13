@@ -6,15 +6,11 @@ import { AppNavigator } from './src/navigation';
 import { useAppStore } from './src/store';
 import { authService } from './src/services/authService';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
-import { initSentry, captureException } from './src/utils/sentry';
+import { captureException } from './src/utils/sentry';
 import './src/i18n';
 
 function AppContent() {
   const { setUser, setAuthenticated } = useAppStore();
-
-  useEffect(() => {
-    initSentry();
-  }, []);
 
   useEffect(() => {
     const initializeAuth = async () => {
