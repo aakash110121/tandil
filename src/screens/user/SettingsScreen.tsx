@@ -259,14 +259,14 @@ const SettingsScreen: React.FC = () => {
             {renderSettingItem(
               'bug-outline',
               'Send test error to Sentry',
-              __DEV__ ? 'Only in staging/production builds' : 'Sends a captured test error to Sentry',
+              __DEV__ ? 'Only in staging/production builds' : 'Sends a test error to Sentry',
               () => {
                 const sent = captureTestEvent();
                 Alert.alert(
                   sent ? 'Test error sent' : 'Not sent',
                   sent
                     ? 'Check Sentry → Issues for "Tandil Sentry test event".'
-                    : 'Sentry only runs in staging/production builds. Build with EAS and try again.'
+                    : 'Sentry only runs in staging/production builds. Use EAS build to test.'
                 );
               }
             )}

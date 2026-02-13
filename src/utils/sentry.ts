@@ -1,13 +1,14 @@
 /**
- * Sentry is only loaded when not in __DEV__ (so staging and production EAS builds).
- * Local "npx expo start" / Expo Go keeps __DEV__ true → Sentry is disabled to avoid crashes.
+ * Sentry runs only in staging/production builds (when __DEV__ is false).
  *
- * IMPORTANT: initSentry() must be called from the app entry point (index.ts) before
- * any other app code runs. That way crashes (e.g. white screen on launch) are captured.
+ * In development (npx expo start), we do NOT load sentry-expo at all. Loading it causes:
+ *   TypeError: Cannot read property '__extends' of undefined
+ * (known sentry-expo + Hermes/Expo Go issue). So in dev, init/capture are no-ops.
  *
- * Environments:
- * - EAS "preview" build → Sentry enabled, environment: 'staging'
- * - EAS "production" build → Sentry enabled, environment: 'production'
+ * To see errors in Sentry: use an EAS build (preview or production), install it, then
+ * errors and the "Send test error" buttons in Settings will report to Sentry.
+ *
+ * initSentry() is called from index.ts before any app code runs.
  */
 
 import Constants from 'expo-constants';
@@ -73,12 +74,9 @@ export function captureException(error: unknown, options?: { tags?: Record<strin
   }
 }
 
-/** Call this from a staging or production build to send a test error and verify Sentry. */
+/** Send a test error to Sentry. Only sends in staging/production builds. */
 export function captureTestEvent(): boolean {
-  if (__DEV__) {
-    console.warn('Sentry: Test events only send in staging/production builds. Use an EAS preview or production build.');
-    return false;
-  }
+  if (__DEV__) return false;
   try {
     const Sentry = getSentry();
     if (Sentry?.React?.captureException) {

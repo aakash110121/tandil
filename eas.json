@@ -22,7 +22,8 @@
       "ios": {
         "simulator": false,
         "distribution": "store",
-        "credentialsSource": "local"
+        "credentialsSource": "local",
+        "image": "macos-sequoia-15.5-xcode-26.0"
       },
       "android": {
         "buildType": "apk",
