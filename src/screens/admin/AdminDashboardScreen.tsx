@@ -649,6 +649,13 @@ const AdminDashboardScreen: React.FC = () => {
               </View>
               <Text style={styles.adminActionText}>{t('admin.dashboard.category')}</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity style={styles.adminAction} onPress={() => navigation.navigate('AdminServices' as never)}>
+              <View style={styles.adminActionIcon}>
+                <Ionicons name="construct-outline" size={24} color={COLORS.primary} />
+              </View>
+              <Text style={styles.adminActionText}>{t('admin.dashboard.services')}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>

@@ -310,6 +310,7 @@ export const adminService = {
     stock: number;
     status: string;
     category_id?: number | null;
+    service_id?: number | null;
     weight_unit?: string;
     sku: string;
     handle: string;
@@ -345,6 +346,7 @@ export const adminService = {
     formData.append('stock', String(params.stock));
     formData.append('status', params.status);
     if (params.category_id != null) formData.append('category_id', String(params.category_id));
+    if (params.service_id != null) formData.append('service_id', String(params.service_id));
     if (params.weight_unit) formData.append('weight_unit', params.weight_unit);
     formData.append('sku', params.sku);
     formData.append('handle', params.handle);
@@ -377,6 +379,7 @@ export const adminService = {
       stock?: number;
       status?: string;
       category_id?: number | null;
+      service_id?: number | null;
       weight_unit?: string;
       sku?: string;
       handle?: string;
@@ -398,6 +401,7 @@ export const adminService = {
       stock?: number;
       status?: string;
       category_id?: number | null;
+      service_id?: number | null;
       weight_unit?: string;
       sku?: string;
       handle?: string;
@@ -414,6 +418,7 @@ export const adminService = {
     if (params.stock !== undefined) formData.append('stock', String(params.stock));
     if (params.status !== undefined) formData.append('status', params.status);
     if (params.category_id != null) formData.append('category_id', String(params.category_id));
+    if (params.service_id != null) formData.append('service_id', String(params.service_id));
     if (params.weight_unit) formData.append('weight_unit', params.weight_unit);
     if (params.sku !== undefined) formData.append('sku', params.sku);
     if (params.handle !== undefined) formData.append('handle', params.handle);
@@ -453,12 +458,118 @@ export const adminService = {
     return response.data;
   },
 
-  // Create category (POST /admin/categories, multipart: name, slug?, description?, image?)
+  /** GET /admin/services - list services (uses admin auth token from apiClient) */
+  getServices: async (params?: { page?: number; per_page?: number }): Promise<AdminServicesResponse> => {
+    const response = await apiClient.get<AdminServicesResponse>('/admin/services', { params });
+    return response.data;
+  },
+
+  /**
+   * GET /admin/services/:service_id - get service detail (Bearer token, Accept: application/json).
+   */
+  getServiceById: async (serviceId: number): Promise<{ success: boolean; message?: string; data: AdminService }> => {
+    const response = await apiClient.get<{ success: boolean; message?: string; data: AdminService }>(`/admin/services/${serviceId}`);
+    return response.data;
+  },
+
+  /**
+   * POST /admin/services - create service (form-data).
+   * Body: name (required), slug?, description?, image?, is_active? (1 = active, 0 = coming soon).
+   */
+  createService: async (params: {
+    name: string;
+    slug?: string;
+    description?: string;
+    image?: { uri: string };
+    is_active?: boolean;
+  }): Promise<{ success: boolean; message?: string; data: AdminService }> => {
+    const formData = new FormData();
+    formData.append('name', params.name.trim());
+    if (params.slug != null && String(params.slug).trim()) {
+      formData.append('slug', params.slug.trim());
+    }
+    if (params.description != null && String(params.description).trim()) {
+      formData.append('description', params.description.trim());
+    }
+    if (params.is_active !== undefined) {
+      formData.append('is_active', params.is_active ? '1' : '0');
+    }
+    if (params.image?.uri) {
+      formData.append('image', {
+        uri: params.image.uri,
+        type: 'image/jpeg',
+        name: 'service-image.jpg',
+      } as any);
+    }
+    const response = await apiClient.post<{ success: boolean; message?: string; data: AdminService }>('/admin/services', formData, { timeout: 60000 });
+    return response.data;
+  },
+
+  /**
+   * POST /admin/services/:service_id - update service (form-data).
+   * Body: name, slug?, description?, image? (file), image_remove? (true to remove image), is_active? (1|0).
+   * No category parameter.
+   */
+  updateService: async (
+    serviceId: number,
+    params: {
+      name: string;
+      slug?: string;
+      description?: string;
+      image?: { uri: string };
+      image_remove?: boolean;
+      is_active?: boolean;
+    }
+  ): Promise<{ status?: boolean; success?: boolean; message?: string; data: AdminService }> => {
+    const formData = new FormData();
+    formData.append('name', params.name.trim());
+    if (params.slug != null && String(params.slug).trim()) {
+      formData.append('slug', params.slug.trim());
+    }
+    if (params.description != null && String(params.description).trim()) {
+      formData.append('description', params.description.trim());
+    }
+    if (params.is_active !== undefined) {
+      formData.append('is_active', params.is_active ? '1' : '0');
+    }
+    if (params.image_remove === true) {
+      formData.append('image_remove', 'true');
+    }
+    if (params.image?.uri) {
+      formData.append('image', {
+        uri: params.image.uri,
+        type: 'image/jpeg',
+        name: 'service-image.jpg',
+      } as any);
+    }
+    const response = await apiClient.post(`/admin/services/${serviceId}`, formData, { timeout: 60000 });
+    return response.data;
+  },
+
+  /**
+   * POST /admin/services/:service_id/toggle-status - toggle active/inactive (Bearer token, Accept: application/json).
+   */
+  toggleServiceStatus: async (serviceId: number): Promise<{ success: boolean; message?: string; data?: AdminService }> => {
+    const response = await apiClient.post<{ success: boolean; message?: string; data?: AdminService }>(`/admin/services/${serviceId}/toggle-status`);
+    return response.data;
+  },
+
+  /**
+   * DELETE /admin/services/:service_id
+   * Headers: Authorization: Bearer <token>, Accept: application/json (sent by apiClient).
+   */
+  deleteService: async (serviceId: number): Promise<{ status?: boolean; success?: boolean; message?: string }> => {
+    const response = await apiClient.delete(`/admin/services/${serviceId}`);
+    return response.data ?? {};
+  },
+
+  // Create category (POST /admin/categories, multipart: name, slug?, description?, image?, is_active?)
   createCategory: async (params: {
     name: string;
     slug?: string;
     description?: string;
     image?: { uri: string };
+    is_active?: number; // 1 = active, 0 = disabled (Coming Soon). Default 1.
   }): Promise<{ status?: boolean; success?: boolean; message?: string; data: AdminCategory }> => {
     const formData = new FormData();
     formData.append('name', params.name.trim());
@@ -467,6 +578,9 @@ export const adminService = {
     }
     if (params.description != null && String(params.description).trim()) {
       formData.append('description', params.description.trim());
+    }
+    if (params.is_active !== undefined) {
+      formData.append('is_active', String(params.is_active));
     }
     if (params.image?.uri) {
       formData.append('image', {
@@ -479,7 +593,7 @@ export const adminService = {
     return response.data;
   },
 
-  // Update category (POST /admin/categories/:id, multipart: name, slug?, description?, image?)
+  // Update category (POST /admin/categories/:id, multipart: name, slug?, description?, image?, is_active?)
   updateCategory: async (
     categoryId: number,
     params: {
@@ -487,6 +601,7 @@ export const adminService = {
       slug?: string;
       description?: string;
       image?: { uri: string };
+      is_active?: number; // 1 = active, 0 = disabled (Coming Soon).
     }
   ): Promise<{ status?: boolean; success?: boolean; message?: string; data: AdminCategory }> => {
     const formData = new FormData();
@@ -497,6 +612,9 @@ export const adminService = {
     if (params.description != null && String(params.description).trim()) {
       formData.append('description', params.description.trim());
     }
+    if (params.is_active !== undefined) {
+      formData.append('is_active', String(params.is_active));
+    }
     if (params.image?.uri) {
       formData.append('image', {
         uri: params.image.uri,
@@ -505,6 +623,14 @@ export const adminService = {
       } as any);
     }
     const response = await apiClient.post(`/admin/categories/${categoryId}`, formData, { timeout: 60000 });
+    return response.data;
+  },
+
+  // Toggle category status (POST /admin/categories/:id/toggle-status). No body. Returns updated category.
+  toggleCategoryStatus: async (categoryId: number): Promise<{ status?: boolean; success?: boolean; message?: string; data?: AdminCategory }> => {
+    const response = await apiClient.post<{ status?: boolean; success?: boolean; message?: string; data?: AdminCategory }>(
+      `/admin/categories/${categoryId}/toggle-status`
+    );
     return response.data;
   },
 
@@ -689,6 +815,7 @@ export interface AdminCategory {
   description?: string | null;
   image?: string | null;
   image_url?: string | null;
+  is_active?: number | boolean; // 1 = active, 0 = disabled (Coming Soon)
   created_at?: string;
   updated_at?: string;
   products_count?: number;
@@ -724,6 +851,36 @@ export interface AdminCategoriesResponse {
   pagination?: AdminCategoriesPagination;
 }
 
+export interface AdminService {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  image?: string | null;
+  image_url?: string | null;
+  icon?: string | null;
+  is_active?: boolean;
+  coming_soon?: boolean;
+  category_id?: number | null;
+  category?: { id: number; name: string; slug: string } | null;
+  sort_order?: number;
+  created_at?: string;
+  updated_at?: string;
+  products_count?: number;
+}
+
+export interface AdminServicesResponse {
+  success: boolean;
+  message?: string;
+  data: AdminService[];
+  pagination?: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
 // Admin product (for list from GET /admin/products)
 export interface AdminProduct {
   id: number;
@@ -743,6 +900,7 @@ export interface AdminProduct {
   created_at?: string;
   updated_at?: string;
   category?: { id: number; name: string; slug?: string };
+  service?: { id: number; name: string };
   primary_image?: { id?: number; image_path?: string; image_url?: string };
   images?: Array<{ id?: number; image_path?: string; image_url?: string; is_primary?: number }>;
 }
@@ -759,6 +917,7 @@ export interface AdminProductCreated {
   weight_unit?: string;
   handle?: string;
   category_id?: number | null;
+  service_id?: number | null;
   track_quantity?: boolean;
   allow_backorder?: boolean;
   requires_shipping?: boolean;
@@ -768,6 +927,7 @@ export interface AdminProductCreated {
   image?: string | null;
   image_url?: string | null;
   category?: { id: number; name: string } | null;
+  service?: { id: number; name: string } | null;
   primary_image?: {
     id: number;
     product_id: number;

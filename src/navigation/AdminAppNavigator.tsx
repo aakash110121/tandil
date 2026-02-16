@@ -24,6 +24,9 @@ import AdminRecentActivitiesScreen from '../screens/admin/AdminRecentActivitiesS
 import AdminCategoriesScreen from '../screens/admin/AdminCategoriesScreen';
 import AdminAddCategoryScreen from '../screens/admin/AdminAddCategoryScreen';
 import AdminEditCategoryScreen from '../screens/admin/AdminEditCategoryScreen';
+import AdminServicesScreen from '../screens/admin/AdminServicesScreen';
+import AdminAddServiceScreen from '../screens/admin/AdminAddServiceScreen';
+import AdminEditServiceScreen from '../screens/admin/AdminEditServiceScreen';
 import AdminBannersScreen from '../screens/admin/AdminBannersScreen';
 import AdminOrdersScreen from '../screens/admin/AdminOrdersScreen';
 
@@ -111,6 +114,9 @@ const AdminAppNavigator = () => {
         <Stack.Screen name="AdminCategories" component={AdminCategoriesScreen} />
         <Stack.Screen name="AdminAddCategory" component={AdminAddCategoryScreen} />
         <Stack.Screen name="AdminEditCategory" component={AdminEditCategoryScreen} />
+        <Stack.Screen name="AdminServices" component={AdminServicesScreen} />
+        <Stack.Screen name="AdminAddService" component={AdminAddServiceScreen} />
+        <Stack.Screen name="AdminEditService" component={AdminEditServiceScreen} />
         <Stack.Screen name="AdminBanners" component={AdminBannersScreen} />
         <Stack.Screen name="AdminOrders" component={AdminOrdersScreen} />
       </Stack.Navigator>

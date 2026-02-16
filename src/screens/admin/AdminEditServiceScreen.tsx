@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Switch,
   KeyboardAvoidingView,
   Platform,
+  Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,39 +21,60 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import { buildFullImageUrl } from '../../config/api';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
-import { adminService, AdminCategory } from '../../services/adminService';
+import { adminService, AdminService } from '../../services/adminService';
 import { compressImageForUpload } from '../../utils/compressImage';
 
-type AdminEditCategoryParams = { category: AdminCategory };
+type AdminEditServiceParams = { service: AdminService } | { serviceId: number };
 
-const AdminEditCategoryScreen: React.FC = () => {
+const AdminEditServiceScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
-  const route = useRoute<RouteProp<{ params: AdminEditCategoryParams }, 'params'>>();
-  const category = route.params?.category;
-  const categoryId = category?.id;
+  const route = useRoute<RouteProp<{ params: AdminEditServiceParams }, 'params'>>();
+  const params = route.params;
+  const serviceId = params && 'serviceId' in params ? params.serviceId : params?.service?.id;
+  const initialService = params && 'service' in params ? params.service : null;
 
-  const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [description, setDescription] = useState('');
-  const [isActive, setIsActive] = useState(true);
+  const [service, setService] = useState<AdminService | null>(initialService ?? null);
+  const [name, setName] = useState(initialService?.name ?? '');
+  const [slug, setSlug] = useState(initialService?.slug ?? '');
+  const [description, setDescription] = useState(initialService?.description ?? '');
   const [image, setImage] = useState<{ uri: string } | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
+  const [isActive, setIsActive] = useState(initialService?.is_active !== false);
+  const [loadingDetail, setLoadingDetail] = useState(!!serviceId);
   const [loading, setLoading] = useState(false);
   const [pickingImage, setPickingImage] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [detailError, setDetailError] = useState<string | null>(null);
+
+  const fetchServiceDetail = useCallback(async () => {
+    if (!serviceId) return;
+    setLoadingDetail(true);
+    setDetailError(null);
+    try {
+      const res = await adminService.getServiceById(serviceId);
+      const data = res.data;
+      if (data) {
+        setService(data);
+        setName(data.name ?? '');
+        setSlug(data.slug ?? '');
+        setDescription(data.description ?? '');
+        setIsActive(data.is_active !== false);
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || t('admin.services.loadError', 'Failed to load service');
+      setDetailError(msg);
+    } finally {
+      setLoadingDetail(false);
+    }
+  }, [serviceId, t]);
 
   useEffect(() => {
-    if (category) {
-      setName(category.name ?? '');
-      setSlug(category.slug ?? '');
-      setDescription(category.description ?? '');
-      const activeVal = category.is_active;
-      setIsActive(activeVal === 0 || activeVal === false ? false : true);
-    }
-  }, [category]);
+    fetchServiceDetail();
+  }, [fetchServiceDetail]);
 
   const currentImageUri =
-    image?.uri ?? (category?.image_url ? category.image_url : category?.image ? buildFullImageUrl(category.image) : null);
+    image?.uri ?? (service?.image_url ? service.image_url : service?.image ? buildFullImageUrl(service.image) : null);
 
   const pickImageFromDevice = async () => {
     if (pickingImage) return;
@@ -83,6 +105,7 @@ const AdminEditCategoryScreen: React.FC = () => {
       if (!result.canceled && result.assets?.[0]) {
         const uri = await compressImageForUpload(result.assets[0].uri);
         setImage({ uri });
+        setImageRemoved(false);
       }
     } catch (err: any) {
       Alert.alert(
@@ -95,17 +118,20 @@ const AdminEditCategoryScreen: React.FC = () => {
     }
   };
 
-  const removeImage = () => setImage(null);
+  const removeImage = () => {
+    setImage(null);
+    setImageRemoved(true);
+  };
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
-    if (!name.trim()) newErrors.name = t('admin.categoryForm.errorNameRequired');
+    if (!name.trim()) newErrors.name = t('admin.services.errorNameRequired', 'Service name is required');
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleUpdateCategory = async () => {
-    if (!categoryId) return;
+  const handleUpdateService = async () => {
+    if (!serviceId) return;
     if (!validateForm()) {
       Alert.alert(
         t('admin.categoryForm.missingFieldTitle'),
@@ -117,16 +143,17 @@ const AdminEditCategoryScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      await adminService.updateCategory(categoryId, {
+      await adminService.updateService(serviceId, {
         name: name.trim(),
         slug: slug.trim() || undefined,
         description: description.trim() || undefined,
-        is_active: isActive ? 1 : 0,
         image: image ?? undefined,
+        image_remove: imageRemoved || undefined,
+        is_active: isActive,
       });
       Alert.alert(
         t('admin.users.success'),
-        t('admin.categoryForm.successUpdate'),
+        t('admin.services.successUpdate', 'Service updated successfully.'),
         [{ text: t('common.done'), onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
@@ -134,25 +161,64 @@ const AdminEditCategoryScreen: React.FC = () => {
         err.response?.data?.message ||
         err.response?.data?.error ||
         err.message ||
-        t('admin.categoryForm.updateFailed');
+        t('admin.services.updateFailed', 'Failed to update service');
       Alert.alert(t('admin.users.error'), message);
     } finally {
       setLoading(false);
     }
   };
 
-  if (!categoryId || !category) {
+  if (!serviceId) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('admin.categoryForm.editTitle')}</Text>
+          <Text style={styles.headerTitle}>{t('admin.services.editTitle', 'Edit Service')}</Text>
           <View style={styles.headerRight} />
         </View>
         <View style={styles.centerWrap}>
-          <Text style={styles.errorText}>{t('admin.categoryForm.notFound')}</Text>
+          <Text style={styles.errorText}>{t('admin.services.notFound', 'Service not found.')}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadingDetail) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('admin.services.editTitle', 'Edit Service')}</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <View style={styles.centerWrap}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>{t('admin.services.loading', 'Loading service…')}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (detailError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('admin.services.editTitle', 'Edit Service')}</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <View style={styles.centerWrap}>
+          <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
+          <Text style={styles.errorText}>{detailError}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={fetchServiceDetail}>
+            <Text style={styles.retryBtnText}>{t('admin.users.retry', 'Retry')}</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -164,7 +230,7 @@ const AdminEditCategoryScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('admin.categoryForm.editTitle')}</Text>
+        <Text style={styles.headerTitle}>{t('admin.services.editTitle', 'Edit Service')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -180,80 +246,51 @@ const AdminEditCategoryScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('admin.categoryForm.detailsSection')}</Text>
+            <Text style={styles.sectionTitle}>{t('admin.services.detailsSection', 'Service details')}</Text>
 
             <Input
-              label={t('admin.categoryForm.nameLabel')}
-              placeholder={t('admin.categoryForm.namePlaceholder')}
+              label={t('admin.services.nameLabel', 'Name')}
+              placeholder={t('admin.services.namePlaceholder', 'Service name')}
               value={name}
               onChangeText={(txt) => { setName(txt); if (errors.name) setErrors({ ...errors, name: '' }); }}
-              leftIcon="pricetag-outline"
+              leftIcon="construct-outline"
               error={errors.name}
             />
 
             <Input
-              label={t('admin.categoryForm.slugLabel')}
-              placeholder={t('admin.categoryForm.slugPlaceholder')}
+              label={t('admin.services.slugLabel', 'Slug')}
+              placeholder={t('admin.services.slugPlaceholder', 'service-slug')}
               value={slug}
               onChangeText={setSlug}
               autoCapitalize="none"
             />
 
             <Input
-              label={t('admin.categoryForm.descriptionLabel')}
-              placeholder={t('admin.categoryForm.descriptionPlaceholder')}
+              label={t('admin.services.descriptionLabel', 'Description')}
+              placeholder={t('admin.services.descriptionPlaceholder', 'Description')}
               value={description}
               onChangeText={setDescription}
               multiline
               numberOfLines={3}
             />
 
-            <View style={styles.dropdownWrapper}>
-              <Text style={styles.dropdownLabel}>
-                {t('admin.categoryForm.isActiveLabel', 'Status')}
-              </Text>
-              <TouchableOpacity
-                style={styles.dropdown}
-                onPress={() => setShowIsActiveDropdown((v) => !v)}
-              >
-                <Text style={styles.dropdownText}>
-                  {isActiveOptions.find((o) => o.value === isActive)?.label ?? isActiveOptions[0].label}
-                </Text>
-                <Ionicons name={showIsActiveDropdown ? 'chevron-up' : 'chevron-down'} size={20} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-              {showIsActiveDropdown && (
-                <Modal transparent visible animationType="fade" onRequestClose={() => setShowIsActiveDropdown(false)}>
-                  <TouchableOpacity
-                    style={styles.modalOverlay}
-                    activeOpacity={1}
-                    onPress={() => setShowIsActiveDropdown(false)}
-                  >
-                    <View style={styles.dropdownModal}>
-                      {isActiveOptions.map((opt) => (
-                        <TouchableOpacity
-                          key={opt.value}
-                          style={styles.dropdownOption}
-                          onPress={() => {
-                            setIsActive(opt.value);
-                            setShowIsActiveDropdown(false);
-                          }}
-                        >
-                          <Text style={styles.dropdownOptionText}>{opt.label}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </TouchableOpacity>
-                </Modal>
-              )}
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>{t('admin.services.isActive', 'Active')}</Text>
+              <Switch
+                value={isActive}
+                onValueChange={setIsActive}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.background}
+              />
             </View>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('admin.categoryForm.imageSection')}</Text>
-            <Text style={styles.uploadedHint}>{t('admin.categoryForm.currentImageHint')}</Text>
+            <Text style={styles.sectionTitle}>{t('admin.categoryForm.imageSection', 'Image')}</Text>
+            <Text style={styles.uploadedHint}>{t('admin.categoryForm.currentImageHint', 'Current image (if any)')}</Text>
             {!image && currentImageUri && (
               <View style={styles.imagePreviewWrap}>
-                <Text style={styles.currentLabel}>{t('admin.categoryForm.currentImageLabel')}</Text>
+                <Text style={styles.currentLabel}>{t('admin.categoryForm.currentImageLabel', 'Current')}</Text>
                 <View style={styles.thumbWrap}>
                   <Image source={{ uri: currentImageUri }} style={styles.thumb} contentFit="cover" />
                 </View>
@@ -287,8 +324,8 @@ const AdminEditCategoryScreen: React.FC = () => {
           </View>
 
           <Button
-            title={t('admin.categoryForm.submitUpdate')}
-            onPress={handleUpdateCategory}
+            title={t('admin.services.submitUpdate', 'Update Service')}
+            onPress={handleUpdateService}
             disabled={loading}
             loading={loading}
             style={styles.submitButton}
@@ -314,8 +351,16 @@ const styles = StyleSheet.create({
   backBtn: { padding: SPACING.xs },
   headerTitle: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.bold, color: COLORS.text },
   headerRight: { width: 40 },
-  centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorText: { fontSize: FONT_SIZES.sm, color: COLORS.error },
+  centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: SPACING.md },
+  errorText: { fontSize: FONT_SIZES.sm, color: COLORS.error, textAlign: 'center' },
+  loadingText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
+  retryBtn: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  retryBtnText: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.semiBold, color: COLORS.background },
   keyboardView: { flex: 1 },
   scrollView: { flex: 1 },
   scrollContent: { padding: SPACING.lg },
@@ -326,26 +371,15 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.md,
   },
-  toggleRow: {
+  switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.md,
-    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
-  toggleLabel: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: FONT_WEIGHTS.medium,
-    color: COLORS.text,
-  },
-  toggleRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  toggleValue: {
+  switchLabel: {
     fontSize: FONT_SIZES.md,
-    color: COLORS.textSecondary,
+    color: COLORS.text,
   },
   uploadedHint: {
     fontSize: FONT_SIZES.xs,
@@ -396,4 +430,4 @@ const styles = StyleSheet.create({
   bottomPad: { height: SPACING.xl * 2 },
 });
 
-export default AdminEditCategoryScreen;
+export default AdminEditServiceScreen;

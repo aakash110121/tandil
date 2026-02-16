@@ -20,7 +20,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import { buildFullImageUrl } from '../../config/api';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
-import { adminService, AdminCategory } from '../../services/adminService';
+import { adminService, AdminCategory, AdminService } from '../../services/adminService';
 import { setPendingProductImage } from './pendingProductImage';
 import { compressImageForUpload, compressImagesForUpload } from '../../utils/compressImage';
 
@@ -36,6 +36,7 @@ const AdminAddProductScreen: React.FC = () => {
   const [stock, setStock] = useState('');
   const [status, setStatus] = useState('active');
   const [categoryId, setCategoryId] = useState('');
+  const [serviceId, setServiceId] = useState('');
   const [weightUnit, setWeightUnit] = useState('kg');
   const [sku, setSku] = useState('');
   const [handle, setHandle] = useState('');
@@ -46,7 +47,9 @@ const AdminAddProductScreen: React.FC = () => {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showWeightUnitDropdown, setShowWeightUnitDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
+  const [services, setServices] = useState<AdminService[]>([]);
   const [pickingMain, setPickingMain] = useState(false);
   const [pickingExtra, setPickingExtra] = useState(false);
 
@@ -60,7 +63,17 @@ const AdminAddProductScreen: React.FC = () => {
     }
   }, []);
 
-  useFocusEffect(useCallback(() => { fetchCategories(); }, [fetchCategories]));
+  const fetchServices = useCallback(async () => {
+    try {
+      const res = await adminService.getServices({ page: 1, per_page: 100 });
+      const list = Array.isArray(res.data) ? res.data : (res as any)?.data ?? [];
+      setServices(Array.isArray(list) ? list : []);
+    } catch (_) {
+      setServices([]);
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => { fetchCategories(); fetchServices(); }, [fetchCategories, fetchServices]));
 
   const categoryOptions = useMemo(
     () => [
@@ -68,6 +81,14 @@ const AdminAddProductScreen: React.FC = () => {
       ...categories.map((c) => ({ value: String(c.id), label: c.name })),
     ],
     [categories, t]
+  );
+
+  const serviceOptions = useMemo(
+    () => [
+      { value: '', label: t('admin.addProduct.noService') },
+      ...services.map((s) => ({ value: String(s.id), label: s.name })),
+    ],
+    [services, t]
   );
 
   const statusOptions = useMemo(
@@ -198,6 +219,7 @@ const AdminAddProductScreen: React.FC = () => {
     setLoading(true);
     try {
       const categoryIdNum = categoryId.trim() ? parseInt(categoryId, 10) : undefined;
+      const serviceIdNum = serviceId.trim() ? parseInt(serviceId, 10) : undefined;
       let createdData: { image_url?: string | null; image?: string | null; primary_image?: { image_url?: string; image_path?: string }; images?: Array<{ image_url?: string; image_path?: string }> } | undefined;
 
       const hasMainFile = mainImage != null;
@@ -214,6 +236,7 @@ const AdminAddProductScreen: React.FC = () => {
             stock: parseInt(stock, 10),
             status,
             category_id: categoryIdNum ?? null,
+            service_id: serviceIdNum ?? null,
             weight_unit: weightUnit,
             sku: sku.trim(),
             handle: handle.trim(),
@@ -231,6 +254,7 @@ const AdminAddProductScreen: React.FC = () => {
           stock: parseInt(stock, 10),
           status,
           category_id: categoryIdNum ?? null,
+          service_id: serviceIdNum ?? null,
           weight_unit: weightUnit,
           sku: sku.trim(),
           handle: handle.trim(),
@@ -446,6 +470,16 @@ const AdminAddProductScreen: React.FC = () => {
               () => setShowCategoryDropdown((v) => !v),
               (v) => { setCategoryId(v); if (errors.category_id) setErrors({ ...errors, category_id: '' }); },
               errors.category_id
+            )}
+
+            {renderDropdown(
+              t('admin.addProduct.serviceLabel'),
+              serviceId,
+              serviceOptions,
+              showServiceDropdown,
+              () => setShowServiceDropdown((v) => !v),
+              (v) => { setServiceId(v); if (errors.service_id) setErrors({ ...errors, service_id: '' }); },
+              errors.service_id
             )}
 
             {renderDropdown(

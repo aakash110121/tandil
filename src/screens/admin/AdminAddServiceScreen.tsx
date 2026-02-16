@@ -6,9 +6,9 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Switch,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,7 +22,7 @@ import { Button } from '../../components/common/Button';
 import { adminService } from '../../services/adminService';
 import { compressImageForUpload } from '../../utils/compressImage';
 
-const AdminAddCategoryScreen: React.FC = () => {
+const AdminAddServiceScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [name, setName] = useState('');
@@ -42,10 +42,7 @@ const AdminAddCategoryScreen: React.FC = () => {
       if (status !== 'granted') {
         Alert.alert(
           t('admin.categoryForm.permissionTitle', 'Permission needed'),
-          t(
-            'admin.categoryForm.permissionBody',
-            'Allow access to your photos to add a category image. You can enable it in Settings.'
-          ),
+          t('admin.categoryForm.permissionBody', 'Allow access to your photos to add an image.'),
           [{ text: t('common.done', 'OK') }]
         );
         return;
@@ -53,10 +50,7 @@ const AdminAddCategoryScreen: React.FC = () => {
       if (typeof ImagePicker.launchImageLibraryAsync !== 'function') {
         Alert.alert(
           t('admin.categoryForm.notAvailableTitle', 'Not available'),
-          t(
-            'admin.categoryForm.notAvailableBody',
-            'Image picker is not available in this environment.'
-          ),
+          t('admin.categoryForm.notAvailableBody', 'Image picker is not available.'),
           [{ text: t('common.done', 'OK') }]
         );
         return;
@@ -85,16 +79,16 @@ const AdminAddCategoryScreen: React.FC = () => {
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
-    if (!name.trim()) newErrors.name = t('admin.categoryForm.errorNameRequired', 'Category name is required');
+    if (!name.trim()) newErrors.name = t('admin.services.errorNameRequired', 'Service name is required');
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleCreateCategory = async () => {
+  const handleCreateService = async () => {
     if (!validateForm()) {
       Alert.alert(
         t('admin.categoryForm.missingFieldTitle', 'Missing required field'),
-        t('admin.categoryForm.missingFieldMessage', 'Please enter a category name.'),
+        t('admin.categoryForm.missingFieldMessage', 'Please enter a service name.'),
         [{ text: t('common.done', 'OK') }]
       );
       return;
@@ -102,16 +96,16 @@ const AdminAddCategoryScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      await adminService.createCategory({
+      await adminService.createService({
         name: name.trim(),
         slug: slug.trim() || undefined,
         description: description.trim() || undefined,
-        is_active: isActive ? 1 : 0,
         image: image ?? undefined,
+        is_active: isActive,
       });
       Alert.alert(
         t('admin.users.success', 'Success'),
-        t('admin.categoryForm.successCreate', 'Category created successfully.'),
+        t('admin.services.createSuccess', 'Service created successfully.'),
         [{ text: t('common.done', 'OK'), onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
@@ -119,7 +113,7 @@ const AdminAddCategoryScreen: React.FC = () => {
         err.response?.data?.message ||
         err.response?.data?.error ||
         err.message ||
-        t('admin.categoryForm.createFailed', 'Failed to create category. Please try again.');
+        t('admin.services.createFailed', 'Failed to create service. Please try again.');
       Alert.alert(t('admin.users.error', 'Error'), message);
     } finally {
       setLoading(false);
@@ -132,9 +126,7 @@ const AdminAddCategoryScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {t('admin.categoryForm.addTitle', 'Add Category')}
-        </Text>
+        <Text style={styles.headerTitle}>{t('admin.services.addTitle', 'Add Service')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -150,61 +142,48 @@ const AdminAddCategoryScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {t('admin.categoryForm.detailsSection', 'Category details')}
-            </Text>
+            <Text style={styles.sectionTitle}>{t('admin.services.detailsSection', 'Service details')}</Text>
 
             <Input
-              label={t('admin.categoryForm.nameLabel', 'Name *')}
-              placeholder={t('admin.categoryForm.namePlaceholder', 'e.g. Fertilizers')}
+              label={t('admin.services.nameLabel', 'Name *')}
+              placeholder={t('admin.services.namePlaceholder', 'e.g. Tree Care')}
               value={name}
-              onChangeText={(t) => { setName(t); if (errors.name) setErrors({ ...errors, name: '' }); }}
-              leftIcon="pricetag-outline"
+              onChangeText={(txt) => { setName(txt); if (errors.name) setErrors({ ...errors, name: '' }); }}
+              leftIcon="construct-outline"
               error={errors.name}
             />
 
             <Input
-              label={t('admin.categoryForm.slugLabel', 'Slug (optional)')}
-              placeholder={t('admin.categoryForm.slugPlaceholder', 'e.g. fertilizers')}
+              label={t('admin.services.slugLabel', 'Slug (optional)')}
+              placeholder={t('admin.services.slugPlaceholder', 'e.g. tree-care')}
               value={slug}
               onChangeText={setSlug}
               autoCapitalize="none"
             />
 
             <Input
-              label={t('admin.categoryForm.descriptionLabel', 'Description (optional)')}
-              placeholder={t('admin.categoryForm.descriptionPlaceholder', 'e.g. Organic and chemical fertilizers')}
+              label={t('admin.services.descriptionLabel', 'Description (optional)')}
+              placeholder={t('admin.services.descriptionPlaceholder', 'e.g. Professional tree care services')}
               value={description}
               onChangeText={setDescription}
               multiline
               numberOfLines={3}
             />
 
-            <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>
-                {t('admin.categoryForm.isActiveLabel', 'Status')}
-              </Text>
-              <View style={styles.toggleRight}>
-                <Text style={styles.toggleValue}>
-                  {isActive ? t('admin.categoryForm.isActiveActive', 'Active') : t('admin.categoryForm.isActiveDisabled', 'Disabled (Coming Soon)')}
-                </Text>
-                <Switch
-                  value={isActive}
-                  onValueChange={setIsActive}
-                  trackColor={{ false: COLORS.border, true: COLORS.primary }}
-                  thumbColor={COLORS.background}
-                />
-              </View>
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>{t('admin.services.isActive', 'Active')}</Text>
+              <Switch
+                value={isActive}
+                onValueChange={setIsActive}
+                trackColor={{ false: COLORS.border, true: COLORS.primary }}
+                thumbColor={COLORS.background}
+              />
             </View>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {t('admin.categoryForm.imageSection', 'Image (optional)')}
-            </Text>
-            <Text style={styles.uploadedHint}>
-              {t('admin.categoryForm.imageHint', 'Add an image for the category. JPEG, PNG or WebP.')}
-            </Text>
+            <Text style={styles.sectionTitle}>{t('admin.categoryForm.imageSection', 'Image (optional)')}</Text>
+            <Text style={styles.uploadedHint}>{t('admin.categoryForm.imageHint', 'Add an image for the service.')}</Text>
             <TouchableOpacity
               style={[styles.uploadBtn, pickingImage && styles.uploadBtnDisabled]}
               onPress={pickImageFromDevice}
@@ -213,9 +192,7 @@ const AdminAddCategoryScreen: React.FC = () => {
             >
               <Ionicons name="image-outline" size={24} color={COLORS.primary} />
               <Text style={styles.uploadBtnText}>
-                {pickingImage
-                  ? t('admin.categoryForm.opening', 'Opening…')
-                  : t('admin.categoryForm.uploadFromDevice', 'Upload from device')}
+                {pickingImage ? t('admin.categoryForm.opening', 'Opening…') : t('admin.categoryForm.uploadFromDevice', 'Upload from device')}
               </Text>
             </TouchableOpacity>
             {image && (
@@ -231,8 +208,8 @@ const AdminAddCategoryScreen: React.FC = () => {
           </View>
 
           <Button
-            title={t('admin.categoryForm.submitCreate', 'Create Category')}
-            onPress={handleCreateCategory}
+            title={t('admin.services.submitCreate', 'Create Service')}
+            onPress={handleCreateService}
             disabled={loading}
             loading={loading}
             style={styles.submitButton}
@@ -268,32 +245,14 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: SPACING.md,
   },
-  toggleRow: {
+  switchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.md,
-    paddingVertical: SPACING.sm,
-  },
-  toggleLabel: {
-    fontSize: FONT_SIZES.sm,
-    fontWeight: FONT_WEIGHTS.medium,
-    color: COLORS.text,
-  },
-  toggleRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  toggleValue: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.textSecondary,
-  },
-  uploadedHint: {
-    fontSize: FONT_SIZES.xs,
-    color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
   },
+  switchLabel: { fontSize: FONT_SIZES.md, color: COLORS.text },
+  uploadedHint: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginBottom: SPACING.sm },
   uploadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -308,29 +267,13 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   uploadBtnDisabled: { opacity: 0.6 },
-  uploadBtnText: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.primary,
-    fontWeight: FONT_WEIGHTS.medium,
-  },
+  uploadBtnText: { fontSize: FONT_SIZES.md, color: COLORS.primary, fontWeight: FONT_WEIGHTS.medium },
   imagePreviewWrap: { marginTop: SPACING.sm },
-  thumbWrap: {
-    width: 100,
-    height: 100,
-    borderRadius: BORDER_RADIUS.sm,
-    overflow: 'hidden',
-    position: 'relative',
-  },
+  thumbWrap: { width: 100, height: 100, borderRadius: BORDER_RADIUS.sm, overflow: 'hidden', position: 'relative' },
   thumb: { width: '100%', height: '100%' },
-  thumbRemove: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-  },
+  thumbRemove: { position: 'absolute', top: 4, right: 4, backgroundColor: COLORS.background, borderRadius: 12 },
   submitButton: { marginTop: SPACING.md },
   bottomPad: { height: SPACING.xl * 2 },
 });
 
-export default AdminAddCategoryScreen;
+export default AdminAddServiceScreen;

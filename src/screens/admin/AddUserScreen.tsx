@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -34,29 +34,25 @@ const AddUserScreen: React.FC = () => {
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
-  const roles = [
-    { value: 'client', labelKey: 'admin.addUser.roleClient' },
-    { value: 'technician', labelKey: 'admin.addUser.roleTechnician' },
-    { value: 'supervisor', labelKey: 'admin.addUser.roleSupervisor' },
-    { value: 'area_manager', labelKey: 'admin.addUser.roleAreaManager' },
-    { value: 'hr', labelKey: 'admin.addUser.roleHr' },
-    { value: 'admin', labelKey: 'admin.addUser.roleAdmin' },
-  ];
+  const roleOptions = useMemo(
+    () => [
+      { value: 'client', label: t('admin.addUser.roleClient') },
+      { value: 'technician', label: t('admin.addUser.roleTechnician') },
+      { value: 'supervisor', label: t('admin.addUser.roleSupervisor') },
+      { value: 'area_manager', label: t('admin.addUser.roleAreaManager') },
+      { value: 'hr', label: t('admin.addUser.roleHr') },
+      { value: 'admin', label: t('admin.addUser.roleAdmin') },
+    ],
+    [t]
+  );
 
-  const statuses = [
-    { value: 'active', labelKey: 'admin.addUser.statusActive' },
-    { value: 'inactive', labelKey: 'admin.addUser.statusInactive' },
-  ];
-
-  const getRoleLabel = (value: string) => {
-    const r = roles.find((x) => x.value === value);
-    return r ? t(r.labelKey) : t('admin.addUser.selectRole');
-  };
-
-  const getStatusLabel = (value: string) => {
-    const s = statuses.find((x) => x.value === value);
-    return s ? t(s.labelKey) : t('admin.addUser.statusActive');
-  };
+  const statusOptions = useMemo(
+    () => [
+      { value: 'active', label: t('admin.addUser.statusActive') },
+      { value: 'inactive', label: t('admin.addUser.statusInactive') },
+    ],
+    [t]
+  );
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -324,7 +320,7 @@ const AddUserScreen: React.FC = () => {
           {renderDropdown(
             t('admin.addUser.userRole'),
             role,
-            roles,
+            roleOptions,
             showRoleDropdown,
             () => {
               setShowRoleDropdown(!showRoleDropdown);
@@ -335,13 +331,12 @@ const AddUserScreen: React.FC = () => {
               if (errors.role) setErrors({ ...errors, role: '' });
             },
             errors.role,
-            undefined,
-            'admin.addUser.selectRole'
+            undefined
           )}
           {renderDropdown(
             t('admin.addUser.accountStatus'),
             status,
-            statuses,
+            statusOptions,
             showStatusDropdown,
             () => {
               setShowStatusDropdown(!showStatusDropdown);
@@ -352,8 +347,7 @@ const AddUserScreen: React.FC = () => {
               if (errors.status) setErrors({ ...errors, status: '' });
             },
             errors.status,
-            t('admin.addUser.statusHint'),
-            'admin.addUser.selectStatus'
+            t('admin.addUser.statusHint')
           )}
         </View>
 
