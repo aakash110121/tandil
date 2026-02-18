@@ -247,6 +247,7 @@ export type UserStackParamList = {
   VendorLogin: undefined;
   ServiceCategory: undefined;
   ServiceDetail: { serviceId: string };
+  ServiceProducts: { serviceId: number; serviceName?: string };
   BookingForm: { serviceId: string };
   OrderSummary: { serviceId: string };
   CategoryProducts: { 
@@ -262,6 +263,7 @@ export type UserStackParamList = {
   Offers: undefined;
   ProductCategory: undefined;
   ProductDetail: { product: any };
+  FeaturedProducts: undefined;
   Cart: undefined;
   Checkout: undefined;
   RateReview: { orderId: string };

@@ -21,7 +21,7 @@ export interface ShopCategoriesResponse {
 
 export interface ShopProduct {
   id: number;
-  category_id: number;
+  category_id?: number | null;
   name: string;
   vendor?: string;
   type?: string;
@@ -35,13 +35,19 @@ export interface ShopProduct {
   weight_unit?: string;
   stock: number;
   status: string;
+  is_featured?: boolean | number;
   image?: string | null;
   image_url?: string | null;
   main_image?: { id: number; image_path: string; image_url?: string } | null;
   gallery_images?: Array<{ id: number; image_path: string; image_url?: string; sort_order?: number }>;
   created_at?: string;
   updated_at?: string;
-  category?: ShopProductCategory;
+  category?: ShopProductCategory | null;
+}
+
+export interface ShopFeaturedProductsResponse {
+  success?: boolean;
+  data?: ShopProduct[];
 }
 
 export interface ShopProductsByCategoryResponse {
@@ -116,6 +122,21 @@ export const shopService = {
       return data;
     } catch (_) {
       return null;
+    }
+  },
+
+  /** GET /shop/products/featured?limit=10 – public. Returns featured products for Home & View All. */
+  getFeaturedProducts: async (limit: number = 10): Promise<ShopProduct[]> => {
+    try {
+      const response = await publicApiClient.get<ShopFeaturedProductsResponse>('/shop/products/featured', {
+        params: { limit },
+        timeout: 15000,
+      });
+      const body = response?.data ?? response;
+      const list = Array.isArray((body as any)?.data) ? (body as any).data : Array.isArray(body) ? body : [];
+      return list;
+    } catch (_) {
+      return [];
     }
   },
 };

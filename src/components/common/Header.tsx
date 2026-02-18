@@ -20,6 +20,7 @@ interface HeaderProps {
   showBack?: boolean;
   showCart?: boolean;
   showNotifications?: boolean;
+  showLanguage?: boolean;
   onBackPress?: () => void;
   onCartPress?: () => void;
   onNotificationPress?: () => void;
@@ -31,6 +32,7 @@ const Header: React.FC<HeaderProps> = ({
   showBack = true,
   showCart = false,
   showNotifications = false,
+  showLanguage = true,
   onBackPress,
   onCartPress,
   onNotificationPress,
@@ -86,9 +88,11 @@ const Header: React.FC<HeaderProps> = ({
         
         <View style={styles.rightSection}>
           {rightComponent}
-          <TouchableOpacity style={styles.iconButton} onPress={() => setLanguageModalVisible(true)}>
-            <Ionicons name="globe-outline" size={22} color={COLORS.text} />
-          </TouchableOpacity>
+          {showLanguage && (
+            <TouchableOpacity style={styles.iconButton} onPress={() => setLanguageModalVisible(true)}>
+              <Ionicons name="globe-outline" size={22} color={COLORS.text} />
+            </TouchableOpacity>
+          )}
           {showNotifications && (
             <TouchableOpacity style={styles.iconButton} onPress={handleNotificationPress}>
               <Ionicons name="notifications-outline" size={24} color={COLORS.text} />

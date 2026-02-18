@@ -315,6 +315,7 @@ export const adminService = {
     sku: string;
     handle: string;
     image_urls?: string[];
+    is_featured?: number; // 0 = no, 1 = show in Featured Products
   }): Promise<{
     status: boolean;
     message?: string;
@@ -336,6 +337,7 @@ export const adminService = {
     sku: string;
     handle: string;
     image_urls?: string[];
+    is_featured?: number; // 0 = no, 1 = show in Featured Products
     mainImage: { uri: string };
     extraImages?: { uri: string }[];
   }): Promise<{ status: boolean; message?: string; data: AdminProductCreated }> => {
@@ -345,6 +347,7 @@ export const adminService = {
     formData.append('price', String(params.price));
     formData.append('stock', String(params.stock));
     formData.append('status', params.status);
+    formData.append('is_featured', String(params.is_featured ?? 0));
     if (params.category_id != null) formData.append('category_id', String(params.category_id));
     if (params.service_id != null) formData.append('service_id', String(params.service_id));
     if (params.weight_unit) formData.append('weight_unit', params.weight_unit);
@@ -385,6 +388,7 @@ export const adminService = {
       handle?: string;
       image_urls?: string[];
       image_ids_to_remove?: number[];
+      is_featured?: number; // 0 = no, 1 = show in Featured Products
     }
   ): Promise<{ status: boolean; message?: string; updated_fields?: string[]; data: AdminProductCreated }> => {
     const response = await apiClient.put(`/admin/products/${productId}`, body, { timeout: 60000 });
@@ -407,6 +411,7 @@ export const adminService = {
       handle?: string;
       image_urls?: string[];
       image_ids_to_remove?: number[];
+      is_featured?: number; // 0 = no, 1 = show in Featured Products
       mainImage?: { uri: string };
       extraImages?: { uri: string }[];
     }
@@ -417,6 +422,7 @@ export const adminService = {
     if (params.price !== undefined) formData.append('price', String(params.price));
     if (params.stock !== undefined) formData.append('stock', String(params.stock));
     if (params.status !== undefined) formData.append('status', params.status);
+    if (params.is_featured !== undefined) formData.append('is_featured', String(params.is_featured));
     if (params.category_id != null) formData.append('category_id', String(params.category_id));
     if (params.service_id != null) formData.append('service_id', String(params.service_id));
     if (params.weight_unit) formData.append('weight_unit', params.weight_unit);
@@ -675,6 +681,162 @@ export const adminService = {
     return { success: body?.success, message: body?.message, data: list };
   },
 
+  /** GET /admin/exclusive-offers – list exclusive offers (Bearer token). */
+  getExclusiveOffers: async (params?: {
+    page?: number;
+    per_page?: number;
+  }): Promise<{ success?: boolean; message?: string; data: AdminExclusiveOffer[]; meta?: { current_page?: number; last_page?: number; total?: number }; pagination?: { current_page?: number; last_page?: number; total?: number } }> => {
+    const response = await apiClient.get<{ success?: boolean; message?: string; data: AdminExclusiveOffer[] | { data: AdminExclusiveOffer[]; current_page?: number; last_page?: number; total?: number }; meta?: { current_page?: number; last_page?: number; total?: number }; pagination?: { current_page?: number; last_page?: number; total?: number } }>(
+      '/admin/exclusive-offers',
+      { params: params ?? {}, timeout: 15000 }
+    );
+    const body = response?.data ?? response;
+    const rawData = (body as any)?.data;
+    const list = Array.isArray(rawData) ? rawData : (rawData && Array.isArray((rawData as any)?.data) ? (rawData as any).data : []);
+    const meta = (body as any)?.meta ?? (body as any)?.pagination ?? (Array.isArray(rawData) ? undefined : (rawData as any));
+    return {
+      success: (body as any)?.success,
+      message: (body as any)?.message,
+      data: list,
+      meta: meta && typeof meta === 'object' ? meta : undefined,
+      pagination: meta && typeof meta === 'object' ? meta : undefined,
+    };
+  },
+
+  /** POST /admin/exclusive-offers – create exclusive offer (form-data, Bearer token). */
+  createExclusiveOffer: async (params: {
+    title: string;
+    description?: string;
+    discount_type: 'percentage' | 'fixed_amount' | 'buy_one_get_one';
+    discount_value?: number | string;
+    applies_to?: string;
+    start_date?: string;
+    end_date?: string;
+    is_active?: boolean | number;
+    sort_order?: number | string;
+    product_ids?: number[] | string;
+    image?: { uri: string };
+  }): Promise<{ success?: boolean; status?: boolean; message?: string; data?: AdminExclusiveOffer }> => {
+    const formData = new FormData();
+    formData.append('title', params.title.trim());
+    if (params.description != null && String(params.description).trim()) {
+      formData.append('description', String(params.description).trim());
+    }
+    formData.append('discount_type', params.discount_type);
+    if (params.discount_value != null && String(params.discount_value).trim() !== '') {
+      formData.append('discount_value', String(params.discount_value));
+    }
+    if (params.applies_to != null && String(params.applies_to).trim()) {
+      formData.append('applies_to', String(params.applies_to).trim());
+    }
+    if (params.start_date != null && String(params.start_date).trim()) {
+      formData.append('start_date', String(params.start_date).trim());
+    }
+    if (params.end_date != null && String(params.end_date).trim()) {
+      formData.append('end_date', String(params.end_date).trim());
+    }
+    if (params.is_active != null) {
+      const v = typeof params.is_active === 'boolean' ? (params.is_active ? '1' : '0') : String(params.is_active);
+      formData.append('is_active', v === '1' ? '1' : '0');
+    }
+    if (params.sort_order != null && String(params.sort_order).trim() !== '') {
+      formData.append('sort_order', String(params.sort_order));
+    }
+    if (params.product_ids != null) {
+      const ids = typeof params.product_ids === 'string'
+        ? params.product_ids
+        : Array.isArray(params.product_ids)
+          ? params.product_ids.join(',')
+          : '';
+      if (ids) formData.append('product_ids', ids);
+    }
+    if (params.image?.uri) {
+      formData.append('image', {
+        uri: params.image.uri,
+        type: 'image/jpeg',
+        name: 'offer-image.jpg',
+      } as any);
+    }
+    const response = await apiClient.post('/admin/exclusive-offers', formData, { timeout: 60000 });
+    return response.data;
+  },
+
+  /** GET /admin/exclusive-offers/:id – get single offer (Bearer token). */
+  getExclusiveOfferById: async (offerId: number): Promise<{ success?: boolean; message?: string; data: AdminExclusiveOffer }> => {
+    const response = await apiClient.get<{ success?: boolean; message?: string; data: AdminExclusiveOffer }>(
+      `/admin/exclusive-offers/${offerId}`,
+      { timeout: 15000 }
+    );
+    return response.data;
+  },
+
+  /** POST /admin/exclusive-offers/:id – update exclusive offer (form-data, Bearer token). */
+  updateExclusiveOffer: async (
+    offerId: number,
+    params: {
+      title: string;
+      description?: string;
+      discount_type: 'percentage' | 'fixed_amount' | 'buy_one_get_one';
+      discount_value?: number | string;
+      applies_to?: string;
+      start_date?: string;
+      end_date?: string;
+      is_active?: boolean | number;
+      sort_order?: number | string;
+      product_ids?: number[] | string;
+      image?: { uri: string };
+    }
+  ): Promise<{ success?: boolean; status?: boolean; message?: string; data?: AdminExclusiveOffer }> => {
+    const formData = new FormData();
+    formData.append('title', params.title.trim());
+    if (params.description != null && String(params.description).trim()) {
+      formData.append('description', String(params.description).trim());
+    }
+    formData.append('discount_type', params.discount_type);
+    if (params.discount_value != null && String(params.discount_value).trim() !== '') {
+      formData.append('discount_value', String(params.discount_value));
+    }
+    if (params.applies_to != null && String(params.applies_to).trim()) {
+      formData.append('applies_to', String(params.applies_to).trim());
+    }
+    if (params.start_date != null && String(params.start_date).trim()) {
+      formData.append('start_date', String(params.start_date).trim());
+    }
+    if (params.end_date != null && String(params.end_date).trim()) {
+      formData.append('end_date', String(params.end_date).trim());
+    }
+    if (params.is_active != null) {
+      const v = typeof params.is_active === 'boolean' ? (params.is_active ? '1' : '0') : String(params.is_active);
+      formData.append('is_active', v === '1' ? '1' : '0');
+    }
+    if (params.sort_order != null && String(params.sort_order).trim() !== '') {
+      formData.append('sort_order', String(params.sort_order));
+    }
+    if (params.product_ids != null) {
+      const ids = typeof params.product_ids === 'string'
+        ? params.product_ids
+        : Array.isArray(params.product_ids)
+          ? params.product_ids.join(',')
+          : '';
+      formData.append('product_ids', ids);
+    }
+    if (params.image?.uri) {
+      formData.append('image', {
+        uri: params.image.uri,
+        type: 'image/jpeg',
+        name: 'offer-image.jpg',
+      } as any);
+    }
+    const response = await apiClient.post(`/admin/exclusive-offers/${offerId}`, formData, { timeout: 60000 });
+    return response.data;
+  },
+
+  /** DELETE /admin/exclusive-offers/:id – delete exclusive offer (Bearer token). */
+  deleteExclusiveOffer: async (offerId: number): Promise<{ success?: boolean; message?: string }> => {
+    const response = await apiClient.delete(`/admin/exclusive-offers/${offerId}`, { timeout: 15000 });
+    return response.data;
+  },
+
   // Create banner (POST /api/admin/banners) – multipart/form-data (image optional)
   createBanner: async (params: {
     title: string;
@@ -800,6 +962,31 @@ export interface AdminBanner {
   updated_at?: string;
 }
 
+/** Exclusive offer (GET /admin/exclusive-offers and GET /admin/exclusive-offers/:id) */
+export interface AdminExclusiveOffer {
+  id: number;
+  title?: string;
+  name?: string;
+  description?: string | null;
+  image?: string | null;
+  image_url?: string | null;
+  status?: string;
+  is_active?: boolean | number;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  applies_to?: string | null;
+  discount_type?: string | null;
+  discount_value?: number | string | null;
+  priority?: number;
+  sort_order?: number;
+  product_ids?: number[];
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
+}
+
 export interface Tip {
   id: number | string;
   title: string;
@@ -895,6 +1082,7 @@ export interface AdminProduct {
   status?: string;
   weight_unit?: string;
   handle?: string;
+  is_featured?: number; // 0 = no, 1 = show in Featured Products
   image?: string | null;
   image_url?: string | null;
   created_at?: string;

@@ -25,7 +25,8 @@ import Header from '../../components/common/Header';
 import BeforeAfter from '../../components/common/BeforeAfter';
 import { useTranslation } from 'react-i18next';
 import { getBanners, getBannerImageUrl, Banner } from '../../services/bannerService';
-import { shopService, ShopProductCategory } from '../../services/shopService';
+import { shopService, ShopProductCategory, ShopProduct } from '../../services/shopService';
+import { publicServiceService, PublicService } from '../../services/publicServiceService';
 import { buildFullImageUrl } from '../../config/api';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -40,6 +41,10 @@ const HomeScreen: React.FC = () => {
   const [bannersLoading, setBannersLoading] = useState(true);
   const [productCategories, setProductCategories] = useState<Array<{ id: string; name: string; image: string; products_count?: number; coming_soon?: boolean }>>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [dashboardServices, setDashboardServices] = useState<PublicService[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [featuredProducts, setFeaturedProducts] = useState<ShopProduct[]>([]);
+  const [featuredProductsLoading, setFeaturedProductsLoading] = useState(true);
 
   const recentOrders = Array.isArray(orders) ? orders.slice(0, 3) : [];
   // Extract first order that has before/after photos in its tracking (if any)
@@ -156,6 +161,44 @@ const HomeScreen: React.FC = () => {
     return () => { cancelled = true; };
   }, []);
 
+  // Fetch public services for Place Service Orders (GET /services?per_page=12, no auth)
+  useEffect(() => {
+    let cancelled = false;
+    setServicesLoading(true);
+    publicServiceService
+      .getServices({ per_page: 12 })
+      .then((list) => {
+        if (!cancelled) setDashboardServices(list);
+        const uris = list
+          .map((s) => s.image_url || (s.image ? buildFullImageUrl(s.image) : null))
+          .filter(Boolean) as string[];
+        if (uris.length > 0) Image.prefetch(uris, { cachePolicy: 'disk' }).catch(() => {});
+      })
+      .finally(() => {
+        if (!cancelled) setServicesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch featured products (GET /shop/products/featured?limit=10) – show first 3 on Home, View All shows all
+  useEffect(() => {
+    let cancelled = false;
+    setFeaturedProductsLoading(true);
+    shopService
+      .getFeaturedProducts(10)
+      .then((list) => {
+        if (!cancelled) setFeaturedProducts(list);
+        const uris = list
+          .map((p) => p.image_url ?? (p.main_image as any)?.image_url ?? p.image)
+          .filter((u): u is string => typeof u === 'string' && u.length > 0)
+          .map((u) => (u.startsWith('http') ? u : buildFullImageUrl(u)));
+        if (uris.length > 0) Image.prefetch(uris.slice(0, 6), { cachePolicy: 'disk' }).catch(() => {});
+      })
+      .catch(() => { if (!cancelled) setFeaturedProducts([]); })
+      .finally(() => { if (!cancelled) setFeaturedProductsLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   // Fetch product categories for Shop by Category (GET /shop/products/categories)
   const categoryPlaceholderImage = 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=800&q=60';
   useEffect(() => {
@@ -179,6 +222,24 @@ const HomeScreen: React.FC = () => {
       })
       .finally(() => {
         if (!cancelled) setCategoriesLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch public services for "Place Service Orders" (GET /services?per_page=12, no auth)
+  useEffect(() => {
+    let cancelled = false;
+    setServicesLoading(true);
+    publicServiceService
+      .getServices({ per_page: 12 })
+      .then((list) => {
+        if (!cancelled) setDashboardServices(list);
+      })
+      .catch(() => {
+        if (!cancelled) setDashboardServices([]);
+      })
+      .finally(() => {
+        if (!cancelled) setServicesLoading(false);
       });
     return () => { cancelled = true; };
   }, []);
@@ -242,36 +303,27 @@ const HomeScreen: React.FC = () => {
     />
   );
 
-  // Featured services with better visuals
-  const featuredServices = [
-    {
-      id: 'featured1',
-      name: t('home.featuredItems.scheduledWatering.name'),
-      description: t('home.featuredItems.scheduledWatering.description'),
-      price: 120,
-      rating: 4.8,
-      image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?w=400',
-      badge: t('home.badges.popular'),
-    },
-    {
-      id: 'featured2',
-      name: t('home.featuredItems.plantingService.name'),
-      description: t('home.featuredItems.plantingService.description'),
-      price: 200,
-      rating: 4.9,
-      image: 'https://images.unsplash.com/photo-1461354464878-ad92f492a5a0?w=400',
-      badge: t('home.badges.new'),
-    },
-    {
-      id: 'featured3',
-      name: t('home.featuredItems.fullCareVisit.name'),
-      description: t('home.featuredItems.fullCareVisit.description'),
-      price: 260,
-      rating: 4.7,
-      image: 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?auto=format&fit=crop&w=800&q=60',
-      badge: t('home.badges.bestValue'),
-    },
-  ];
+  // Featured products: first 3 from API for the Home section; View All opens FeaturedProductsScreen
+  const featuredProductsFirst3 = featuredProducts.slice(0, 3);
+  const getFeaturedProductImage = (p: ShopProduct) => {
+    const raw = p.image_url ?? (p.main_image as any)?.image_url ?? p.image;
+    if (typeof raw === 'string' && raw.trim()) return raw.startsWith('http') ? raw : buildFullImageUrl(raw);
+    return 'https://images.unsplash.com/photo-1461354464878-ad92f492a5a0?w=400';
+  };
+  const featuredProductToDetail = (p: ShopProduct) => ({
+    id: String(p.id),
+    name: p.name,
+    price: typeof p.price === 'string' ? parseFloat(p.price) || 0 : p.price,
+    originalPrice: typeof p.compare_at_price === 'string' ? parseFloat(p.compare_at_price) || 0 : (p.compare_at_price ?? 0),
+    rating: 4.5,
+    reviews: 0,
+    image: getFeaturedProductImage(p),
+    badge: '',
+    inStock: (p.stock ?? 0) > 0,
+    description: p.description ?? undefined,
+    features: [] as string[],
+  });
+  const featuredBadges = [t('home.badges.popular'), t('home.badges.new'), t('home.badges.bestValue')];
 
   // Shop by Category: use API categories when available, else static fallback
   const staticCategoryFallback = [
@@ -474,7 +526,7 @@ const HomeScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Service Categories */}
+      {/* Place Service Orders - dynamic from GET /services (public API) or static fallback */}
        <View style={styles.section}>
          <View style={styles.sectionHeader}>
            <Text style={styles.sectionTitle}>{t('home.placeServiceOrders')}</Text>
@@ -484,87 +536,137 @@ const HomeScreen: React.FC = () => {
              <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
            </TouchableOpacity>
          </View>
-         
-                   <View style={styles.serviceGrid}>
-            {serviceCategories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={styles.serviceGridCard}
-                onPress={() => navigation.navigate('ServiceCategory', { 
-                  category: { 
-                    id: category.id, 
-                    name: category.name, 
-                    description: category.description, 
-                    icon: category.icon, 
-                    services: category.services 
-                  }
-                })}
-              >
-                <View style={styles.serviceGridIconContainer}>
-                  <View style={styles.serviceGridIcon}>
-                    <Ionicons 
-                      name={category.icon as any} 
-                      size={32} 
-                      color={COLORS.primary} 
-                    />
-                  </View>
-                                     <View style={styles.serviceGridBadge}>
-                     <Text style={styles.serviceGridBadgeText}>{category.services?.length || 4} {t('common.services')}</Text>
+
+         {servicesLoading ? (
+           <View style={styles.serviceGridPlaceholder}>
+             <Text style={styles.placeholderText}>{t('home.loading', 'Loading...')}</Text>
+           </View>
+         ) : dashboardServices.length > 0 ? (
+           <View style={styles.serviceGrid}>
+             {dashboardServices.map((service) => {
+               const imageUri = service.image_url ?? (service.image ? buildFullImageUrl(service.image) : null);
+               return (
+                 <TouchableOpacity
+                   key={service.id}
+                   style={styles.serviceGridCard}
+                   onPress={() => navigation.navigate('ServiceProducts', { serviceId: service.id, serviceName: service.name })}
+                 >
+                   <View style={styles.serviceGridIconContainer}>
+                     {imageUri ? (
+                       <Image source={{ uri: imageUri }} style={styles.serviceGridImageFull} contentFit="cover" />
+                     ) : (
+                       <View style={styles.serviceGridIcon}>
+                         <Ionicons name={getServiceIcon(service.slug || service.name)} size={32} color={COLORS.primary} />
+                       </View>
+                     )}
+                     <View style={styles.serviceGridBadge}>
+                       <Text style={styles.serviceGridBadgeText}>
+                         {service.products_count ?? 0} {t('category.products', 'products')}
+                       </Text>
+                     </View>
                    </View>
-                </View>
-                <View style={styles.serviceGridContent}>
-                  <Text style={styles.serviceGridTitle} numberOfLines={1}>{category.name}</Text>
-                  <Text style={styles.serviceGridDescription} numberOfLines={2}>{category.description}</Text>
-                                     <View style={styles.serviceGridServices}>
+                   <View style={styles.serviceGridContent}>
+                     <Text style={styles.serviceGridTitle} numberOfLines={1}>{service.name}</Text>
+                     <Text style={styles.serviceGridDescription} numberOfLines={2}>{service.description || t('home.professionalServices')}</Text>
+                   </View>
+                 </TouchableOpacity>
+               );
+             })}
+           </View>
+         ) : (
+           <View style={styles.serviceGrid}>
+             {serviceCategories.map((category) => (
+               <TouchableOpacity
+                 key={category.id}
+                 style={styles.serviceGridCard}
+                 onPress={() => navigation.navigate('ServiceCategory', {
+                   category: {
+                     id: category.id,
+                     name: category.name,
+                     description: category.description,
+                     icon: category.icon,
+                     services: category.services,
+                   },
+                 })}
+               >
+                 <View style={styles.serviceGridIconContainer}>
+                   <View style={styles.serviceGridIcon}>
+                     <Ionicons name={category.icon as any} size={32} color={COLORS.primary} />
+                   </View>
+                   <View style={styles.serviceGridBadge}>
+                     <Text style={styles.serviceGridBadgeText}>{category.services?.length || 4} {t('category.products', 'products')}</Text>
+                   </View>
+                 </View>
+                 <View style={styles.serviceGridContent}>
+                   <Text style={styles.serviceGridTitle} numberOfLines={1}>{category.name}</Text>
+                   <Text style={styles.serviceGridDescription} numberOfLines={2}>{category.description}</Text>
+                   <View style={styles.serviceGridServices}>
                      <Text style={styles.serviceGridServicesText}>
                        {category.services?.slice(0, 2).join(', ') || t('home.professionalServices')}
                        {category.services && category.services.length > 2 && '...'}
                      </Text>
                    </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+                 </View>
+               </TouchableOpacity>
+             ))}
+           </View>
+         )}
        </View>
 
-      {/* Featured Services */}
+      {/* Featured Products (from API: first 3 here, View All shows all) */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>{t('home.featured')}</Text>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Main' as never, { screen: 'Services' } as never)}
+            onPress={() => navigation.navigate('FeaturedProducts' as never)}
           >
             <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
           </TouchableOpacity>
         </View>
-        
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {featuredServices.map((service) => (
-            <TouchableOpacity
-              key={service.id}
-              style={styles.featuredServiceCard}
-              onPress={() => navigation.navigate('ServiceDetail', { service })}
-            >
-              <View style={styles.featuredServiceImageContainer}>
-                <OfferImage uri={service.image} style={styles.featuredServiceImage} />
-                <View style={styles.featuredServiceBadge}>
-                  <Text style={styles.featuredServiceBadgeText}>{service.badge}</Text>
-                </View>
-              </View>
-              <View style={styles.featuredServiceContent}>
-                <Text style={styles.featuredServiceName}>{service.name}</Text>
-                <Text style={styles.featuredServiceDescription}>{service.description}</Text>
-                <View style={styles.featuredServiceFooter}>
-                  <Text style={styles.featuredServicePrice}>${service.price}</Text>
-                  <View style={styles.featuredServiceRating}>
-                    <Ionicons name="star" size={14} color={COLORS.warning} />
-                    <Text style={styles.featuredServiceRatingText}>{service.rating}</Text>
+
+        {featuredProductsLoading ? (
+          <View style={styles.featuredLoadingWrap}>
+            <Text style={styles.featuredLoadingText}>{t('home.loading', { defaultValue: 'Loading…' })}</Text>
+          </View>
+        ) : featuredProductsFirst3.length === 0 ? (
+          <View style={styles.featuredLoadingWrap}>
+            <Text style={styles.featuredLoadingText}>{t('home.noFeatured', { defaultValue: 'No featured products' })}</Text>
+          </View>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {featuredProductsFirst3.map((product, index) => {
+              const priceNum = typeof product.price === 'string' ? parseFloat(product.price) || 0 : product.price;
+              const detail = featuredProductToDetail(product);
+              const imageUri = getFeaturedProductImage(product);
+              const currency = t('orders.currency', { defaultValue: 'AED' });
+              return (
+                <TouchableOpacity
+                  key={product.id}
+                  style={styles.featuredServiceCard}
+                  onPress={() => navigation.navigate('ProductDetail', { product: detail })}
+                >
+                  <View style={styles.featuredServiceImageContainer}>
+                    <OfferImage uri={imageUri} style={styles.featuredServiceImage} />
+                    <View style={styles.featuredServiceBadge}>
+                      <Text style={styles.featuredServiceBadgeText}>{featuredBadges[index] ?? t('home.badges.popular')}</Text>
+                    </View>
                   </View>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                  <View style={styles.featuredServiceContent}>
+                    <Text style={styles.featuredServiceName}>{product.name}</Text>
+                    <Text style={styles.featuredServiceDescription} numberOfLines={2}>{product.description || ''}</Text>
+                    <View style={styles.featuredServiceFooter}>
+                      <Text style={styles.featuredServicePrice}>{currency} {priceNum}</Text>
+                      <View style={styles.featuredServiceRating}>
+                        <Ionicons name="star" size={14} color={COLORS.warning} />
+                        <Text style={styles.featuredServiceRatingText}>4.5</Text>
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
       </View>
 
       {/* Product Categories */}
@@ -833,11 +935,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
    serviceGridIconContainer: {
-     height: 100,
+     height: 120,
      position: 'relative',
      justifyContent: 'center',
      alignItems: 'center',
      backgroundColor: COLORS.primary + '10',
+     overflow: 'hidden',
+     borderTopLeftRadius: BORDER_RADIUS.lg,
+     borderTopRightRadius: BORDER_RADIUS.lg,
    },
    serviceGridIcon: {
      width: 48,
@@ -846,6 +951,32 @@ const styles = StyleSheet.create({
      backgroundColor: COLORS.primary + '20',
      justifyContent: 'center',
      alignItems: 'center',
+   },
+   serviceGridImageFull: {
+     position: 'absolute',
+     left: 0,
+     right: 0,
+     top: 0,
+     bottom: 0,
+     width: '100%',
+     height: '100%',
+     backgroundColor: COLORS.primary + '20',
+   },
+   serviceGridImage: {
+     width: 48,
+     height: 48,
+     borderRadius: 24,
+     backgroundColor: COLORS.primary + '20',
+   },
+   serviceGridPlaceholder: {
+     minHeight: 120,
+     justifyContent: 'center',
+     alignItems: 'center',
+     paddingVertical: SPACING.lg,
+   },
+   placeholderText: {
+     fontSize: FONT_SIZES.sm,
+     color: COLORS.textSecondary,
    },
    serviceGridBadge: {
      position: 'absolute',
@@ -1071,7 +1202,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     width: 24,
   },
-  // Featured Services Styles
+  // Featured Products Styles
+  featuredLoadingWrap: {
+    paddingVertical: SPACING.xl,
+    alignItems: 'center',
+  },
+  featuredLoadingText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+  },
   featuredServiceCard: {
     width: 280,
     backgroundColor: COLORS.surface,

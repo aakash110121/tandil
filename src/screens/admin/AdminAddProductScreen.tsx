@@ -9,6 +9,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,6 +39,7 @@ const AdminAddProductScreen: React.FC = () => {
   const [categoryId, setCategoryId] = useState('');
   const [serviceId, setServiceId] = useState('');
   const [weightUnit, setWeightUnit] = useState('kg');
+  const [isFeatured, setIsFeatured] = useState(false); // 0 = no, 1 = yes → send as is_featured
   const [sku, setSku] = useState('');
   const [handle, setHandle] = useState('');
   const [mainImage, setMainImage] = useState<{ uri: string } | null>(null);
@@ -238,6 +240,7 @@ const AdminAddProductScreen: React.FC = () => {
             category_id: categoryIdNum ?? null,
             service_id: serviceIdNum ?? null,
             weight_unit: weightUnit,
+            is_featured: isFeatured ? 1 : 0,
             sku: sku.trim(),
             handle: handle.trim(),
             mainImage: mainFile,
@@ -256,6 +259,7 @@ const AdminAddProductScreen: React.FC = () => {
           category_id: categoryIdNum ?? null,
           service_id: serviceIdNum ?? null,
           weight_unit: weightUnit,
+          is_featured: isFeatured ? 1 : 0,
           sku: sku.trim(),
           handle: handle.trim(),
         });
@@ -491,6 +495,16 @@ const AdminAddProductScreen: React.FC = () => {
               setWeightUnit
             )}
 
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>{t('admin.addProduct.featuredLabel')}</Text>
+              <Switch
+                value={isFeatured}
+                onValueChange={setIsFeatured}
+                trackColor={{ false: COLORS.border, true: COLORS.primary + '99' }}
+                thumbColor={isFeatured ? COLORS.primary : COLORS.textSecondary}
+              />
+            </View>
+
             <Input
               label={t('admin.addProduct.skuLabel')}
               placeholder={t('admin.addProduct.skuPlaceholder')}
@@ -616,6 +630,18 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   dropdownWrapper: { marginBottom: SPACING.md },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
+  switchLabel: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.text,
+  },
   dropdown: {
     flexDirection: 'row',
     alignItems: 'center',

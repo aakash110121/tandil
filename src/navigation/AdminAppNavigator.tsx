@@ -29,6 +29,9 @@ import AdminAddServiceScreen from '../screens/admin/AdminAddServiceScreen';
 import AdminEditServiceScreen from '../screens/admin/AdminEditServiceScreen';
 import AdminBannersScreen from '../screens/admin/AdminBannersScreen';
 import AdminOrdersScreen from '../screens/admin/AdminOrdersScreen';
+import AdminExclusiveOffersScreen from '../screens/admin/AdminExclusiveOffersScreen';
+import AdminAddExclusiveOfferScreen from '../screens/admin/AdminAddExclusiveOfferScreen';
+import AdminEditExclusiveOfferScreen from '../screens/admin/AdminEditExclusiveOfferScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -119,6 +122,9 @@ const AdminAppNavigator = () => {
         <Stack.Screen name="AdminEditService" component={AdminEditServiceScreen} />
         <Stack.Screen name="AdminBanners" component={AdminBannersScreen} />
         <Stack.Screen name="AdminOrders" component={AdminOrdersScreen} />
+        <Stack.Screen name="AdminExclusiveOffers" component={AdminExclusiveOffersScreen} />
+        <Stack.Screen name="AdminAddExclusiveOffer" component={AdminAddExclusiveOfferScreen} />
+        <Stack.Screen name="AdminEditExclusiveOffer" component={AdminEditExclusiveOfferScreen} />
       </Stack.Navigator>
     </SafeAreaView>
   );

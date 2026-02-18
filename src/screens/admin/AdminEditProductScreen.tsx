@@ -9,6 +9,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -76,6 +77,7 @@ const AdminEditProductScreen: React.FC = () => {
   const [categoryId, setCategoryId] = useState('');
   const [serviceId, setServiceId] = useState('');
   const [weightUnit, setWeightUnit] = useState('kg');
+  const [isFeatured, setIsFeatured] = useState(false); // 0 = no, 1 = yes
   const [sku, setSku] = useState('');
   const [handle, setHandle] = useState('');
   const [mainImage, setMainImage] = useState<{ uri: string } | null>(null);
@@ -162,6 +164,9 @@ const AdminEditProductScreen: React.FC = () => {
     setCategoryId(productDetails.category_id != null ? String(productDetails.category_id) : '');
     setServiceId(productDetails.service_id != null ? String(productDetails.service_id) : '');
     setWeightUnit(productDetails.weight_unit ?? 'kg');
+    // API may return is_featured as 1, "1", or boolean – treat as featured when truthy/1
+    const raw = (productDetails as any)?.is_featured;
+    setIsFeatured(Number(raw) === 1 || raw === true);
     setSku(productDetails.sku ?? '');
     setHandle(productDetails.handle ?? '');
   }, [productDetails, hasUserEdited]);
@@ -312,6 +317,7 @@ const AdminEditProductScreen: React.FC = () => {
         category_id: categoryIdNum ?? null,
         service_id: serviceIdNum ?? null,
         weight_unit: weightUnit,
+        is_featured: isFeatured ? 1 : 0,
         sku: sku.trim(),
         handle: handle.trim(),
         image_ids_to_remove: removedGalleryImageIds.length > 0 ? removedGalleryImageIds : undefined,
@@ -360,6 +366,11 @@ const AdminEditProductScreen: React.FC = () => {
       if (mainImage) {
         setPendingProductImage(productId, mainImage.uri);
       }
+
+      // Keep local productDetails in sync with saved is_featured so toggle state is correct
+      setProductDetails((prev) =>
+        prev ? { ...prev, is_featured: isFeatured ? 1 : 0 } : prev
+      );
 
       Alert.alert(
         t('admin.users.success'),
@@ -594,6 +605,18 @@ const AdminEditProductScreen: React.FC = () => {
               () => setShowWeightUnitDropdown((v) => !v),
               setWeightUnit
             )}
+            <View style={styles.switchRow}>
+              <Text style={styles.switchLabel}>{t('admin.editProduct.featuredLabel')}</Text>
+              <Switch
+                value={isFeatured}
+                onValueChange={(value) => {
+                  setIsFeatured(value);
+                  setHasUserEdited(true);
+                }}
+                trackColor={{ false: COLORS.border, true: COLORS.primary + '99' }}
+                thumbColor={isFeatured ? COLORS.primary : COLORS.textSecondary}
+              />
+            </View>
             <Input
               label={t('admin.editProduct.skuLabel')}
               placeholder={t('admin.editProduct.skuPlaceholder')}
@@ -758,6 +781,18 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   dropdownWrapper: { marginBottom: SPACING.md },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+    paddingVertical: SPACING.xs,
+  },
+  switchLabel: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.text,
+  },
   dropdown: {
     flexDirection: 'row',
     alignItems: 'center',

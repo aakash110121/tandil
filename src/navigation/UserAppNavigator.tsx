@@ -17,6 +17,7 @@ import ProfileScreen from '../screens/user/ProfileScreen';
 // Stack Screens
 import ServiceCategoryScreen from '../screens/user/ServiceCategoryScreen';
 import ServiceDetailScreen from '../screens/user/ServiceDetailScreen';
+import ServiceProductsScreen from '../screens/user/ServiceProductsScreen';
 import BookingFormScreen from '../screens/user/BookingFormScreen';
 import OrderSummaryScreen from '../screens/user/OrderSummaryScreen';
 import CategoryProductsScreen from '../screens/user/CategoryProductsScreen';
@@ -25,6 +26,7 @@ import OrderHistoryScreen from '../screens/user/OrderHistoryScreen';
 import LoyaltyPointsScreen from '../screens/user/LoyaltyPointsScreen';
 import NotificationsScreen from '../screens/user/NotificationsScreen';
 import ProductDetailScreen from '../screens/user/ProductDetailScreen';
+import FeaturedProductsScreen from '../screens/user/FeaturedProductsScreen';
 import CartScreen from '../screens/user/CartScreen';
 import CheckoutScreen from '../screens/user/CheckoutScreen';
 import RateReviewScreen from '../screens/user/RateReviewScreen';
@@ -110,6 +112,7 @@ const UserAppNavigator = () => {
       {/* Service Screens */}
       <Stack.Screen name="ServiceCategory" component={ServiceCategoryScreen} />
       <Stack.Screen name="ServiceDetail" component={ServiceDetailScreen} />
+      <Stack.Screen name="ServiceProducts" component={ServiceProductsScreen} />
       <Stack.Screen name="BookingForm" component={BookingFormScreen} />
       <Stack.Screen name="OrderSummary" component={OrderSummaryScreen} />
       <Stack.Screen name="CategoryProducts" component={CategoryProductsScreen} />
@@ -124,6 +127,7 @@ const UserAppNavigator = () => {
       {/* Store Screens */}
       <Stack.Screen name="ProductCategory" component={ServiceCategoryScreen} />
       <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <Stack.Screen name="FeaturedProducts" component={FeaturedProductsScreen} />
       <Stack.Screen name="Cart" component={CartScreen} />
       <Stack.Screen name="Checkout" component={CheckoutScreen} />
       
