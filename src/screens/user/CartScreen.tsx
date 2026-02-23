@@ -15,7 +15,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
-import { getCart, removeCartItem, updateCartItemQuantity, CartApiItem, CartOrderSummary } from '../../services/cartService';
+import { getCart, removeCartItem, updateCartItemQuantity, getOrderSummary, CartApiItem, CartOrderSummary, OrderSummaryData } from '../../services/cartService';
 import { getShopSettings, ShopSettings } from '../../services/shopSettingsService';
 import { useIsAuthenticated } from '../../store';
 
@@ -52,6 +52,7 @@ const CartScreen: React.FC = () => {
 
   const [cartItems, setCartItems] = useState<CartItemDisplay[]>([]);
   const [orderSummary, setOrderSummary] = useState<CartOrderSummary | null>(null);
+  const [orderSummaryApi, setOrderSummaryApi] = useState<OrderSummaryData | null>(null);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -76,6 +77,7 @@ const CartScreen: React.FC = () => {
     if (!isAuthenticated) {
       setCartItems([]);
       setOrderSummary(null);
+      setOrderSummaryApi(null);
       setLoading(false);
       setError(null);
       return;
@@ -89,9 +91,16 @@ const CartScreen: React.FC = () => {
       const summary = res.data?.order_summary ?? null;
       setCartItems(items.map(mapApiItemToDisplay));
       setOrderSummary(summary);
+      try {
+        const summaryRes = await getOrderSummary();
+        setOrderSummaryApi(summaryRes ?? null);
+      } catch (_) {
+        setOrderSummaryApi(null);
+      }
     } catch (err: any) {
       setCartItems([]);
       setOrderSummary(null);
+      setOrderSummaryApi(null);
       setError(err.response?.data?.message || err.message || t('cart.errorLoad', { defaultValue: 'Failed to load cart' }));
     } finally {
       setLoading(false);
@@ -162,13 +171,15 @@ const CartScreen: React.FC = () => {
     );
   };
 
-  const subtotal = orderSummary?.subtotal ?? cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const discount = orderSummary?.discount ?? 0;
-  const shipping = orderSummary?.shipping ?? shopSettings?.shipping_amount ?? 0;
-  const taxPercent = shopSettings?.tax_percent ?? 0;
+  const useApiSummary = orderSummaryApi != null;
+  const subtotal = useApiSummary ? orderSummaryApi.subtotal : (orderSummary?.subtotal ?? cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0));
+  const discount = useApiSummary ? orderSummaryApi.discount : (orderSummary?.discount ?? 0);
+  const shipping = useApiSummary ? orderSummaryApi.shipping : (orderSummary?.shipping ?? shopSettings?.shipping_amount ?? 0);
+  const taxPercent = useApiSummary ? (orderSummaryApi.tax_percent ?? 0) : (shopSettings?.tax_percent ?? 0);
+  // Tax = (subtotal - discount) × tax_percent% so e.g. 100 + 5% = 105
   const taxAmount = Math.round((subtotal - discount) * (taxPercent / 100) * 100) / 100;
   const total = Math.round((subtotal - discount + shipping + taxAmount) * 100) / 100;
-  const currency = orderSummary?.currency || shopSettings?.currency || t('orders.currency', { defaultValue: 'AED' });
+  const currency = useApiSummary ? orderSummaryApi.currency : (orderSummary?.currency || shopSettings?.currency || t('orders.currency', { defaultValue: 'AED' }));
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
@@ -307,9 +318,11 @@ const CartScreen: React.FC = () => {
               <Text style={styles.summaryLabel}>{t('cart.shipping')}</Text>
               <Text style={styles.summaryValue}>{shipping > 0 ? `${currency} ${shipping.toFixed(2)}` : t('cart.free')}</Text>
             </View>
-            {taxAmount > 0 && (
+            {(taxAmount > 0 || taxPercent > 0) && (
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{t('cart.tax', 'Tax')}</Text>
+                <Text style={styles.summaryLabel}>
+                  {taxPercent > 0 ? `${t('cart.tax', 'Tax')} (${taxPercent}%)` : t('cart.tax', 'Tax')}
+                </Text>
                 <Text style={styles.summaryValue}>{currency} {taxAmount.toFixed(2)}</Text>
               </View>
             )}

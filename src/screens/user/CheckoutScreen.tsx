@@ -16,6 +16,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
 import { getShopSettings, ShopSettings } from '../../services/shopSettingsService';
+import { getOrderSummary, OrderSummaryData } from '../../services/cartService';
 
 interface CartItem {
   id: string;
@@ -56,6 +57,7 @@ const CheckoutScreen: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<'address' | 'payment' | 'review'>('address');
   const [loading, setLoading] = useState(false);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+  const [orderSummaryApi, setOrderSummaryApi] = useState<OrderSummaryData | null>(null);
   
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     fullName: 'Ahmed Hassan',
@@ -101,25 +103,27 @@ const CheckoutScreen: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
-    getShopSettings().then((s) => {
-      if (!cancelled) setShopSettings(s);
-    });
+    getShopSettings().then((s) => { if (!cancelled) setShopSettings(s); });
+    getOrderSummary().then((s) => { if (!cancelled) setOrderSummaryApi(s ?? null); });
     return () => { cancelled = true; };
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       getShopSettings().then(setShopSettings);
+      getOrderSummary().then(setOrderSummaryApi);
     }, [])
   );
 
-  const subtotal = calculateSubtotal();
-  const discount = calculateDiscount();
-  const shippingAmount = shopSettings?.shipping_amount ?? 0;
-  const taxPercent = shopSettings?.tax_percent ?? 0;
+  const useApiSummary = orderSummaryApi != null;
+  const subtotal = useApiSummary ? orderSummaryApi.subtotal : calculateSubtotal();
+  const discount = useApiSummary ? orderSummaryApi.discount : calculateDiscount();
+  const shippingAmount = useApiSummary ? orderSummaryApi.shipping : (shopSettings?.shipping_amount ?? 0);
+  const taxPercent = useApiSummary ? (orderSummaryApi.tax_percent ?? 0) : (shopSettings?.tax_percent ?? 0);
+  // Tax = (subtotal - discount) × tax_percent% so e.g. 100 + 5% = 105
   const taxAmount = Math.round((subtotal - discount) * (taxPercent / 100) * 100) / 100;
   const total = Math.round((subtotal - discount + shippingAmount + taxAmount) * 100) / 100;
-  const currency = shopSettings?.currency ?? 'AED';
+  const currency = useApiSummary ? orderSummaryApi.currency : (shopSettings?.currency ?? 'AED');
 
   const handlePlaceOrder = () => {
     setLoading(true);
@@ -424,9 +428,11 @@ const CheckoutScreen: React.FC = () => {
             </Text>
           </View>
           
-          {taxAmount > 0 && (
+          {(taxAmount > 0 || taxPercent > 0) && (
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>{t('cart.tax', 'Tax')}</Text>
+              <Text style={styles.summaryLabel}>
+                {taxPercent > 0 ? `${t('cart.tax', 'Tax')} (${taxPercent}%)` : t('cart.tax', 'Tax')}
+              </Text>
               <Text style={styles.summaryValue}>{currency} {taxAmount.toFixed(2)}</Text>
             </View>
           )}

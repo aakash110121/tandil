@@ -1,90 +1,92 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONT_SIZES, FONT_WEIGHTS, BORDER_RADIUS } from '../../constants';
-import { useMembershipPackages, useSelectedMembership, useAppStore } from '../../store';
-import { MembershipTier } from '../../types';
+import { getClientMemberships, ClientMembership } from '../../services/clientMembershipService';
 
-const TierBadge = ({ label, color }: { label: string; color?: string }) => (
-  <View style={[styles.badge, { backgroundColor: color || COLORS.primary }]}>
-    <Text style={styles.badgeText}>{label}</Text>
-  </View>
-);
+function formatPlan(plan: string): string {
+  if (!plan) return plan;
+  const normalized = plan.replace(/_/g, ' ');
+  return normalized.replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
-type MembershipCardProps = {
-  id: MembershipTier;
-  title: string;
-  subtitle: string;
-  priceAED: number;
-  durationMonths: number;
-  features: string[];
-  highlight?: boolean;
+/** Subtitle from plan key (e.g. 6_month -> "6 month subscription") */
+function planSubtitle(plan: string): string {
+  if (!plan) return 'Subscription plan';
+  const normalized = plan.replace(/_/g, ' ');
+  const parts = normalized.split(' ');
+  const num = parts.find((p) => /^\d+$/.test(p));
+  if (num) {
+    const n = parseInt(num, 10);
+    if (n === 1) return '1 month subscription';
+    return `${n} month subscription`;
+  }
+  return normalized + ' subscription';
+}
+
+/** Price duration line (e.g. "for 6 months") */
+function planDurationLabel(plan: string): string {
+  if (!plan) return '';
+  const parts = plan.replace(/_/g, ' ').split(' ');
+  const num = parts.find((p) => /^\d+$/.test(p));
+  if (num) {
+    const n = parseInt(num, 10);
+    if (n === 1) return 'for 1 month';
+    return `for ${n} months`;
+  }
+  return '';
+}
+
+/** Default features when API has none – same style as dummy cards */
+const DEFAULT_FEATURES: string[] = [
+  'Regular service visits',
+  'Scheduled maintenance',
+  'Before/After photos',
+  'Priority support',
+];
+
+/** Available plan card – same design as the original dummy membership card (icon, title, subtitle, price, features, select button). */
+const AvailablePlanCard: React.FC<{
+  plan: ClientMembership;
   selected: boolean;
   onSelect: () => void;
-};
-
-const TIER_THEME: Record<MembershipTier, { primary: string; surface: string; accent: string; icon: string }>= {
-  '1D': { primary: COLORS.primary, surface: COLORS.primaryLight + '20', accent: COLORS.primaryLight + '40', icon: 'today' },
-  '1M': { primary: COLORS.primary, surface: COLORS.primaryLight + '20', accent: COLORS.primaryLight + '40', icon: 'leaf' },
-  '3M': { primary: COLORS.primary, surface: COLORS.primaryLight + '20', accent: COLORS.primaryLight + '40', icon: 'calendar' },
-  '6M': { primary: COLORS.primary, surface: COLORS.primaryLight + '20', accent: COLORS.primaryLight + '40', icon: 'calendar-number' },
-  '12M': { primary: COLORS.primary, surface: COLORS.primaryLight + '20', accent: COLORS.primaryLight + '40', icon: 'time' },
-  'VIP-1D': { primary: '#FFD700', surface: '#FFD700' + '20', accent: '#FFD700' + '40', icon: 'star' },
-  'VIP-1M': { primary: '#FFD700', surface: '#FFD700' + '20', accent: '#FFD700' + '40', icon: 'star' },
-  'VIP-3M': { primary: '#FFD700', surface: '#FFD700' + '20', accent: '#FFD700' + '40', icon: 'star' },
-  'VIP-6M': { primary: '#FFD700', surface: '#FFD700' + '20', accent: '#FFD700' + '40', icon: 'star' },
-  'VIP-12M': { primary: '#FFD700', surface: '#FFD700' + '20', accent: '#FFD700' + '40', icon: 'star' },
-};
-
-const MembershipCard: React.FC<MembershipCardProps> = ({ id, title, subtitle, priceAED, durationMonths, features, highlight, selected, onSelect }) => {
-  const theme = TIER_THEME[id];
+}> = ({ plan, selected, onSelect }) => {
+  const title = formatPlan(plan.plan);
+  const subtitle = planSubtitle(plan.plan);
+  const durationLabel = planDurationLabel(plan.plan) || subtitle;
+  const amount = plan.amount ?? '0';
   return (
-    <TouchableOpacity 
-      activeOpacity={0.9} 
-      onPress={onSelect} 
-      style={[
-        styles.card, 
-        selected && styles.cardSelected,
-        highlight && styles.cardHighlight,
-      ]}
+    <TouchableOpacity
+      activeOpacity={0.9}
+      onPress={onSelect}
+      style={[styles.card, selected && styles.cardSelected]}
     >
-      {/* Header with Icon and Title */}
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
-          <View style={[styles.iconContainer, { backgroundColor: theme.primary }]}>
-            <Ionicons name={theme.icon as any} size={24} color={COLORS.background} />
+          <View style={[styles.iconContainer, { backgroundColor: COLORS.primary }]}>
+            <Ionicons name="calendar" size={24} color={COLORS.background} />
           </View>
           <View>
             <Text style={styles.cardTitle}>{title}</Text>
             <Text style={styles.cardSubtitle}>{subtitle}</Text>
           </View>
         </View>
-        {highlight && (
-          <View style={[styles.recommendedBadge, { backgroundColor: theme.primary }]}>
-            <Text style={styles.recommendedText}>Recommended</Text>
-          </View>
-        )}
         {selected && (
           <Ionicons name="checkmark-circle" size={28} color={COLORS.success} />
         )}
       </View>
 
-      {/* Price Section */}
       <View style={styles.priceSection}>
-        <Text style={styles.priceAmount}>AED {priceAED}</Text>
-        <Text style={styles.priceDuration}>
-          {durationMonths === 0 ? 'for 1 day' : `for ${durationMonths} month${durationMonths > 1 ? 's' : ''}`}
-        </Text>
+        <Text style={styles.priceAmount}>AED {amount}</Text>
+        <Text style={styles.priceDuration}>{durationLabel}</Text>
       </View>
 
-      {/* Divider */}
       <View style={styles.divider} />
 
-      {/* Features */}
       <View style={styles.features}>
-        {features.map((f, i) => (
+        {DEFAULT_FEATURES.map((f, i) => (
           <View key={i} style={styles.featureRow}>
             <Ionicons name="checkmark-circle" size={20} color={COLORS.primary} />
             <Text style={styles.featureText}>{f}</Text>
@@ -92,24 +94,17 @@ const MembershipCard: React.FC<MembershipCardProps> = ({ id, title, subtitle, pr
         ))}
       </View>
 
-      {/* Select Button */}
-      <TouchableOpacity 
-        style={[
-          styles.selectButton,
-          selected && styles.selectButtonSelected
-        ]}
+      <TouchableOpacity
+        style={[styles.selectButton, selected && styles.selectButtonSelected]}
         onPress={onSelect}
       >
-        <Text style={[
-          styles.selectButtonText,
-          selected && styles.selectButtonTextSelected
-        ]}>
+        <Text style={[styles.selectButtonText, selected && styles.selectButtonTextSelected]}>
           {selected ? 'Selected' : 'Choose This Plan'}
         </Text>
-        <Ionicons 
-          name={selected ? 'checkmark' : 'arrow-forward'} 
-          size={18} 
-          color={selected ? COLORS.background : COLORS.primary} 
+        <Ionicons
+          name={selected ? 'checkmark' : 'arrow-forward'}
+          size={18}
+          color={selected ? COLORS.background : COLORS.primary}
         />
       </TouchableOpacity>
     </TouchableOpacity>
@@ -117,16 +112,37 @@ const MembershipCard: React.FC<MembershipCardProps> = ({ id, title, subtitle, pr
 };
 
 const MembershipsScreen: React.FC = () => {
-  const packages = useMembershipPackages();
-  const selectedTier = useSelectedMembership();
-  const setSelectedMembership = useAppStore((s) => s.setSelectedMembership);
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
 
+  const [availablePlans, setAvailablePlans] = useState<ClientMembership[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<ClientMembership | null>(null);
+
+  const fetchPlans = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    else setRefreshing(true);
+    try {
+      const { list } = await getClientMemberships();
+      setAvailablePlans(list ?? []);
+    } catch {
+      setAvailablePlans([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPlans(false);
+    }, [fetchPlans])
+  );
+
   return (
     <View style={styles.container}>
-      {/* Top App Bar */}
-      <View style={[styles.header, { paddingTop: insets.top + SPACING.sm, marginBottom: 20 }] }>
+      <View style={[styles.header, { paddingTop: insets.top + SPACING.sm, marginBottom: 20 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
@@ -135,33 +151,51 @@ const MembershipsScreen: React.FC = () => {
           <Ionicons name="help-circle-outline" size={22} color={COLORS.textSecondary} />
         </TouchableOpacity>
       </View>
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING.xxl * 2 }]} showsVerticalScrollIndicator={false}>
-        {packages.map((p) => (
-          <MembershipCard
-            key={p.id}
-            id={p.id}
-            title={p.title}
-            subtitle={p.subtitle}
-            priceAED={p.priceAED}
-            durationMonths={p.durationMonths}
-            features={p.features}
-            highlight={p.highlight}
-            selected={selectedTier === p.id}
-            onSelect={() => setSelectedMembership(p.id)}
-          />
-        ))}
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + SPACING.xxl * 2 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchPlans(true)} colors={[COLORS.primary]} />
+        }
+      >
+        <Text style={styles.sectionTitle}>Available Plans</Text>
+        {loading ? (
+          <ActivityIndicator size="small" color={COLORS.primary} style={styles.sectionLoader} />
+        ) : availablePlans.length === 0 ? (
+          <View style={styles.emptyPlans}>
+            <Ionicons name="calendar-outline" size={40} color={COLORS.textSecondary} />
+            <Text style={styles.emptyPlansText}>No plans available</Text>
+          </View>
+        ) : (
+          availablePlans.map((plan) => (
+            <AvailablePlanCard
+              key={plan.id}
+              plan={plan}
+              selected={selectedPlan?.id === plan.id}
+              onSelect={() => setSelectedPlan(plan)}
+            />
+          ))
+        )}
         <View style={{ height: SPACING.xl }} />
       </ScrollView>
-      {/* Sticky bottom action bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + SPACING.md }]}>
         <View style={styles.bottomSelected}>
           <Text style={styles.bottomLabel}>Selected</Text>
-          <Text style={styles.bottomValue}>{selectedTier ?? 'None'}</Text>
+          <Text style={styles.bottomValue}>
+            {selectedPlan ? formatPlan(selectedPlan.plan) : 'None'}
+          </Text>
         </View>
         <TouchableOpacity
-          disabled={!selectedTier}
-          onPress={() => selectedTier && navigation.navigate('MembershipCheckout', { tier: selectedTier })}
-          style={[styles.ctaButton, !selectedTier && { opacity: 0.5 }]}
+          disabled={!selectedPlan}
+          onPress={() =>
+            selectedPlan &&
+            navigation.navigate('MembershipCheckout', {
+              tier: selectedPlan.plan as any,
+              planId: selectedPlan.id,
+              amount: selectedPlan.amount,
+            })
+          }
+          style={[styles.ctaButton, !selectedPlan && { opacity: 0.5 }]}
           activeOpacity={0.9}
         >
           <Text style={styles.ctaText}>Continue</Text>
@@ -195,6 +229,24 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.xxl,
+  },
+  sectionTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  sectionLoader: {
+    marginVertical: SPACING.md,
+  },
+  emptyPlans: {
+    paddingVertical: SPACING.xl,
+    alignItems: 'center',
+  },
+  emptyPlansText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.sm,
   },
   card: {
     backgroundColor: COLORS.background,

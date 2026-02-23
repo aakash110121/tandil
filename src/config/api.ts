@@ -56,3 +56,12 @@ export function buildFullImageUrl(raw: string): string {
     : `storage/${path}`;
   return `${origin}/${fullPath}`;
 }
+
+/** Build full URL for profile picture. API often returns path like "profiles/xxx.png" served under /media/. */
+export function buildProfilePictureUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
+  const origin = API_BASE_URL.replace(/\/api\/?$/, '');
+  const path = trimmed.startsWith('media/') ? trimmed : `media/${trimmed}`;
+  return `${origin}/${path}`;
+}

@@ -1,23 +1,46 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
+  ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { useAppStore } from '../../store';
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
+import { getUserProfile, UserProfileData, getProfilePhone, getProfilePictureUrl } from '../../services/userService';
 
 const ProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
   const { user, logout } = useAppStore();
+  const [profile, setProfile] = useState<UserProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setLoading(true);
+      getUserProfile()
+        .then((data) => { if (!cancelled) setProfile(data ?? null); })
+        .catch(() => { if (!cancelled) setProfile(null); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+      return () => { cancelled = true; };
+    }, [])
+  );
+
+  const displayName = profile?.name ?? user?.name ?? t('profile.userNameDefault');
+  const displayEmail = profile?.email ?? user?.email ?? t('profile.emailDefault');
+  // Prefer phone from profile API (phone, phone_number, or mobile); fallback to store only when profile has none
+  const displayPhone = getProfilePhone(profile) ?? user?.phone ?? null;
+  // Resolve profile picture: use full URL from API or build from relative path (e.g. profiles/xxx -> /media/profiles/xxx)
+  const profilePictureUrl = getProfilePictureUrl(profile);
 
   const handleLogout = async () => {
     try {
@@ -99,16 +122,31 @@ const ProfileScreen: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
+          {loading ? (
+            <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+          ) : null}
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{user?.name?.charAt(0) || 'U'}</Text>
+              <Text style={styles.avatarText}>{(displayName || 'U').charAt(0).toUpperCase()}</Text>
             </View>
+            {profilePictureUrl ? (
+              <Image
+                source={{ uri: profilePictureUrl }}
+                style={[styles.avatarImage, styles.avatarImageOverlay]}
+                contentFit="cover"
+                cachePolicy="disk"
+                transition={200}
+              />
+            ) : null}
             <TouchableOpacity style={styles.editButton}>
               <Ionicons name="camera" size={16} color={COLORS.background} />
             </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{user?.name || t('profile.userNameDefault')}</Text>
-          <Text style={styles.userEmail}>{user?.email || t('profile.emailDefault')}</Text>
+          <Text style={styles.userName}>{displayName}</Text>
+          <Text style={styles.userEmail}>{displayEmail}</Text>
+          {displayPhone ? (
+            <Text style={styles.userPhone}>{displayPhone}</Text>
+          ) : null}
         </View>
 
         {/* Menu Items */}
@@ -148,6 +186,9 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xl,
     paddingHorizontal: SPACING.lg,
   },
+  loader: {
+    marginBottom: SPACING.sm,
+  },
   avatarContainer: {
     position: 'relative',
     marginBottom: SPACING.md,
@@ -164,6 +205,16 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.background,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  avatarImageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   editButton: {
     position: 'absolute',
@@ -184,6 +235,11 @@ const styles = StyleSheet.create({
   },
   userEmail: {
     fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xs,
+  },
+  userPhone: {
+    fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
   },
   menuContainer: {

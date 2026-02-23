@@ -41,6 +41,10 @@ const TechnicianProfileScreen: React.FC = () => {
     try {
       const data = await getTechnicianProfile();
       setProfile(data ?? null);
+      const pictureUrl = data?.profile_picture_url ?? data?.profile_picture;
+      if (typeof pictureUrl === 'string' && pictureUrl.trim()) {
+        Image.prefetch([pictureUrl.trim()], { cachePolicy: 'disk' }).catch(() => {});
+      }
     } catch (_) {
       setProfile(null);
     } finally {
@@ -201,16 +205,19 @@ const TechnicianProfileScreen: React.FC = () => {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
+            {/* Always show letter placeholder so circle is never empty while image loads */}
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{(technician.name || 'T').charAt(0).toUpperCase()}</Text>
+            </View>
             {technician.profilePictureUrl ? (
               <Image
                 source={{ uri: technician.profilePictureUrl }}
-                style={styles.avatarImage}
+                style={[styles.avatarImage, styles.avatarImageOverlay]}
+                contentFit="cover"
+                cachePolicy="disk"
+                transition={200}
               />
-            ) : (
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{(technician.name || 'T').charAt(0).toUpperCase()}</Text>
-              </View>
-            )}
+            ) : null}
             <View style={styles.onlineStatus}>
               <View style={[styles.statusDot, { backgroundColor: COLORS.success }]} />
               <Text style={styles.statusText}>Online</Text>
@@ -366,6 +373,11 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
+  },
+  avatarImageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
   },
   onlineStatus: {
     position: 'absolute',

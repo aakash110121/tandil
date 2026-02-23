@@ -40,6 +40,35 @@ export interface CartOrderSummary {
   currency: string;
 }
 
+/** Order summary from GET /shop/order-summary API (Auth required) */
+export interface OrderSummaryData {
+  subtotal: number;
+  discount: number;
+  shipping: number;
+  shipping_label?: string | null;
+  tax_percent?: number;
+  /** Calculated tax amount; may be omitted when API only returns tax_percent + total */
+  tax?: number;
+  total: number;
+  currency: string;
+}
+
+export interface GetOrderSummaryResponse {
+  success?: boolean;
+  message?: string;
+  data?: OrderSummaryData;
+}
+
+/**
+ * Get order summary for current cart. Requires customer token.
+ * GET /shop/order-summary. Returns subtotal, discount, shipping, tax, total, currency.
+ */
+export async function getOrderSummary(): Promise<OrderSummaryData | null> {
+  const response = await apiClient.get<GetOrderSummaryResponse>('/shop/order-summary', { timeout: 15000 });
+  if (response.data?.success && response.data?.data) return response.data.data;
+  return null;
+}
+
 export interface GetCartResponse {
   success?: boolean;
   message?: string;

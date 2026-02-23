@@ -38,6 +38,8 @@ import MembershipsScreen from '../screens/common/MembershipsScreen';
 import MembershipCheckoutScreen from '../screens/common/MembershipCheckoutScreen';
 import PersonalInfoScreen from '../screens/user/PersonalInfoScreen';
 import AddressesScreen from '../screens/user/AddressesScreen';
+import AddAddressScreen from '../screens/user/AddAddressScreen';
+import EditAddressScreen from '../screens/user/EditAddressScreen';
 import PaymentMethodsScreen from '../screens/user/PaymentMethodsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -141,6 +143,8 @@ const UserAppNavigator = () => {
       <Stack.Screen name="MembershipCheckout" component={MembershipCheckoutScreen} />
       <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />
       <Stack.Screen name="Addresses" component={AddressesScreen} />
+      <Stack.Screen name="AddAddress" component={AddAddressScreen} />
+      <Stack.Screen name="EditAddress" component={EditAddressScreen} />
       <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
     </Stack.Navigator>
   );
