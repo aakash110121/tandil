@@ -261,6 +261,7 @@ export type UserStackParamList = {
   OrderHistory: undefined;
   LoyaltyPoints: undefined;
   Offers: undefined;
+  ExclusiveOfferProducts: { offer: { id: number; title?: string; description?: string; product_ids?: number[]; [key: string]: unknown } };
   ProductCategory: undefined;
   ProductDetail: { product: any };
   FeaturedProducts: undefined;
@@ -279,6 +280,7 @@ export type TechnicianStackParamList = {
   OrderHistory: undefined;
   PayoutSummary: undefined;
   Profile: undefined;
+  TechnicianProfileEdit: undefined;
   Availability: undefined;
   SupervisorReport?: { visitId?: string } | undefined;
   Memberships: undefined;

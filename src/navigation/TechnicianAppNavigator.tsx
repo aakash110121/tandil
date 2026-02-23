@@ -13,6 +13,7 @@ import JobDetailScreen from '../screens/technician/JobDetailScreen';
 import TechnicianOrderHistoryScreen from '../screens/technician/TechnicianOrderHistoryScreen';
 import PayoutSummaryScreen from '../screens/technician/PayoutSummaryScreen';
 import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScreen';
+import TechnicianProfileEditScreen from '../screens/technician/TechnicianProfileEditScreen';
 import AvailabilityScreen from '../screens/technician/AvailabilityScreen';
 import SupervisorReportScreen from '../screens/technician/SupervisorReportScreen';
 import MembershipsScreen from '../screens/common/MembershipsScreen';
@@ -91,6 +92,7 @@ const TechnicianAppNavigator = () => {
         <Stack.Screen name="JobDetail" component={JobDetailScreen} />
         <Stack.Screen name="SupervisorReport" component={SupervisorReportScreen} />
         <Stack.Screen name="PayoutSummary" component={PayoutSummaryScreen} />
+        <Stack.Screen name="TechnicianProfileEdit" component={TechnicianProfileEditScreen} />
         <Stack.Screen name="Memberships" component={MembershipsScreen} />
         <Stack.Screen name="MembershipCheckout" component={MembershipCheckoutScreen} />
       </Stack.Navigator>

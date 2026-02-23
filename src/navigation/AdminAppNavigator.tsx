@@ -28,6 +28,7 @@ import AdminServicesScreen from '../screens/admin/AdminServicesScreen';
 import AdminAddServiceScreen from '../screens/admin/AdminAddServiceScreen';
 import AdminEditServiceScreen from '../screens/admin/AdminEditServiceScreen';
 import AdminBannersScreen from '../screens/admin/AdminBannersScreen';
+import AdminProductSettingsScreen from '../screens/admin/AdminProductSettingsScreen';
 import AdminOrdersScreen from '../screens/admin/AdminOrdersScreen';
 import AdminExclusiveOffersScreen from '../screens/admin/AdminExclusiveOffersScreen';
 import AdminAddExclusiveOfferScreen from '../screens/admin/AdminAddExclusiveOfferScreen';
@@ -121,6 +122,7 @@ const AdminAppNavigator = () => {
         <Stack.Screen name="AdminAddService" component={AdminAddServiceScreen} />
         <Stack.Screen name="AdminEditService" component={AdminEditServiceScreen} />
         <Stack.Screen name="AdminBanners" component={AdminBannersScreen} />
+        <Stack.Screen name="AdminProductSettings" component={AdminProductSettingsScreen} />
         <Stack.Screen name="AdminOrders" component={AdminOrdersScreen} />
         <Stack.Screen name="AdminExclusiveOffers" component={AdminExclusiveOffersScreen} />
         <Stack.Screen name="AdminAddExclusiveOffer" component={AdminAddExclusiveOfferScreen} />

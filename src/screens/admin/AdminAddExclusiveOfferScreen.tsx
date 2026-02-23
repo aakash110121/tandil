@@ -24,6 +24,7 @@ import { Button } from '../../components/common/Button';
 import Header from '../../components/common/Header';
 import { adminService, AdminProduct } from '../../services/adminService';
 import { compressImageForUpload } from '../../utils/compressImage';
+import { Image } from 'expo-image';
 
 const DISCOUNT_TYPES = ['percentage', 'fixed_amount', 'buy_one_get_one'] as const;
 
@@ -297,6 +298,14 @@ const AdminAddExclusiveOfferScreen: React.FC = () => {
                 {pickingImage ? t('common.loading', 'Loading…') : image ? t('admin.exclusiveOffers.imageSelected', 'Image selected') : t('admin.exclusiveOffers.uploadImage', 'Upload image')}
               </Text>
             </TouchableOpacity>
+            {image?.uri ? (
+              <View style={styles.imagePreviewWrap}>
+                <Image source={{ uri: image.uri }} style={styles.imagePreview} contentFit="cover" />
+                <TouchableOpacity style={styles.imagePreviewRemove} onPress={() => setImage(null)}>
+                  <Ionicons name="close-circle" size={28} color={COLORS.error} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
           </View>
 
           <Button
@@ -456,6 +465,22 @@ const styles = StyleSheet.create({
   },
   imageBtnDisabled: { opacity: 0.6 },
   imageBtnText: { fontSize: FONT_SIZES.md, color: COLORS.text },
+  imagePreviewWrap: {
+    marginTop: SPACING.sm,
+    position: 'relative',
+    alignSelf: 'flex-start',
+  },
+  imagePreview: {
+    width: 120,
+    height: 120,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.border + '40',
+  },
+  imagePreviewRemove: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+  },
   submitBtn: { marginTop: SPACING.lg },
   bottomPad: { height: SPACING.xl },
 

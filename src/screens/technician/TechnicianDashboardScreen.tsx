@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,69 +7,80 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { useTranslation } from 'react-i18next';
+import { getTechnicianDashboard, TechnicianDashboardData, TechnicianTodayTask } from '../../services/technicianService';
+
+/** Map API task to dashboard job shape */
+function mapTaskToJob(task: TechnicianTodayTask) {
+  return {
+    id: String(task.id),
+    customerName: task.customer_name ?? task.customerName ?? '—',
+    service: task.service ?? '—',
+    address: task.address ?? '—',
+    scheduledTime: task.scheduled_time ?? task.scheduledTime ?? '—',
+    status: (task.status ?? 'assigned').toLowerCase().replace(/\s+/g, '_'),
+    estimatedDuration: task.estimated_duration ?? task.estimatedDuration ?? '—',
+    taskType: task.task_type ?? task.taskType ?? 'care',
+  };
+}
 
 const TechnicianDashboardScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
 
-  const technician = {
-    id: 'tech_001',
-    employeeId: 'EMP-1001',
-    name: 'Ahmed Hassan',
-    email: 'ahmed.hassan@tandil.com',
-    phone: '+971 50 123 4567',
-    rating: 4.8,
-    completedVisits: 156,
-    totalEarnings: 10847.50,
-    thisWeekEarnings: 1342.75,
-    isOnline: true,
+  const [dashboard, setDashboard] = useState<TechnicianDashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchDashboard = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    else setRefreshing(true);
+    try {
+      const data = await getTechnicianDashboard();
+      setDashboard(data ?? null);
+    } catch (_) {
+      setDashboard(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  const currentJobs = [
-    {
-      id: 'task_001',
-      customerName: 'Mohammed Ali Farm',
-      service: 'Tree Watering Visit',
-      address: 'Al Ain Oasis, Abu Dhabi, UAE',
-      scheduledTime: '8:00 AM',
-      status: 'in_progress',
-      estimatedDuration: '120 min',
-      taskType: 'watering',
-    },
-    {
-      id: 'task_002',
-      customerName: 'Palm Grove Estate',
-      service: 'Palm Tree Maintenance',
-      address: 'Liwa Desert, Abu Dhabi, UAE',
-      scheduledTime: '11:00 AM',
-      status: 'assigned',
-      estimatedDuration: '90 min',
-      taskType: 'care',
-    },
-  ];
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  const technician = dashboard
+    ? {
+        name: dashboard.name || '—',
+        employeeId: dashboard.employee_id || '—',
+        email: dashboard.email || '',
+        isOnline: dashboard.is_online ?? true,
+        thisWeekEarnings: dashboard.weekly_kpis?.earnings ?? 0,
+        completedVisits: dashboard.weekly_kpis?.visits_done ?? 0,
+        rating: dashboard.weekly_kpis?.rating ?? 0,
+      }
+    : {
+        name: '—',
+        employeeId: '—',
+        email: '',
+        isOnline: false,
+        thisWeekEarnings: 0,
+        completedVisits: 0,
+        rating: 0,
+      };
+
+  const currentJobs = (dashboard?.today_tasks ?? []).map(mapTaskToJob);
 
   const recentJobs = [
-    {
-      id: 'visit_003',
-      customerName: 'Green Valley Farm',
-      service: 'Planting & Fertilizing',
-      completedAt: '2024-01-15',
-      earnings: 289.99,
-      rating: 5,
-    },
-    {
-      id: 'visit_004',
-      customerName: 'Desert Palm Resort',
-      service: 'Garden Cleaning',
-      completedAt: '2024-01-14',
-      earnings: 145.50,
-      rating: 4,
-    },
+    { id: 'visit_003', customerName: 'Green Valley Farm', service: 'Planting & Fertilizing', completedAt: '2024-01-15', earnings: 289.99, rating: 5 },
+    { id: 'visit_004', customerName: 'Desert Palm Resort', service: 'Garden Cleaning', completedAt: '2024-01-14', earnings: 145.50, rating: 4 },
   ];
 
   const renderCurrentJob = ({ item }: { item: any }) => (
@@ -172,6 +183,17 @@ const TechnicianDashboardScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
+  if (loading && !dashboard) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, styles.centeredContent]}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>{t('home.loading', 'Loading...')}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -185,28 +207,34 @@ const TechnicianDashboardScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => {
-              // Ensure we target the Tab Navigator via the parent Stack's 'Main' route
               navigation.navigate('Main' as never, { screen: 'ProfileTab' } as never);
             }}
           >
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{technician.name.charAt(0)}</Text>
+              <Text style={styles.avatarText}>{(technician.name || 'T').charAt(0).toUpperCase()}</Text>
             </View>
           </TouchableOpacity>
         </View>
         
         <View style={styles.onlineStatus}>
-          <View style={[styles.statusDot, { backgroundColor: COLORS.success }]} />
-          <Text style={styles.statusText}>Online - Field Worker</Text>
+          <View style={[styles.statusDot, { backgroundColor: technician.isOnline ? COLORS.success : COLORS.textSecondary }]} />
+          <Text style={styles.statusText}>
+            {technician.isOnline ? t('technician.online', 'Online') : t('technician.offline', 'Offline')} - {t('technician.fieldWorker', 'Field Worker')}
+          </Text>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchDashboard(true)} colors={[COLORS.primary]} />
+        }
+      >
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Ionicons name="cash-outline" size={24} color={COLORS.primary} />
-            <Text style={styles.statValue}>AED {technician.thisWeekEarnings}</Text>
+            <Text style={styles.statValue}>AED {Number(technician.thisWeekEarnings).toFixed(2)}</Text>
             <Text style={styles.statLabel}>This Week</Text>
           </View>
           
@@ -218,7 +246,7 @@ const TechnicianDashboardScreen: React.FC = () => {
           
           <View style={styles.statCard}>
             <Ionicons name="star-outline" size={24} color={COLORS.warning} />
-            <Text style={styles.statValue}>{technician.rating}</Text>
+            <Text style={styles.statValue}>{Number(technician.rating) ? Number(technician.rating).toFixed(1) : '0'}</Text>
             <Text style={styles.statLabel}>Rating</Text>
           </View>
         </View>
@@ -361,6 +389,16 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.xl,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.lg,
+  },
+  centeredContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  loadingText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
   },
   headerContent: {
     flexDirection: 'row',

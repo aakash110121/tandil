@@ -17,6 +17,8 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
 import { shopService, ShopProduct } from '../../services/shopService';
+import { addCartItem } from '../../services/cartService';
+import { useIsAuthenticated } from '../../store';
 
 const { width: screenWidth } = Dimensions.get('window');
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=1200&q=60';
@@ -71,6 +73,8 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
   const [quantity, setQuantity] = useState(1);
   const [apiProduct, setApiProduct] = useState<ShopProduct | null>(null);
   const [loading, setLoading] = useState(true);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const isAuthenticated = useIsAuthenticated();
 
   useEffect(() => {
     const id = initialProduct?.id;
@@ -97,21 +101,53 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
     return initialProduct;
   }, [apiProduct, initialProduct]);
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product.inStock) {
       Alert.alert(t('category.outOfStock'), t('category.outOfStock'));
       return;
     }
-    
-    // Add to cart logic here
-    Alert.alert(
-      t('product.addedToCart'), 
-      `${product.name} (Qty: ${quantity})`,
-      [
-        { text: t('product.continueShopping'), style: 'cancel' },
-        { text: t('product.viewCart'), onPress: () => navigation.navigate('Cart') }
-      ]
-    );
+    if (!isAuthenticated) {
+      Alert.alert(
+        t('product.loginRequired', { defaultValue: 'Login required' }),
+        t('product.loginToAddToCart', { defaultValue: 'Please log in to add items to your cart.' }),
+        [
+          { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+          { text: t('auth.login', 'Log in'), onPress: () => navigation.navigate('Main', { screen: 'Profile' }) }
+        ]
+      );
+      return;
+    }
+    setAddingToCart(true);
+    try {
+      const productId = Number(product.id);
+      if (!Number.isFinite(productId)) {
+        Alert.alert(t('common.error', 'Error'), t('product.invalidProduct', { defaultValue: 'Invalid product.' }));
+        return;
+      }
+      await addCartItem(productId, quantity);
+      Alert.alert(
+        t('product.addedToCart'),
+        `${product.name} (Qty: ${quantity})`,
+        [
+          { text: t('product.continueShopping'), style: 'cancel' },
+          { text: t('product.viewCart'), onPress: () => navigation.navigate('Cart') }
+        ]
+      );
+    } catch (err: any) {
+      const status = err.response?.status;
+      const message = err.response?.data?.message || err.message || t('product.addToCartFailed', { defaultValue: 'Failed to add to cart. Please try again.' });
+      if (status === 401) {
+        Alert.alert(
+          t('product.loginRequired', { defaultValue: 'Login required' }),
+          t('product.loginToAddToCart', { defaultValue: 'Please log in to add items to your cart.' }),
+          [{ text: t('common.ok', 'OK') }]
+        );
+      } else {
+        Alert.alert(t('common.error', 'Error'), message);
+      }
+    } finally {
+      setAddingToCart(false);
+    }
   };
 
   const handleBuyNow = () => {
@@ -278,12 +314,16 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
       {/* Bottom Action Buttons */}
       <View style={styles.bottomActions}>
         <TouchableOpacity
-          style={[styles.addToCartButton, !product.inStock && styles.disabledButton]}
+          style={[styles.addToCartButton, (!product.inStock || addingToCart) && styles.disabledButton]}
           onPress={handleAddToCart}
-          disabled={!product.inStock}
+          disabled={!product.inStock || addingToCart}
         >
-          <Ionicons name="cart-outline" size={20} color={COLORS.primary} />
-          <Text style={styles.addToCartText}>{t('product.addToCart')}</Text>
+          {addingToCart ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Ionicons name="cart-outline" size={20} color={COLORS.primary} />
+          )}
+          <Text style={styles.addToCartText}>{addingToCart ? t('common.loading', 'Loading…') : t('product.addToCart')}</Text>
         </TouchableOpacity>
         
         <TouchableOpacity

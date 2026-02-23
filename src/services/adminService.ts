@@ -943,6 +943,27 @@ export const adminService = {
     const response = await apiClient.delete(`/admin/banners/${bannerId}`, { timeout: 15000 });
     return response.data;
   },
+
+  /** Shop settings (shipping & tax). GET /api/admin/settings/shop */
+  getShopSettings: async (): Promise<{
+    success?: boolean;
+    data?: { shipping_amount: number; tax_percent: number; currency: string };
+  }> => {
+    const response = await apiClient.get('/admin/settings/shop', { timeout: 15000 });
+    return response.data;
+  },
+
+  /** Update shop settings. PUT /api/admin/settings/shop body: { shipping_amount, tax_percent } */
+  updateShopSettings: async (body: {
+    shipping_amount: number;
+    tax_percent: number;
+  }): Promise<{
+    success?: boolean;
+    data?: { shipping_amount: number; tax_percent: number; currency: string };
+  }> => {
+    const response = await apiClient.put('/admin/settings/shop', body, { timeout: 15000 });
+    return response.data;
+  },
 };
 
 export interface AdminBanner {
@@ -970,6 +991,7 @@ export interface AdminExclusiveOffer {
   description?: string | null;
   image?: string | null;
   image_url?: string | null;
+  image_path?: string | null;
   status?: string;
   is_active?: boolean | number;
   valid_from?: string | null;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,11 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
+import { getShopSettings, ShopSettings } from '../../services/shopSettingsService';
 
 interface CartItem {
   id: string;
@@ -50,10 +51,11 @@ const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
   const route = useRoute<any>();
-  const { cartItems = [], total = 0 } = route.params || { cartItems: [], total: 0 };
+  const { cartItems = [], total: routeTotal = 0 } = route.params || { cartItems: [], total: 0 };
   
   const [currentStep, setCurrentStep] = useState<'address' | 'payment' | 'review'>('address');
   const [loading, setLoading] = useState(false);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     fullName: 'Ahmed Hassan',
@@ -65,23 +67,9 @@ const CheckoutScreen: React.FC = () => {
     country: 'UAE',
   });
 
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('card1');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('paypal');
 
   const paymentMethods: PaymentMethod[] = [
-    {
-      id: 'card1',
-      type: 'card',
-      name: t('checkout.visaEndingIn', { last4: '4242' }),
-      icon: 'card-outline',
-      last4: '4242',
-    },
-    {
-      id: 'card2',
-      type: 'card',
-      name: t('checkout.mastercardEndingIn', { last4: '8888' }),
-      icon: 'card-outline',
-      last4: '8888',
-    },
     {
       id: 'paypal',
       type: 'paypal',
@@ -110,6 +98,28 @@ const CheckoutScreen: React.FC = () => {
       return acc;
     }, 0);
   };
+
+  useEffect(() => {
+    let cancelled = false;
+    getShopSettings().then((s) => {
+      if (!cancelled) setShopSettings(s);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      getShopSettings().then(setShopSettings);
+    }, [])
+  );
+
+  const subtotal = calculateSubtotal();
+  const discount = calculateDiscount();
+  const shippingAmount = shopSettings?.shipping_amount ?? 0;
+  const taxPercent = shopSettings?.tax_percent ?? 0;
+  const taxAmount = Math.round((subtotal - discount) * (taxPercent / 100) * 100) / 100;
+  const total = Math.round((subtotal - discount + shippingAmount + taxAmount) * 100) / 100;
+  const currency = shopSettings?.currency ?? 'AED';
 
   const handlePlaceOrder = () => {
     setLoading(true);
@@ -211,7 +221,7 @@ const CheckoutScreen: React.FC = () => {
   const renderPaymentMethods = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{t('checkout.paymentMethod')}</Text>
-      
+
       {paymentMethods.map((method) => (
         <TouchableOpacity
           key={method.id}
@@ -395,28 +405,37 @@ const CheckoutScreen: React.FC = () => {
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>{t('cart.subtotal')}</Text>
-            <Text style={styles.summaryValue}>${calculateSubtotal().toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>{currency} {subtotal.toFixed(2)}</Text>
           </View>
           
-          {calculateDiscount() > 0 && (
+          {discount > 0 && (
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{t('cart.discount')}</Text>
               <Text style={[styles.summaryValue, styles.discountText]}>
-                -${calculateDiscount().toFixed(2)}
+                -{currency} {discount.toFixed(2)}
               </Text>
             </View>
           )}
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>{t('cart.shipping')}</Text>
-            <Text style={styles.summaryValue}>$9.99</Text>
+            <Text style={styles.summaryValue}>
+              {shippingAmount === 0 ? t('cart.free', 'Free') : `${currency} ${shippingAmount.toFixed(2)}`}
+            </Text>
           </View>
+          
+          {taxAmount > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>{t('cart.tax', 'Tax')}</Text>
+              <Text style={styles.summaryValue}>{currency} {taxAmount.toFixed(2)}</Text>
+            </View>
+          )}
           
           <View style={styles.summaryDivider} />
           
           <View style={styles.summaryRow}>
             <Text style={styles.totalLabel}>{t('cart.total')}</Text>
-            <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+            <Text style={styles.totalValue}>{currency} {total.toFixed(2)}</Text>
           </View>
         </View>
       </ScrollView>
@@ -616,6 +635,72 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: COLORS.primary,
+  },
+  paypalSubSection: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  paypalSubTitle: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.medium,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.sm,
+  },
+  paypalSubOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.sm,
+  },
+  paypalSubOptionSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '10',
+  },
+  paypalSubHint: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  paypalOrDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: SPACING.sm,
+  },
+  paypalOrLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  paypalOrText: {
+    marginHorizontal: SPACING.md,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  cardFormSection: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  cardFormTitle: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  cardRow: {
+    flexDirection: 'row',
+  },
+  reviewCardDetails: {
+    marginTop: SPACING.sm,
   },
   orderItems: {
     marginBottom: SPACING.lg,

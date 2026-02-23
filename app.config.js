@@ -8,6 +8,17 @@ module.exports = {
   ...appJson,
   expo: {
     ...expo,
+    ios: {
+      ...expo.ios,
+      infoPlist: {
+        ...expo.ios?.infoPlist,
+        NSLocationWhenInUseUsageDescription: 'We use your location to show local weather on your dashboard.',
+      },
+    },
+    android: {
+      ...expo.android,
+      permissions: [...(expo.android?.permissions || []), 'ACCESS_COARSE_LOCATION', 'ACCESS_FINE_LOCATION'],
+    },
     extra: {
       ...expo.extra,
       easBuildProfile,

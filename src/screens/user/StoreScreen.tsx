@@ -7,15 +7,17 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
-import { useAppStore } from '../../store';
+import { useIsAuthenticated } from '../../store';
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
 import { shopService, ShopProduct } from '../../services/shopService';
+import { addCartItem, getCart } from '../../services/cartService';
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=800&q=60';
 
@@ -24,13 +26,30 @@ type CategoryItem = { id: string; name: string; icon: string };
 const StoreScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
-  const { cart, addToCart } = useAppStore();
+  const isAuthenticated = useIsAuthenticated();
   const [categories, setCategories] = useState<CategoryItem[]>([]);
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [addedToCart, setAddedToCart] = useState<string | null>(null);
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
+  const [cartItemCount, setCartItemCount] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthenticated) {
+        setCartItemCount(0);
+        return;
+      }
+      getCart()
+        .then((res) => {
+          const items = res.data?.items ?? [];
+          setCartItemCount(items.reduce((sum, i) => sum + i.quantity, 0));
+        })
+        .catch(() => setCartItemCount(0));
+    }, [isAuthenticated])
+  );
 
   const getProductImage = useCallback((p: ShopProduct) => {
     return p.image_url ?? (p.main_image as any)?.image_url ?? p.image ?? FALLBACK_IMAGE;
@@ -116,14 +135,45 @@ const StoreScreen: React.FC = () => {
           return name.includes(q) || desc.includes(q);
         });
 
-  const handleAddToCart = (product: ShopProduct) => {
-    const detail = toDetailProduct(product);
-    addToCart(detail);
-    setAddedToCart(String(product.id));
-    setTimeout(() => setAddedToCart(null), 1000);
+  const handleAddToCart = async (product: ShopProduct) => {
+    if (!isAuthenticated) {
+      Alert.alert(
+        t('product.loginRequired', { defaultValue: 'Login required' }),
+        t('product.loginToAddToCart', { defaultValue: 'Please log in to add items to your cart.' }),
+        [
+          { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+          { text: t('auth.login', 'Log in'), onPress: () => navigation.navigate('Main', { screen: 'Profile' }) }
+        ]
+      );
+      return;
+    }
+    const productId = product.id;
+    if ((product.stock ?? 0) <= 0) {
+      Alert.alert(t('category.outOfStock'), t('category.outOfStock'));
+      return;
+    }
+    setAddingProductId(String(productId));
+    try {
+      await addCartItem(productId, 1);
+      setAddedToCart(String(productId));
+      setCartItemCount((prev) => prev + 1);
+      setTimeout(() => setAddedToCart(null), 1000);
+    } catch (err: any) {
+      const status = err.response?.status;
+      const message = err.response?.data?.message || err.message || t('product.addToCartFailed', { defaultValue: 'Failed to add to cart. Please try again.' });
+      if (status === 401) {
+        Alert.alert(
+          t('product.loginRequired', { defaultValue: 'Login required' }),
+          t('product.loginToAddToCart', { defaultValue: 'Please log in to add items to your cart.' }),
+          [{ text: t('common.ok', 'OK') }]
+        );
+      } else {
+        Alert.alert(t('common.error', 'Error'), message);
+      }
+    } finally {
+      setAddingProductId(null);
+    }
   };
-
-  const cartItemCount = (cart || []).reduce((total, item) => total + item.quantity, 0);
 
   const renderCategoryItem = ({ item }: { item: CategoryItem }) => (
     <TouchableOpacity
@@ -170,10 +220,19 @@ const StoreScreen: React.FC = () => {
             </View>
           </View>
           <TouchableOpacity
-            style={[styles.addToCartButton, addedToCart === String(item.id) && styles.addToCartButtonAdded]}
+            style={[
+              styles.addToCartButton,
+              addedToCart === String(item.id) && styles.addToCartButtonAdded,
+              addingProductId === String(item.id) && styles.addToCartButtonDisabled,
+            ]}
             onPress={() => handleAddToCart(item)}
+            disabled={addingProductId !== null}
           >
-            <Ionicons name={addedToCart === String(item.id) ? 'checkmark' : 'add'} size={20} color={COLORS.background} />
+            {addingProductId === String(item.id) ? (
+              <ActivityIndicator size="small" color={COLORS.background} />
+            ) : (
+              <Ionicons name={addedToCart === String(item.id) ? 'checkmark' : 'add'} size={20} color={COLORS.background} />
+            )}
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -467,6 +526,9 @@ const styles = StyleSheet.create({
   },
   addToCartButtonAdded: {
     backgroundColor: COLORS.success,
+  },
+  addToCartButtonDisabled: {
+    opacity: 0.7,
   },
 });
 

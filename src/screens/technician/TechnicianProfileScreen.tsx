@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,29 +6,80 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { useAppStore } from '../../store';
+import { getTechnicianProfile, TechnicianProfileData } from '../../services/technicianService';
+
+function formatMemberSince(isoDate: string | null | undefined): string {
+  if (!isoDate) return '—';
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return '—';
+  const now = new Date();
+  const months = Math.max(0, (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth()));
+  if (months < 1) return 'Less than 1 month';
+  if (months === 1) return '1 month';
+  return `${months} months`;
+}
 
 const TechnicianProfileScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user, logout } = useAppStore();
 
-  const technician = {
-    id: 'tech_001',
-    name: 'John Smith',
-    email: 'john.smith@shozy.com',
-    phone: '+1 (555) 123-4567',
-    rating: 4.8,
-    completedJobs: 156,
-    totalEarnings: 2847.50,
-    joinDate: '2023-03-15',
-    isOnline: true,
-    specializations: ['Shoe Cleaning', 'Leather Care', 'Sneaker Restoration'],
-    address: 'New York, NY',
+  const [profile, setProfile] = useState<TechnicianProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchProfile = async (isRefresh = false) => {
+    if (!isRefresh) setLoading(true);
+    else setRefreshing(true);
+    try {
+      const data = await getTechnicianProfile();
+      setProfile(data ?? null);
+    } catch (_) {
+      setProfile(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile(false);
+    }, [])
+  );
+
+  const technician = profile
+    ? {
+        name: profile.name || user?.name || '—',
+        email: profile.email || user?.email || '—',
+        phone: profile.phone || user?.phone || '—',
+        profilePictureUrl: profile.profile_picture_url || profile.profile_picture || null,
+        rating: profile.rating ?? 0,
+        completedJobs: profile.jobs_completed ?? 0,
+        totalEarnings: profile.total_earnings ?? 0,
+        memberSince: formatMemberSince(profile.member_since),
+        specializations: Array.isArray(profile.specializations) ? profile.specializations : [],
+        serviceArea: profile.service_area || '—',
+      }
+    : {
+        name: user?.name || '—',
+        email: user?.email || '—',
+        phone: user?.phone || '—',
+        profilePictureUrl: null as string | null,
+        rating: 0,
+        completedJobs: 0,
+        totalEarnings: 0,
+        memberSince: '—',
+        specializations: [] as string[],
+        serviceArea: '—',
+      };
 
   const handleLogout = () => {
     Alert.alert(
@@ -104,6 +155,24 @@ const TechnicianProfileScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
+  if (loading && !profile) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, { marginBottom: 20 }]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={styles.editButton} />
+        </View>
+        <View style={styles.centeredContent}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -115,31 +184,50 @@ const TechnicianProfileScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity style={styles.editButton}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => navigation.navigate('TechnicianProfileEdit')}
+        >
           <Ionicons name="create-outline" size={24} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchProfile(true)} colors={[COLORS.primary]} />
+        }
+      >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{technician.name.charAt(0)}</Text>
-            </View>
+            {technician.profilePictureUrl ? (
+              <Image
+                source={{ uri: technician.profilePictureUrl }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{(technician.name || 'T').charAt(0).toUpperCase()}</Text>
+              </View>
+            )}
             <View style={styles.onlineStatus}>
               <View style={[styles.statusDot, { backgroundColor: COLORS.success }]} />
               <Text style={styles.statusText}>Online</Text>
             </View>
           </View>
           
-          <Text style={styles.technicianName}>{user?.name || technician.name}</Text>
-          <Text style={styles.technicianEmail}>{user?.email || technician.email}</Text>
-          <Text style={styles.technicianPhone}>{user?.phone || technician.phone}</Text>
+          <Text style={styles.technicianName}>{technician.name}</Text>
+          <Text style={styles.technicianEmail}>{technician.email}</Text>
+          {technician.phone ? (
+            <Text style={styles.technicianPhone}>{technician.phone}</Text>
+          ) : null}
           
           <View style={styles.ratingContainer}>
             <Ionicons name="star" size={16} color={COLORS.warning} />
-            <Text style={styles.ratingText}>{technician.rating}/5</Text>
+            <Text style={styles.ratingText}>
+              {Number(technician.rating) ? Number(technician.rating).toFixed(1) : '0'}/5
+            </Text>
             <Text style={styles.ratingLabel}>({technician.completedJobs} jobs)</Text>
           </View>
         </View>
@@ -154,13 +242,13 @@ const TechnicianProfileScreen: React.FC = () => {
           
           <View style={styles.statCard}>
             <Ionicons name="cash-outline" size={24} color={COLORS.primary} />
-            <Text style={styles.statValue}>${technician.totalEarnings}</Text>
+            <Text style={styles.statValue}>AED {Number(technician.totalEarnings).toFixed(2)}</Text>
             <Text style={styles.statLabel}>Total Earnings</Text>
           </View>
           
           <View style={styles.statCard}>
             <Ionicons name="calendar-outline" size={24} color={COLORS.info} />
-            <Text style={styles.statValue}>10 months</Text>
+            <Text style={styles.statValue}>{technician.memberSince}</Text>
             <Text style={styles.statLabel}>Member Since</Text>
           </View>
         </View>
@@ -169,11 +257,15 @@ const TechnicianProfileScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Specializations</Text>
           <View style={styles.specializationsContainer}>
-            {technician.specializations.map((spec, index) => (
-              <View key={index} style={styles.specializationTag}>
-                <Text style={styles.specializationText}>{spec}</Text>
-              </View>
-            ))}
+            {technician.specializations.length > 0 ? (
+              technician.specializations.map((spec, index) => (
+                <View key={index} style={styles.specializationTag}>
+                  <Text style={styles.specializationText}>{spec}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.placeholderText}>No specializations</Text>
+            )}
           </View>
         </View>
 
@@ -182,7 +274,7 @@ const TechnicianProfileScreen: React.FC = () => {
           <Text style={styles.sectionTitle}>Service Area</Text>
           <View style={styles.serviceAreaCard}>
             <Ionicons name="location-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.serviceAreaText}>{technician.address}</Text>
+            <Text style={styles.serviceAreaText}>{technician.serviceArea}</Text>
           </View>
         </View>
 
@@ -238,6 +330,16 @@ const styles = StyleSheet.create({
   editButton: {
     padding: SPACING.sm,
   },
+  centeredContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  loadingText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+  },
   profileHeader: {
     alignItems: 'center',
     paddingVertical: SPACING.xl,
@@ -259,6 +361,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.background,
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   onlineStatus: {
     position: 'absolute',
@@ -363,6 +470,10 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.primary,
     fontWeight: FONT_WEIGHTS.medium,
+  },
+  placeholderText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
   },
   serviceAreaCard: {
     backgroundColor: COLORS.surface,

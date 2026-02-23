@@ -10,6 +10,8 @@ import {
   FlatList,
   Linking,
   Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,7 +29,10 @@ import { useTranslation } from 'react-i18next';
 import { getBanners, getBannerImageUrl, Banner } from '../../services/bannerService';
 import { shopService, ShopProductCategory, ShopProduct } from '../../services/shopService';
 import { publicServiceService, PublicService } from '../../services/publicServiceService';
+import { getExclusiveOffers, PublicExclusiveOffer } from '../../services/exclusiveOffersService';
 import { buildFullImageUrl } from '../../config/api';
+import * as Location from 'expo-location';
+import { fetchWeather, WeatherData } from '../../services/weatherService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -45,6 +50,11 @@ const HomeScreen: React.FC = () => {
   const [servicesLoading, setServicesLoading] = useState(true);
   const [featuredProducts, setFeaturedProducts] = useState<ShopProduct[]>([]);
   const [featuredProductsLoading, setFeaturedProductsLoading] = useState(true);
+  const [exclusiveOffers, setExclusiveOffers] = useState<PublicExclusiveOffer[]>([]);
+  const [exclusiveOffersLoading, setExclusiveOffersLoading] = useState(true);
+  const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+  const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
 
   const recentOrders = Array.isArray(orders) ? orders.slice(0, 3) : [];
   // Extract first order that has before/after photos in its tracking (if any)
@@ -127,6 +137,18 @@ const HomeScreen: React.FC = () => {
     }
   };
 
+  // Weather condition → Ionicons name for widget
+  const getWeatherIcon = (condition: string) => {
+    const c = condition.toLowerCase();
+    if (c.includes('clear')) return 'sunny';
+    if (c.includes('fog') || c.includes('mist')) return 'cloudy';
+    if (c.includes('rain') || c.includes('drizzle')) return 'rainy';
+    if (c.includes('snow')) return 'snow';
+    if (c.includes('thunder')) return 'thunderstorm';
+    if (c.includes('cloud')) return 'partly-sunny';
+    return 'partly-sunny';
+  };
+
   // Helper function for service icons
   const getServiceIcon = (category: string) => {
     switch (category.toLowerCase()) {
@@ -158,6 +180,31 @@ const HomeScreen: React.FC = () => {
       .finally(() => {
         if (!cancelled) setBannersLoading(false);
       });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Location + weather: request permission, get position, fetch weather and place name
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (cancelled) return;
+        setLocationPermission(status === 'granted');
+        if (status !== 'granted') {
+          setWeatherLoading(false);
+          return;
+        }
+        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (cancelled) return;
+        const data = await fetchWeather(position.coords.latitude, position.coords.longitude);
+        if (!cancelled) setWeather(data);
+      } catch {
+        if (!cancelled) setWeather(null);
+      } finally {
+        if (!cancelled) setWeatherLoading(false);
+      }
+    })();
     return () => { cancelled = true; };
   }, []);
 
@@ -196,6 +243,17 @@ const HomeScreen: React.FC = () => {
       })
       .catch(() => { if (!cancelled) setFeaturedProducts([]); })
       .finally(() => { if (!cancelled) setFeaturedProductsLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Fetch exclusive offers (GET /api/exclusive-offers, no auth) – first 3 for dashboard
+  useEffect(() => {
+    let cancelled = false;
+    setExclusiveOffersLoading(true);
+    getExclusiveOffers({ per_page: 3 })
+      .then((list) => { if (!cancelled) setExclusiveOffers(list); })
+      .catch(() => { if (!cancelled) setExclusiveOffers([]); })
+      .finally(() => { if (!cancelled) setExclusiveOffersLoading(false); });
     return () => { cancelled = true; };
   }, []);
 
@@ -303,6 +361,24 @@ const HomeScreen: React.FC = () => {
     />
   );
 
+  const OfferCardBackground = ({ uri, style }: { uri: string | null; style: any }) =>
+    uri ? (
+      <Image source={{ uri }} style={style} contentFit="cover" transition={200} cachePolicy="disk" />
+    ) : (
+      <View style={[style, styles.offerPlaceholder]} />
+    );
+
+  const getOfferImageUrl = (offer: PublicExclusiveOffer): string | null => {
+    const raw = offer.image_url ?? (offer as any).image ?? (offer as any).image_path;
+    if (typeof raw !== 'string' || !raw.trim()) return null;
+    return raw.startsWith('http') ? raw : buildFullImageUrl(raw);
+  };
+
+  const offerSubtitle = (offer: PublicExclusiveOffer): string =>
+    offer.description?.trim() || offer.applies_to?.trim() || '';
+  const offerTitle = (offer: PublicExclusiveOffer): string =>
+    offer.title?.trim() || t('home.exclusiveOffer', 'Offer');
+
   // Featured products: first 3 from API for the Home section; View All opens FeaturedProductsScreen
   const featuredProductsFirst3 = featuredProducts.slice(0, 3);
   const getFeaturedProductImage = (p: ShopProduct) => {
@@ -344,7 +420,54 @@ const HomeScreen: React.FC = () => {
         showCart={true}
       />
       <ScrollView showsVerticalScrollIndicator={false}>
-      
+      {/* Weather widget – premium card with location, temperature, condition */}
+      <View style={styles.weatherCard}>
+        {weatherLoading ? (
+          <View style={styles.weatherContent}>
+            <ActivityIndicator size="small" color="#fff" />
+            <Text style={styles.weatherCardSubtext}>{t('home.weather.loading', 'Getting weather…')}</Text>
+          </View>
+        ) : locationPermission === false ? (
+          <View style={styles.weatherContent}>
+            <View style={styles.weatherIconCircle}>
+              <Ionicons name="location-outline" size={28} color="#fff" />
+            </View>
+            <Text style={styles.weatherCardSubtext}>{t('home.weather.enableLocation', 'Enable location for local weather')}</Text>
+          </View>
+        ) : weather ? (
+          <>
+            <View style={styles.weatherRow}>
+              <View style={styles.weatherIconCircle}>
+                <Ionicons name={getWeatherIcon(weather.condition) as any} size={40} color="#fff" />
+              </View>
+              <View style={styles.weatherMain}>
+                <View style={styles.weatherTempRow}>
+                  <Text style={styles.weatherTemp}>{Math.round(weather.temperature)}</Text>
+                  <Text style={styles.weatherTempUnit}>°C</Text>
+                </View>
+                <View style={styles.weatherConditionPill}>
+                  <Text style={styles.weatherConditionText}>{weather.condition}</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.weatherLocationRow}>
+              <Ionicons name="location" size={14} color="rgba(255,255,255,0.9)" />
+              <Text style={styles.weatherLocationText} numberOfLines={2}>
+                {weather.locationName?.trim() && weather.locationName !== 'Current location'
+                  ? weather.locationName
+                  : weather.coordinates
+                    ? `${t('home.weather.yourLocation', 'Your location')} (${weather.coordinates})`
+                    : t('home.weather.currentLocation', 'Current location')}
+              </Text>
+            </View>
+          </>
+        ) : (
+          <View style={styles.weatherContent}>
+            <Text style={styles.weatherCardSubtext}>{t('home.weather.unavailable', 'Weather unavailable')}</Text>
+          </View>
+        )}
+      </View>
+
       {/* Promotional Slider */}
       <View style={styles.sliderContainer}>
         <FlatList
@@ -487,7 +610,7 @@ const HomeScreen: React.FC = () => {
         );
       })()}
 
-      {/* Offers Section */}
+      {/* Exclusive Offers – dynamic from GET /api/exclusive-offers (first 3) */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Exclusive Offers</Text>
@@ -495,35 +618,46 @@ const HomeScreen: React.FC = () => {
             <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
           </TouchableOpacity>
         </View>
-        {/* Top full-width banner */}
-          <TouchableOpacity style={styles.offerBannerFull} onPress={() => navigation.navigate('Offers')}>
-          <OfferImage uri={'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?auto=format&fit=crop&w=1200&q=60'} style={styles.offerImageFull} />
-          <View style={styles.offerOverlay} />
-          <View style={styles.offerContentFull}>
-            <Text style={styles.offerTitle}>Farm Fresh Week</Text>
-            <Text style={styles.offerSubtitle}>Up to 30% OFF on fresh produce</Text>
+        {exclusiveOffersLoading ? (
+          <View style={[styles.offerBannerFull, styles.offerPlaceholder]}>
+            <Text style={styles.offerPlaceholderText}>{t('home.loading', 'Loading...')}</Text>
           </View>
-        </TouchableOpacity>
-
-        {/* Two half banners side by side */}
-        <View style={styles.offerRow}>
-          <TouchableOpacity style={styles.offerHalf} onPress={() => navigation.navigate('Offers')}>
-            <OfferImage uri={'https://images.unsplash.com/photo-1582515073490-d2e98499d4a7?auto=format&fit=crop&w=800&q=60'} style={styles.offerImageHalf} />
-            <View style={styles.offerOverlay} />
-            <View style={styles.offerContentHalf}>
-              <Text style={styles.offerTitleSm}>Buy 1 Get 1</Text>
-              <Text style={styles.offerSubtitleSm}>Fertilizers & Soil</Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.offerHalf} onPress={() => navigation.navigate('Offers')}>
-            <OfferImage uri={'https://images.unsplash.com/photo-1472145246862-b24cf25c4a36?auto=format&fit=crop&w=800&q=60'} style={styles.offerImageHalf} />
-            <View style={styles.offerOverlay} />
-            <View style={styles.offerContentHalf}>
-              <Text style={styles.offerTitleSm}>Irrigation Deal</Text>
-              <Text style={styles.offerSubtitleSm}>Extra 10% OFF kits</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
+        ) : exclusiveOffers.length >= 1 ? (
+          <>
+            <TouchableOpacity style={styles.offerBannerFull} onPress={() => navigation.navigate('ExclusiveOfferProducts', { offer: exclusiveOffers[0] })}>
+              <OfferCardBackground uri={getOfferImageUrl(exclusiveOffers[0])} style={styles.offerImageFull} />
+              <View style={styles.offerOverlay} />
+              <View style={styles.offerContentFull}>
+                <Text style={styles.offerTitle} numberOfLines={1}>{offerTitle(exclusiveOffers[0])}</Text>
+                <Text style={styles.offerSubtitle} numberOfLines={1}>{offerSubtitle(exclusiveOffers[0])}</Text>
+              </View>
+            </TouchableOpacity>
+            {exclusiveOffers.length >= 2 && (
+              <View style={styles.offerRow}>
+                <TouchableOpacity style={styles.offerHalf} onPress={() => navigation.navigate('ExclusiveOfferProducts', { offer: exclusiveOffers[1] })}>
+                  <OfferCardBackground uri={getOfferImageUrl(exclusiveOffers[1])} style={styles.offerImageHalf} />
+                  <View style={styles.offerOverlay} />
+                  <View style={styles.offerContentHalf}>
+                    <Text style={styles.offerTitleSm} numberOfLines={1}>{offerTitle(exclusiveOffers[1])}</Text>
+                    <Text style={styles.offerSubtitleSm} numberOfLines={1}>{offerSubtitle(exclusiveOffers[1])}</Text>
+                  </View>
+                </TouchableOpacity>
+                {exclusiveOffers.length >= 3 ? (
+                  <TouchableOpacity style={styles.offerHalf} onPress={() => navigation.navigate('ExclusiveOfferProducts', { offer: exclusiveOffers[2] })}>
+                    <OfferCardBackground uri={getOfferImageUrl(exclusiveOffers[2])} style={styles.offerImageHalf} />
+                    <View style={styles.offerOverlay} />
+                    <View style={styles.offerContentHalf}>
+                      <Text style={styles.offerTitleSm} numberOfLines={1}>{offerTitle(exclusiveOffers[2])}</Text>
+                      <Text style={styles.offerSubtitleSm} numberOfLines={1}>{offerSubtitle(exclusiveOffers[2])}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.offerHalf} />
+                )}
+              </View>
+            )}
+          </>
+        ) : null}
       </View>
 
       {/* Place Service Orders - dynamic from GET /services (public API) or static fallback */}
@@ -1117,6 +1251,95 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     textAlign: 'center',
   },
+  // Weather widget – premium dark card
+  weatherCard: {
+    marginHorizontal: SPACING.md,
+    marginBottom: SPACING.md,
+    padding: SPACING.lg,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.xl,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: { elevation: 6 },
+    }),
+  },
+  weatherContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+  },
+  weatherIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weatherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  weatherMain: {
+    flex: 1,
+  },
+  weatherTempRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  weatherTemp: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: '#fff',
+    letterSpacing: -1,
+  },
+  weatherTempUnit: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#fff',
+    marginLeft: 2,
+    marginBottom: 6,
+  },
+  weatherConditionPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.round,
+    marginTop: 4,
+  },
+  weatherConditionText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.semiBold as any,
+    color: '#fff',
+  },
+  weatherCardSubtext: {
+    fontSize: FONT_SIZES.md,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  weatherLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.2)',
+  },
+  weatherLocationText: {
+    fontSize: FONT_SIZES.sm,
+    color: 'rgba(255,255,255,0.85)',
+    flex: 1,
+  },
   // Slider Styles
   sliderContainer: {
     marginBottom: SPACING.lg,
@@ -1463,6 +1686,15 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.lg,
     overflow: 'hidden',
     marginBottom: SPACING.md,
+  },
+  offerPlaceholder: {
+    backgroundColor: '#e8e8e8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  offerPlaceholderText: {
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZES.sm,
   },
   offerImageFull: { width: '100%', height: '100%' },
   offerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },

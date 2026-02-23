@@ -88,7 +88,13 @@ const AdminExclusiveOffersScreen: React.FC = () => {
     item.title ?? item.name ?? `#${item.id}`;
 
   const getOfferImage = (item: AdminExclusiveOffer) => {
-    const raw = item.image_url ?? item.image;
+    const raw =
+      item.image_url ??
+      item.image ??
+      (item as any).image_path ??
+      (item as any).thumbnail_url ??
+      (item as any).banner_url ??
+      (item as any).media?.url;
     if (typeof raw === 'string' && raw.trim()) {
       return raw.startsWith('http') ? raw : buildFullImageUrl(raw);
     }
@@ -114,6 +120,8 @@ const AdminExclusiveOffersScreen: React.FC = () => {
               style={styles.cardImage}
               contentFit="cover"
               cachePolicy="disk"
+              recyclingKey={String(item.id)}
+              placeholder={{ uri: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" viewBox="0 0 1 1"><rect fill="%23f0f0f0" width="1" height="1"/></svg>') }}
             />
           ) : (
             <View style={[styles.cardImage, styles.cardImagePlaceholder]}>

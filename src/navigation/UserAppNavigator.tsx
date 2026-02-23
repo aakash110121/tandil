@@ -33,6 +33,7 @@ import RateReviewScreen from '../screens/user/RateReviewScreen';
 import SettingsScreen from '../screens/user/SettingsScreen';
 import HelpCenterScreen from '../screens/user/HelpCenterScreen';
 import OffersScreen from '../screens/user/OffersScreen';
+import ExclusiveOfferProductsScreen from '../screens/user/ExclusiveOfferProductsScreen';
 import MembershipsScreen from '../screens/common/MembershipsScreen';
 import MembershipCheckoutScreen from '../screens/common/MembershipCheckoutScreen';
 import PersonalInfoScreen from '../screens/user/PersonalInfoScreen';
@@ -123,6 +124,7 @@ const UserAppNavigator = () => {
       <Stack.Screen name="LoyaltyPoints" component={LoyaltyPointsScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Offers" component={OffersScreen} />
+      <Stack.Screen name="ExclusiveOfferProducts" component={ExclusiveOfferProductsScreen} />
       
       {/* Store Screens */}
       <Stack.Screen name="ProductCategory" component={ServiceCategoryScreen} />

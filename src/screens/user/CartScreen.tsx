@@ -1,21 +1,25 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  StatusBar,
   Image,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
+import { getCart, removeCartItem, updateCartItemQuantity, CartApiItem, CartOrderSummary } from '../../services/cartService';
+import { getShopSettings, ShopSettings } from '../../services/shopSettingsService';
+import { useIsAuthenticated } from '../../store';
 
-interface CartItem {
+interface CartItemDisplay {
   id: string;
   productId: string;
   name: string;
@@ -27,11 +31,84 @@ interface CartItem {
   quantity: number;
 }
 
+function mapApiItemToDisplay(item: CartApiItem): CartItemDisplay {
+  return {
+    id: String(item.id),
+    productId: String(item.product_id),
+    name: item.name,
+    price: item.current_price,
+    originalPrice: item.original_price ?? undefined,
+    image: item.image_url || 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=400&q=60',
+    category: item.category ?? undefined,
+    brand: item.brand ?? undefined,
+    quantity: item.quantity,
+  };
+}
+
 const CartScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
-  
-  // Fallback image component
+  const isAuthenticated = useIsAuthenticated();
+
+  const [cartItems, setCartItems] = useState<CartItemDisplay[]>([]);
+  const [orderSummary, setOrderSummary] = useState<CartOrderSummary | null>(null);
+  const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getShopSettings().then((s) => {
+      if (!cancelled) setShopSettings(s);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      getShopSettings().then(setShopSettings);
+    }, [])
+  );
+
+  const fetchCart = useCallback(async (isRefresh = false) => {
+    if (!isAuthenticated) {
+      setCartItems([]);
+      setOrderSummary(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    if (!isRefresh) setLoading(true);
+    else setRefreshing(true);
+    setError(null);
+    try {
+      const res = await getCart();
+      const items = res.data?.items ?? [];
+      const summary = res.data?.order_summary ?? null;
+      setCartItems(items.map(mapApiItemToDisplay));
+      setOrderSummary(summary);
+    } catch (err: any) {
+      setCartItems([]);
+      setOrderSummary(null);
+      setError(err.response?.data?.message || err.message || t('cart.errorLoad', { defaultValue: 'Failed to load cart' }));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [isAuthenticated, t]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchCart();
+    }, [fetchCart])
+  );
+
+  const onRefresh = useCallback(() => {
+    fetchCart(true);
+  }, [fetchCart]);
+
   const FallbackImage = ({ uri, style }: { uri: string; style: any }) => {
     const [currentUri, setCurrentUri] = useState(uri);
     const fallback = 'https://images.unsplash.com/photo-1464226184884-fa280b87c399?auto=format&fit=crop&w=400&q=60';
@@ -43,40 +120,22 @@ const CartScreen: React.FC = () => {
       />
     );
   };
-  
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    {
-      id: '1',
-      productId: 'product_001',
-      name: 'Organic Fertilizer 5kg',
-      price: 89.99,
-      originalPrice: 129.99,
-      image: 'https://images.unsplash.com/photo-1615486363561-9be0d9e74075?auto=format&fit=crop&w=400&q=60&v=cart1',
-      category: 'Fertilizer',
-      brand: 'GreenFarm',
-      quantity: 1,
-    },
-    {
-      id: '2',
-      productId: 'product_004',
-      name: 'Drip Irrigation Kit',
-      price: 79.99,
-      image: 'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=400&q=60&v=cart2',
-      category: 'Irrigation',
-      brand: 'AquaFlow',
-      quantity: 2,
-    },
-  ]);
 
-  const updateQuantity = (itemId: string, newQuantity: number) => {
+  const updateQuantity = useCallback(async (itemId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
-    
-    setCartItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId ? { ...item, quantity: newQuantity } : item
-      )
-    );
-  };
+    const id = Number(itemId);
+    if (!Number.isFinite(id)) return;
+    setUpdatingItemId(itemId);
+    try {
+      await updateCartItemQuantity(id, newQuantity);
+      await fetchCart(true);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || t('cart.updateQuantityFailed', { defaultValue: 'Failed to update quantity.' });
+      Alert.alert(t('common.error', 'Error'), msg);
+    } finally {
+      setUpdatingItemId(null);
+    }
+  }, [fetchCart, t]);
 
   const removeItem = (itemId: string) => {
     Alert.alert(
@@ -87,43 +146,39 @@ const CartScreen: React.FC = () => {
         {
           text: t('cart.remove'),
           style: 'destructive',
-          onPress: () => {
-            setCartItems(prevItems => prevItems.filter(item => item.id !== itemId));
+          onPress: async () => {
+            const id = Number(itemId);
+            if (!Number.isFinite(id)) return;
+            try {
+              await removeCartItem(id);
+              await fetchCart(true);
+            } catch (err: any) {
+              const msg = err.response?.data?.message || err.message || t('cart.removeFailed', { defaultValue: 'Failed to remove item.' });
+              Alert.alert(t('common.error', 'Error'), msg);
+            }
           },
         },
       ]
     );
   };
 
-  const calculateSubtotal = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-  };
-
-  const calculateDiscount = () => {
-    return cartItems.reduce((total, item) => {
-      if (item.originalPrice) {
-        return total + ((item.originalPrice - item.price) * item.quantity);
-      }
-      return total;
-    }, 0);
-  };
-
-  const calculateTotal = () => {
-    const subtotal = calculateSubtotal();
-    const discount = calculateDiscount();
-    const shipping = subtotal > 0 ? 9.99 : 0;
-    return subtotal + shipping;
-  };
+  const subtotal = orderSummary?.subtotal ?? cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discount = orderSummary?.discount ?? 0;
+  const shipping = orderSummary?.shipping ?? shopSettings?.shipping_amount ?? 0;
+  const taxPercent = shopSettings?.tax_percent ?? 0;
+  const taxAmount = Math.round((subtotal - discount) * (taxPercent / 100) * 100) / 100;
+  const total = Math.round((subtotal - discount + shipping + taxAmount) * 100) / 100;
+  const currency = orderSummary?.currency || shopSettings?.currency || t('orders.currency', { defaultValue: 'AED' });
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
       Alert.alert(t('cart.emptyCartTitle'), t('cart.emptyCartBody'));
       return;
     }
-    navigation.navigate('Checkout', { cartItems, total: calculateTotal() });
+    navigation.navigate('Checkout', { cartItems, total });
   };
 
-  const renderCartItem = (item: CartItem) => (
+  const renderCartItem = (item: CartItemDisplay) => (
     <View key={item.id} style={styles.cartItem}>
       <FallbackImage uri={item.image} style={styles.itemImage} />
       
@@ -137,9 +192,9 @@ const CartScreen: React.FC = () => {
           </View>
           
           <View style={styles.itemPrice}>
-            <Text style={styles.currentPrice}>{t('orders.currency', { defaultValue: 'AED' })} {item.price}</Text>
-            {item.originalPrice && (
-              <Text style={styles.originalPrice}>{t('orders.currency', { defaultValue: 'AED' })} {item.originalPrice}</Text>
+            <Text style={styles.currentPrice}>{currency} {item.price}</Text>
+            {item.originalPrice != null && item.originalPrice > item.price && (
+              <Text style={styles.originalPrice}>{currency} {item.originalPrice}</Text>
             )}
           </View>
         </View>
@@ -147,25 +202,29 @@ const CartScreen: React.FC = () => {
         <View style={styles.itemActions}>
           <View style={styles.quantityControls}>
             <TouchableOpacity
-              style={styles.quantityButton}
+              style={[styles.quantityButton, updatingItemId === item.id && styles.quantityButtonDisabled]}
               onPress={() => updateQuantity(item.id, item.quantity - 1)}
+              disabled={updatingItemId !== null || item.quantity <= 1}
             >
-              <Ionicons name="remove" size={16} color={COLORS.text} />
+              <Ionicons name="remove" size={16} color={item.quantity <= 1 ? COLORS.textSecondary : COLORS.text} />
             </TouchableOpacity>
-            
-            <Text style={styles.quantityText}>{item.quantity}</Text>
-            
+            {updatingItemId === item.id ? (
+              <ActivityIndicator size="small" color={COLORS.primary} style={styles.quantityLoader} />
+            ) : (
+              <Text style={styles.quantityText}>{item.quantity}</Text>
+            )}
             <TouchableOpacity
-              style={styles.quantityButton}
+              style={[styles.quantityButton, updatingItemId === item.id && styles.quantityButtonDisabled]}
               onPress={() => updateQuantity(item.id, item.quantity + 1)}
+              disabled={updatingItemId !== null}
             >
               <Ionicons name="add" size={16} color={COLORS.text} />
             </TouchableOpacity>
           </View>
-          
           <TouchableOpacity
-            style={styles.removeButton}
+            style={[styles.removeButton, updatingItemId === item.id && styles.quantityButtonDisabled]}
             onPress={() => removeItem(item.id)}
+            disabled={updatingItemId !== null}
           >
             <Ionicons name="trash-outline" size={16} color={COLORS.error} />
           </TouchableOpacity>
@@ -176,71 +235,94 @@ const CartScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Header 
-        title={t('cart.title')} 
-        showBack={true}
-        showCart={true}
+      <Header
+        title={t('cart.title')}
+        showBack
+        showCart
       />
 
-      {cartItems.length === 0 ? (
+      {!isAuthenticated ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="log-in-outline" size={64} color={COLORS.textSecondary} />
+          <Text style={styles.emptyStateTitle}>{t('cart.loginToView', { defaultValue: 'Log in to view your cart' })}</Text>
+          <Text style={styles.emptyStateText}>{t('cart.loginToViewBody', { defaultValue: 'Sign in to see items you have added.' })}</Text>
+          <TouchableOpacity
+            style={styles.shopButton}
+            onPress={() => navigation.navigate('Main' as never, { screen: 'Profile' } as never)}
+          >
+            <Text style={styles.shopButtonText}>{t('auth.login', 'Log in')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : loading ? (
+        <View style={styles.loadingState}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>{t('cart.loading', { defaultValue: 'Loading cart…' })}</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="alert-circle-outline" size={64} color={COLORS.error} />
+          <Text style={styles.emptyStateTitle}>{t('common.error', 'Error')}</Text>
+          <Text style={styles.emptyStateText}>{error}</Text>
+          <TouchableOpacity style={styles.shopButton} onPress={() => fetchCart()}>
+            <Text style={styles.shopButtonText}>{t('common.retry', 'Retry')}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : cartItems.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="bag-outline" size={64} color={COLORS.textSecondary} />
           <Text style={styles.emptyStateTitle}>{t('cart.emptyTitle')}</Text>
           <Text style={styles.emptyStateText}>{t('cart.emptyText')}</Text>
           <TouchableOpacity
             style={styles.shopButton}
-            onPress={() => navigation.navigate('Main' as never, { screen: 'Home' } as never)}
+            onPress={() => navigation.navigate('Main' as never, { screen: 'Store' } as never)}
           >
             <Text style={styles.shopButtonText}>{t('cart.startShopping')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <>
-          {/* Cart Items */}
-          <ScrollView style={styles.cartList} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            style={styles.cartList}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
+            }
+          >
             {cartItems.map(renderCartItem)}
           </ScrollView>
 
-          {/* Order Summary */}
           <View style={styles.orderSummary}>
             <Text style={styles.summaryTitle}>{t('cart.orderSummary')}</Text>
-            
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{t('cart.subtotal')}</Text>
-              <Text style={styles.summaryValue}>{t('orders.currency', { defaultValue: 'AED' })} {calculateSubtotal().toFixed(2)}</Text>
+              <Text style={styles.summaryValue}>{currency} {subtotal.toFixed(2)}</Text>
             </View>
-            
-            {calculateDiscount() > 0 && (
+            {discount > 0 && (
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>{t('cart.discount')}</Text>
-                <Text style={[styles.summaryValue, styles.discountText]}>
-                  -{t('orders.currency', { defaultValue: 'AED' })} {calculateDiscount().toFixed(2)}
-                </Text>
+                <Text style={[styles.summaryValue, styles.discountText]}>-{currency} {discount.toFixed(2)}</Text>
               </View>
             )}
-            
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{t('cart.shipping')}</Text>
-              <Text style={styles.summaryValue}>
-                {calculateSubtotal() > 0 ? `${t('orders.currency', { defaultValue: 'AED' })} 9.99` : t('cart.free')}
-              </Text>
+              <Text style={styles.summaryValue}>{shipping > 0 ? `${currency} ${shipping.toFixed(2)}` : t('cart.free')}</Text>
             </View>
-            
+            {taxAmount > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{t('cart.tax', 'Tax')}</Text>
+                <Text style={styles.summaryValue}>{currency} {taxAmount.toFixed(2)}</Text>
+              </View>
+            )}
             <View style={styles.summaryDivider} />
-            
             <View style={styles.summaryRow}>
               <Text style={styles.totalLabel}>{t('cart.total')}</Text>
-              <Text style={styles.totalValue}>{t('orders.currency', { defaultValue: 'AED' })} {calculateTotal().toFixed(2)}</Text>
+              <Text style={styles.totalValue}>{currency} {total.toFixed(2)}</Text>
             </View>
           </View>
 
-          {/* Checkout Button */}
           <View style={styles.checkoutContainer}>
-            <TouchableOpacity
-              style={styles.checkoutButton}
-              onPress={handleCheckout}
-            >
-              <Text style={styles.checkoutButtonText}>{t('cart.proceed', { amount: `${t('orders.currency', { defaultValue: 'AED' })} ${calculateTotal().toFixed(2)}` })}</Text>
+            <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
+              <Text style={styles.checkoutButtonText}>{t('cart.proceed', { amount: `${currency} ${total.toFixed(2)}` })}</Text>
               <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
             </TouchableOpacity>
           </View>
@@ -275,6 +357,17 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  loadingState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+  },
+  loadingText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.md,
   },
   emptyState: {
     flex: 1,
@@ -388,6 +481,12 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     minWidth: 30,
     textAlign: 'center',
+  },
+  quantityButtonDisabled: {
+    opacity: 0.6,
+  },
+  quantityLoader: {
+    minWidth: 30,
   },
   removeButton: {
     padding: SPACING.sm,

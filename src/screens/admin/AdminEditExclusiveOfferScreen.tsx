@@ -24,6 +24,8 @@ import { Button } from '../../components/common/Button';
 import Header from '../../components/common/Header';
 import { adminService, AdminProduct, AdminExclusiveOffer } from '../../services/adminService';
 import { compressImageForUpload } from '../../utils/compressImage';
+import { buildFullImageUrl } from '../../config/api';
+import { Image } from 'expo-image';
 
 const DISCOUNT_TYPES = ['percentage', 'fixed_amount', 'buy_one_get_one'] as const;
 
@@ -47,6 +49,7 @@ const AdminEditExclusiveOfferScreen: React.FC = () => {
   const [sortOrder, setSortOrder] = useState('0');
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
   const [image, setImage] = useState<{ uri: string } | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(null);
 
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -77,6 +80,17 @@ const AdminEditExclusiveOfferScreen: React.FC = () => {
       );
     } else {
       setSelectedProductIds([]);
+    }
+    // Only update existing image when API returns one; don't clear when API omits it (keeps list image until loaded)
+    const raw =
+      offer.image_url ??
+      offer.image ??
+      (offer as any).image_path ??
+      (offer as any).thumbnail_url ??
+      (offer as any).banner_url ??
+      (offer as any).media?.url;
+    if (typeof raw === 'string' && raw.trim()) {
+      setExistingImageUrl(raw.startsWith('http') ? raw : buildFullImageUrl(raw));
     }
   }, []);
 
@@ -299,6 +313,23 @@ const AdminEditExclusiveOfferScreen: React.FC = () => {
               <Ionicons name="image-outline" size={24} color={COLORS.primary} />
               <Text style={styles.imageBtnText}>{pickingImage ? t('common.loading', 'Loading…') : image ? t('admin.exclusiveOffers.imageSelected', 'Image selected') : t('admin.exclusiveOffers.uploadImage', 'Upload image')}</Text>
             </TouchableOpacity>
+            {image?.uri ? (
+              <View style={styles.imagePreviewWrap}>
+                <Image source={{ uri: image.uri }} style={styles.imagePreview} contentFit="cover" />
+                <TouchableOpacity style={styles.imagePreviewRemove} onPress={() => setImage(null)}>
+                  <Ionicons name="close-circle" size={28} color={COLORS.error} />
+                </TouchableOpacity>
+              </View>
+            ) : existingImageUrl ? (
+              <View style={styles.imagePreviewWrap}>
+                <Image
+                  source={{ uri: existingImageUrl }}
+                  style={styles.imagePreview}
+                  contentFit="cover"
+                  placeholder={{ uri: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" viewBox="0 0 1 1"><rect fill="%23f0f0f0" width="1" height="1"/></svg>') }}
+                />
+              </View>
+            ) : null}
           </View>
           <Button title={t('admin.exclusiveOffers.updateButton', 'Update offer')} onPress={handleUpdate} disabled={loading} loading={loading} style={styles.submitBtn} />
           <View style={styles.bottomPad} />
@@ -382,6 +413,9 @@ const styles = StyleSheet.create({
   imageBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: BORDER_RADIUS.md, padding: SPACING.md, gap: SPACING.sm },
   imageBtnDisabled: { opacity: 0.6 },
   imageBtnText: { fontSize: FONT_SIZES.md, color: COLORS.text },
+  imagePreviewWrap: { marginTop: SPACING.sm, position: 'relative', alignSelf: 'flex-start' },
+  imagePreview: { width: 120, height: 120, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.border + '40' },
+  imagePreviewRemove: { position: 'absolute', top: -8, right: -8 },
   submitBtn: { marginTop: SPACING.lg },
   bottomPad: { height: SPACING.xl },
   centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },

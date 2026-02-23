@@ -88,6 +88,18 @@ const AdminSettingsScreen: React.FC = () => {
       ],
     },
     {
+      titleKey: 'admin.settings.productSettingsSection',
+      items: [
+        {
+          icon: 'cube',
+          titleKey: 'admin.settings.productSettings.title',
+          subtitleKey: 'admin.settings.productSettings.subtitle',
+          type: 'navigation',
+          onPress: () => navigation.navigate('AdminProductSettings'),
+        },
+      ],
+    },
+    {
       titleKey: 'admin.settings.dataPrivacy',
       items: [
         {
