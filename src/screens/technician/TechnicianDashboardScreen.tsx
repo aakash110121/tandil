@@ -9,24 +9,45 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { useTranslation } from 'react-i18next';
-import { getTechnicianDashboard, TechnicianDashboardData, TechnicianTodayTask } from '../../services/technicianService';
+import { getTechnicianDashboard, TechnicianDashboardData, TechnicianTodayTask, TechnicianRecentVisit } from '../../services/technicianService';
+import { buildProfilePictureUrl } from '../../config/api';
+import dayjs from 'dayjs';
 
 /** Map API task to dashboard job shape */
 function mapTaskToJob(task: TechnicianTodayTask) {
+  const status = (task.status ?? 'assigned').toLowerCase().replace(/\s+/g, '_');
+  const durationStr = task.duration_minutes != null
+    ? `${task.duration_minutes} min`
+    : (task.estimated_duration ?? task.estimatedDuration ?? '—');
   return {
     id: String(task.id),
-    customerName: task.customer_name ?? task.customerName ?? '—',
-    service: task.service ?? '—',
-    address: task.address ?? '—',
+    customerName: task.farm_name ?? task.customer_name ?? task.customerName ?? '—',
+    service: task.service_name ?? task.service ?? '—',
+    address: task.location ?? task.address ?? '—',
     scheduledTime: task.scheduled_time ?? task.scheduledTime ?? '—',
-    status: (task.status ?? 'assigned').toLowerCase().replace(/\s+/g, '_'),
-    estimatedDuration: task.estimated_duration ?? task.estimatedDuration ?? '—',
+    status,
+    estimatedDuration: durationStr,
     taskType: task.task_type ?? task.taskType ?? 'care',
+  };
+}
+
+/** Map API recent visit to dashboard card shape */
+function mapRecentVisitToJob(visit: TechnicianRecentVisit) {
+  return {
+    id: String(visit.id),
+    customerName: visit.farm_name,
+    service: visit.service_name,
+    completedAt: visit.date,
+    dateFormatted: dayjs(visit.date).format('D/M/YYYY'),
+    earnings: visit.price,
+    earningsDisplay: visit.price_display ?? `AED ${Number(visit.price).toFixed(2)}`,
+    rating: visit.rating,
   };
 }
 
@@ -37,6 +58,7 @@ const TechnicianDashboardScreen: React.FC = () => {
   const [dashboard, setDashboard] = useState<TechnicianDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [profileImageError, setProfileImageError] = useState(false);
 
   const fetchDashboard = async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -56,12 +78,18 @@ const TechnicianDashboardScreen: React.FC = () => {
     fetchDashboard();
   }, []);
 
+  useEffect(() => {
+    setProfileImageError(false);
+  }, [dashboard?.profile_picture_url, dashboard?.profile_picture]);
+
   const technician = dashboard
     ? {
         name: dashboard.name || '—',
         employeeId: dashboard.employee_id || '—',
         email: dashboard.email || '',
         isOnline: dashboard.is_online ?? true,
+        profilePictureUrl: dashboard.profile_picture_url
+          || (dashboard.profile_picture ? buildProfilePictureUrl(dashboard.profile_picture) : null),
         thisWeekEarnings: dashboard.weekly_kpis?.earnings ?? 0,
         completedVisits: dashboard.weekly_kpis?.visits_done ?? 0,
         rating: dashboard.weekly_kpis?.rating ?? 0,
@@ -71,17 +99,17 @@ const TechnicianDashboardScreen: React.FC = () => {
         employeeId: '—',
         email: '',
         isOnline: false,
+        profilePictureUrl: null as string | null,
         thisWeekEarnings: 0,
         completedVisits: 0,
         rating: 0,
       };
 
   const currentJobs = (dashboard?.today_tasks ?? []).map(mapTaskToJob);
+  const recentJobs = (dashboard?.recent_visits ?? []).map(mapRecentVisitToJob);
 
-  const recentJobs = [
-    { id: 'visit_003', customerName: 'Green Valley Farm', service: 'Planting & Fertilizing', completedAt: '2024-01-15', earnings: 289.99, rating: 5 },
-    { id: 'visit_004', customerName: 'Desert Palm Resort', service: 'Garden Cleaning', completedAt: '2024-01-14', earnings: 145.50, rating: 4 },
-  ];
+  const showProfileImage = Boolean(technician.profilePictureUrl?.trim()) && !profileImageError;
+  const profileImageUri = technician.profilePictureUrl?.trim() || undefined;
 
   const renderCurrentJob = ({ item }: { item: any }) => (
     <View style={styles.jobCard}>
@@ -93,13 +121,25 @@ const TechnicianDashboardScreen: React.FC = () => {
           <Text style={styles.customerName}>{item.customerName}</Text>
           <View style={[
             styles.statusBadge,
-            { backgroundColor: item.status === 'in_progress' ? COLORS.primary + '20' : COLORS.info + '20' }
+            {
+              backgroundColor:
+                item.status === 'in_progress' ? COLORS.primary + '20'
+                : item.status === 'accepted' ? COLORS.info + '20'
+                : item.status === 'pending' ? COLORS.warning + '20'
+                : COLORS.textSecondary + '20',
+            }
           ]}>
             <Text style={[
               styles.jobStatusText,
-              { color: item.status === 'in_progress' ? COLORS.primary : COLORS.info }
+              {
+                color:
+                  item.status === 'in_progress' ? COLORS.primary
+                  : item.status === 'accepted' ? COLORS.info
+                  : item.status === 'pending' ? COLORS.warning
+                  : COLORS.textSecondary,
+              }
             ]}>
-              {item.status === 'in_progress' ? 'In Progress' : 'Assigned'}
+              {item.status === 'in_progress' ? 'In Progress' : item.status === 'accepted' ? 'Accepted' : item.status === 'pending' ? 'Pending' : 'Assigned'}
             </Text>
           </View>
         </View>
@@ -119,8 +159,8 @@ const TechnicianDashboardScreen: React.FC = () => {
         </View>
       </TouchableOpacity>
 
-      {/* Accept/Reject Buttons for Assigned Jobs */}
-      {item.status === 'assigned' && (
+      {/* Accept/Reject Buttons only for Pending tasks */}
+      {item.status === 'pending' && (
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, styles.acceptButton]}
@@ -170,11 +210,11 @@ const TechnicianDashboardScreen: React.FC = () => {
     <TouchableOpacity style={styles.recentJobCard}>
       <View style={styles.recentJobHeader}>
         <Text style={styles.recentCustomerName}>{item.customerName}</Text>
-        <Text style={styles.recentEarnings}>AED {item.earnings}</Text>
+        <Text style={styles.recentEarnings}>{item.earningsDisplay ?? `AED ${Number(item.earnings).toFixed(2)}`}</Text>
       </View>
       
       <Text style={styles.recentServiceName}>{item.service}</Text>
-      <Text style={styles.recentDate}>{item.completedAt}</Text>
+      <Text style={styles.recentDate}>{item.dateFormatted ?? item.completedAt}</Text>
       
       <View style={styles.ratingContainer}>
         <Ionicons name="star" size={16} color={COLORS.warning} />
@@ -211,7 +251,18 @@ const TechnicianDashboardScreen: React.FC = () => {
             }}
           >
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{(technician.name || 'T').charAt(0).toUpperCase()}</Text>
+              {showProfileImage && profileImageUri ? (
+                <Image
+                  key={profileImageUri}
+                  source={{ uri: profileImageUri }}
+                  style={styles.avatarImage}
+                  resizeMode="cover"
+                  onError={() => setProfileImageError(true)}
+                  onLoad={() => setProfileImageError(false)}
+                />
+              ) : (
+                <Text style={styles.avatarText}>{(technician.name || 'T').charAt(0).toUpperCase()}</Text>
+              )}
             </View>
           </TouchableOpacity>
         </View>
@@ -281,19 +332,26 @@ const TechnicianDashboardScreen: React.FC = () => {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Visits</Text>
             <TouchableOpacity onPress={() => {
-              // Navigate to Tasks tab through parent Stack 'Main'
               navigation.navigate('Main' as never, { screen: 'TasksTab' } as never);
             }}>
               <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
             </TouchableOpacity>
           </View>
-          
-          <FlatList
-            data={recentJobs}
-            renderItem={renderRecentJob}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
+
+          {recentJobs.length > 0 ? (
+            <FlatList
+              data={recentJobs}
+              renderItem={renderRecentJob}
+              keyExtractor={(item) => item.id}
+              scrollEnabled={false}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="time-outline" size={48} color={COLORS.textSecondary} />
+              <Text style={styles.emptyStateText}>No recent visits</Text>
+              <Text style={styles.emptyStateSubtext}>Completed visits will appear here</Text>
+            </View>
+          )}
         </View>
 
         {/* Quick Actions */}
@@ -431,6 +489,12 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   avatarText: {
     fontSize: FONT_SIZES.md,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,57 +6,76 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import dayjs from 'dayjs';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
-import { useAppStore } from '../../store';
+import { getNotifications, type UserNotification } from '../../services/userService';
 
 const NotificationsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { t, i18n } = useTranslation();
-  const { notifications, markNotificationAsRead, clearNotifications } = useAppStore();
+  const { t } = useTranslation();
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [list, setList] = useState<UserNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredNotifications = notifications.filter(notification => {
+  const loadNotifications = useCallback(async (page: number = 1) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await getNotifications(page);
+      setList(result.list);
+    } catch (e) {
+      setError(t('notifications.errorLoad', 'Failed to load notifications.'));
+      setList([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [t]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadNotifications(1);
+    }, [loadNotifications])
+  );
+
+  const filteredList = list.filter(item => {
     if (selectedFilter === 'all') return true;
-    if (selectedFilter === 'unread') return !notification.isRead;
-    return notification.type === selectedFilter;
+    if (selectedFilter === 'unread') return true; // API has no read status; show all
+    return item.type === selectedFilter;
   });
 
-  const renderNotification = ({ item }: { item: any }) => (
-    <View style={[styles.notificationItem, !item.isRead && styles.unreadNotification]}>
-      <TouchableOpacity
-        style={styles.notificationMain}
-        onPress={() => markNotificationAsRead(item.id)}
-      >
+  const formatDate = (createdAt: string) => dayjs(createdAt).format('D/M/YYYY');
+
+  const renderNotification = ({ item }: { item: UserNotification }) => (
+    <View style={styles.notificationItem}>
+      <TouchableOpacity style={styles.notificationMain} activeOpacity={0.7}>
         <View style={styles.notificationIcon}>
-          <Ionicons 
+          <Ionicons
             name={
               item.type === 'supervisor_report' ? 'document-text-outline' :
-              item.type === 'order' ? 'bag-outline' : 
+              item.type === 'order' ? 'bag-outline' :
               item.type === 'promotion' ? 'pricetag-outline' :
               item.type === 'tip' ? 'bulb-outline' :
               'notifications-outline'
-            } 
-            size={24} 
-            color={COLORS.primary} 
+            }
+            size={24}
+            color={COLORS.primary}
           />
         </View>
         <View style={styles.notificationContent}>
           <Text style={styles.notificationTitle}>{item.title}</Text>
           <Text style={styles.notificationMessage}>{item.message}</Text>
-          <Text style={styles.notificationTime}>
-            {new Date(item.createdAt).toLocaleDateString()}
-          </Text>
+          <Text style={styles.notificationTime}>{formatDate(item.created_at)}</Text>
         </View>
-        {!item.isRead && <View style={styles.unreadDot} />}
       </TouchableOpacity>
-      
-      {/* Buy Products Button for Supervisor Reports */}
-      {item.type === 'supervisor_report' && item.recommendations && (
+
+      {item.type === 'supervisor_report' && (
         <TouchableOpacity
           style={styles.buyProductsButton}
           onPress={() => navigation.navigate('Main' as never, { screen: 'Store' } as never)}
@@ -68,55 +87,23 @@ const NotificationsScreen: React.FC = () => {
     </View>
   );
 
-  const mockNotifications = [
-    {
-      id: '1',
-      title: 'Supervisor Report Received',
-      message: 'Your palm tree requires organic fertilizer and additional watering. View recommended products.',
-      type: 'supervisor_report',
-      recommendations: ['fertilizer', 'watering'],
-      isRead: false,
-      createdAt: new Date('2024-01-15T10:30:00'),
-    },
-    {
-      id: '2',
-      title: 'Agricultural Tip',
-      message: 'Best season for pollinating palm trees. End of the month is ideal for fertilizing date palms.',
-      type: 'tip',
-      isRead: false,
-      createdAt: new Date('2024-01-15T08:00:00'),
-    },
-    {
-      id: '3',
-      title: 'Visit Scheduled',
-      message: 'Your tree watering service is scheduled for tomorrow at 8:00 AM.',
-      type: 'order',
-      isRead: true,
-      createdAt: new Date('2024-01-14T15:20:00'),
-    },
-    {
-      id: '4',
-      title: 'Special Offer',
-      message: 'Get 20% off on organic fertilizer this week!',
-      type: 'promotion',
-      isRead: false,
-      createdAt: new Date('2024-01-13T14:45:00'),
-    },
-  ];
+  const handleClearAll = () => {
+    setList([]);
+    loadNotifications(1);
+  };
 
   return (
     <View style={styles.container}>
-      <Header 
-        title={t('notifications.title')} 
+      <Header
+        title={t('notifications.title')}
         showBack={true}
         rightComponent={
-          <TouchableOpacity style={styles.clearButton} onPress={clearNotifications}>
+          <TouchableOpacity style={styles.clearButton} onPress={handleClearAll}>
             <Text style={styles.clearButtonText}>{t('notifications.clearAll')}</Text>
           </TouchableOpacity>
         }
       />
 
-      {/* Filter Tabs */}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {[
@@ -144,14 +131,27 @@ const NotificationsScreen: React.FC = () => {
         </ScrollView>
       </View>
 
-      {/* Notifications List */}
-      <FlatList
-        data={mockNotifications}
-        renderItem={renderNotification}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.notificationsList}
-      />
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : filteredList.length === 0 ? (
+        <View style={styles.centered}>
+          <Text style={styles.emptyText}>{t('notifications.empty', 'No notifications.')}</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredList}
+          renderItem={renderNotification}
+          keyExtractor={(item) => String(item.id)}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.notificationsList}
+        />
+      )}
     </View>
   );
 };
@@ -271,6 +271,22 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.background,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: SPACING.lg,
+  },
+  errorText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.error,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
 });
 

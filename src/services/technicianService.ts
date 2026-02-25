@@ -9,13 +9,25 @@ export interface TechnicianWeeklyKpis {
 /** Task as returned by GET /api/technician/dashboard today_tasks */
 export interface TechnicianTodayTask {
   id: number | string;
+  scheduled_date?: string;
+  scheduled_time?: string;
+  status?: string;
+  farm_name?: string;
+  service_name?: string;
+  location?: string;
+  duration_minutes?: number;
+  client_name?: string;
+  client_id?: number;
+  area?: string;
+  accepted_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  /** Legacy field names */
   customer_name?: string;
   customerName?: string;
   service?: string;
   address?: string;
-  scheduled_time?: string;
   scheduledTime?: string;
-  status?: string;
   estimated_duration?: string;
   estimatedDuration?: string;
   task_type?: string;
@@ -23,13 +35,28 @@ export interface TechnicianTodayTask {
   [key: string]: unknown;
 }
 
+/** Recent visit as returned by GET /api/technician/dashboard recent_visits */
+export interface TechnicianRecentVisit {
+  id: number | string;
+  farm_name: string;
+  service_name: string;
+  date: string;
+  price: number;
+  price_display?: string;
+  rating: number;
+}
+
 export interface TechnicianDashboardData {
   name: string;
   email: string;
   employee_id: string;
   is_online: boolean;
+  profile_picture?: string | null;
+  profile_picture_url?: string | null;
+  designation?: string;
   weekly_kpis: TechnicianWeeklyKpis;
   today_tasks: TechnicianTodayTask[];
+  recent_visits?: TechnicianRecentVisit[];
 }
 
 export interface TechnicianDashboardResponse {

@@ -269,6 +269,7 @@ export type UserStackParamList = {
   Checkout: undefined;
   RateReview: { orderId: string };
   HelpCenter: undefined;
+  SubmitTicket: undefined;
   Memberships: undefined;
 };
 

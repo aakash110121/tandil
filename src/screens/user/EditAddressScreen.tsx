@@ -15,6 +15,9 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { updateAddress, CreateAddressParams, UserAddress } from '../../services/userService';
+import { getAddressFromCurrentLocation } from '../../utils/addressFromLocation';
+import MapPickerModal from '../../components/MapPickerModal';
+import type { AddressFromLocation } from '../../utils/addressFromLocation';
 
 const ADDRESS_TYPES = [
   { value: 'home', label: 'Home' },
@@ -40,6 +43,35 @@ const EditAddressScreen: React.FC = () => {
   const [country, setCountry] = useState('UAE');
   const [isDefault, setIsDefault] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [mapPickerVisible, setMapPickerVisible] = useState(false);
+
+  const fillFromLocation = async () => {
+    setLocationLoading(true);
+    const result = await getAddressFromCurrentLocation();
+    setLocationLoading(false);
+    if (result.ok) {
+      const a = result.address;
+      if (a.street_address) setStreetAddress(a.street_address);
+      if (a.city) setCity(a.city);
+      if (a.state) setState(a.state);
+      if (a.country) setCountry(a.country);
+      if (a.zip_code) setZipCode(a.zip_code);
+    } else {
+      Alert.alert(
+        t('common.error', 'Error'),
+        t('addAddress.locationError', 'Could not get current location. Please allow location access or enter manually.')
+      );
+    }
+  };
+
+  const fillFromMapAddress = (a: AddressFromLocation) => {
+    if (a.street_address) setStreetAddress(a.street_address);
+    if (a.city) setCity(a.city);
+    if (a.state) setState(a.state);
+    if (a.country) setCountry(a.country);
+    if (a.zip_code) setZipCode(a.zip_code);
+  };
 
   useEffect(() => {
     if (address) {
@@ -173,6 +205,29 @@ const EditAddressScreen: React.FC = () => {
           keyboardType="phone-pad"
         />
 
+        <View style={styles.locationOptions}>
+          <TouchableOpacity
+            style={styles.useLocationBtn}
+            onPress={fillFromLocation}
+            disabled={locationLoading}
+          >
+            {locationLoading ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : (
+              <>
+                <Ionicons name="location" size={18} color={COLORS.primary} />
+                <Text style={styles.useLocationText}>{t('addAddress.useCurrentLocation', 'Use current location')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.pickFromMapBtn}
+            onPress={() => setMapPickerVisible(true)}
+          >
+            <Ionicons name="map" size={18} color={COLORS.primary} />
+            <Text style={styles.useLocationText}>{t('addAddress.pickFromMap', 'Pick from map')}</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.label}>{t('addAddress.streetAddress', 'Street address')} *</Text>
         <TextInput
           style={styles.input}
@@ -238,6 +293,13 @@ const EditAddressScreen: React.FC = () => {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <MapPickerModal
+        visible={mapPickerVisible}
+        onClose={() => setMapPickerVisible(false)}
+        onSelect={fillFromMapAddress}
+        confirmMessage={t('addAddress.useThisLocation', 'Use this location')}
+      />
     </SafeAreaView>
   );
 };
@@ -258,6 +320,22 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   form: { padding: SPACING.lg, paddingBottom: SPACING.xl * 2 },
   label: { color: COLORS.textSecondary, fontSize: FONT_SIZES.sm, marginBottom: SPACING.xs },
+  locationOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.sm },
+  useLocationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: 0,
+  },
+  pickFromMapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: 0,
+  },
+  useLocationText: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: FONT_WEIGHTS.medium },
   input: {
     backgroundColor: COLORS.surface,
     borderWidth: 1,

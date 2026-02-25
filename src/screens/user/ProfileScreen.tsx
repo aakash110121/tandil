@@ -85,28 +85,12 @@ const ProfileScreen: React.FC = () => {
         console.error('ProfileScreen: Navigation error to Notifications:', error);
       }
     } },
-    { icon: 'star-outline', title: t('profile.loyaltyPoints'), onPress: () => {
-      console.log('ProfileScreen: Navigating to LoyaltyPoints');
-      try {
-        navigation.navigate('LoyaltyPoints');
-      } catch (error) {
-        console.error('ProfileScreen: Navigation error to LoyaltyPoints:', error);
-      }
-    } },
     { icon: 'help-circle-outline', title: t('profile.helpSupport'), onPress: () => {
       console.log('ProfileScreen: Navigating to HelpCenter');
       try {
         navigation.navigate('HelpCenter');
       } catch (error) {
         console.error('ProfileScreen: Navigation error to HelpCenter:', error);
-      }
-    } },
-    { icon: 'settings-outline', title: t('profile.settings'), onPress: () => {
-      console.log('ProfileScreen: Navigating to Settings');
-      try {
-        navigation.navigate('Settings');
-      } catch (error) {
-        console.error('ProfileScreen: Navigation error to Settings:', error);
       }
     } },
     { icon: 'log-out-outline', title: t('profile.logout'), onPress: handleLogout, color: COLORS.error },

@@ -26,24 +26,35 @@ const HelpCenterScreen: React.FC = () => {
       : { question: String(item ?? ''), answer: '' }
   );
 
+  const supportPhone = (t('helpCenter.contact.phone') || '+1234567890').replace(/\s*[()\-]\s*/g, '').trim() || '+1234567890';
+  const supportEmail = (t('helpCenter.contact.email') || 'support@tandil.com').trim() || 'support@tandil.com';
+
+  const openPhone = () => {
+    const url = `tel:${supportPhone}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert(t('common.error', 'Error'), t('helpCenter.callNotAvailable', 'Cannot open phone app.'));
+    });
+  };
+
+  const openEmail = () => {
+    const url = `mailto:${supportEmail}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert(t('common.error', 'Error'), t('helpCenter.emailNotAvailable', 'Cannot open email app.'));
+    });
+  };
+
   const supportCategories = [
     {
       icon: 'call-outline',
       title: t('helpCenter.categories.call.title'),
       subtitle: t('helpCenter.categories.call.subtitle'),
-      action: () => Linking.openURL('tel:+1234567890'),
+      action: openPhone,
     },
     {
       icon: 'mail-outline',
       title: t('helpCenter.categories.email.title'),
       subtitle: t('helpCenter.categories.email.subtitle'),
-      action: () => Linking.openURL('mailto:support@shozy.com'),
-    },
-    {
-      icon: 'chatbubble-outline',
-      title: t('helpCenter.categories.chat.title'),
-      subtitle: t('helpCenter.categories.chat.subtitle'),
-      action: () => Alert.alert(t('helpCenter.chatComingSoonTitle'), t('helpCenter.chatComingSoonBody')),
+      action: openEmail,
     },
     {
       icon: 'document-text-outline',

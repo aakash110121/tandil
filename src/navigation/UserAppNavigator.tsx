@@ -32,6 +32,7 @@ import CheckoutScreen from '../screens/user/CheckoutScreen';
 import RateReviewScreen from '../screens/user/RateReviewScreen';
 import SettingsScreen from '../screens/user/SettingsScreen';
 import HelpCenterScreen from '../screens/user/HelpCenterScreen';
+import SubmitTicketScreen from '../screens/user/SubmitTicketScreen';
 import OffersScreen from '../screens/user/OffersScreen';
 import ExclusiveOfferProductsScreen from '../screens/user/ExclusiveOfferProductsScreen';
 import MembershipsScreen from '../screens/common/MembershipsScreen';
@@ -139,6 +140,7 @@ const UserAppNavigator = () => {
       <Stack.Screen name="RateReview" component={RateReviewScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+      <Stack.Screen name="SubmitTicket" component={SubmitTicketScreen} />
       <Stack.Screen name="Memberships" component={MembershipsScreen} />
       <Stack.Screen name="MembershipCheckout" component={MembershipCheckoutScreen} />
       <Stack.Screen name="PersonalInfo" component={PersonalInfoScreen} />

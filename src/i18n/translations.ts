@@ -951,6 +951,8 @@ export const en = {
     },
     chatComingSoonTitle: 'Live Chat',
     chatComingSoonBody: 'Live chat feature coming soon!',
+    callNotAvailable: 'Cannot open phone app.',
+    emailNotAvailable: 'Cannot open email app.',
     faqItems: [
       {
         q: 'How do I book a service?',
@@ -977,6 +979,17 @@ export const en = {
       phone: '+1 (234) 567-8900',
       email: 'support@tandil.com',
       hours: '24/7 Customer Support',
+    },
+    submitTicket: {
+      title: 'Submit Ticket',
+      subject: 'Subject',
+      subjectPlaceholder: 'Support request',
+      message: 'Message',
+      messagePlaceholder: 'Describe your issue...',
+      submitButton: 'Submit Ticket',
+      successTitle: 'Success',
+      successMessage: 'Your ticket has been submitted. We will get back to you soon.',
+      errorMessage: 'Failed to submit ticket. Please try again.',
     },
   },
   notifications: {

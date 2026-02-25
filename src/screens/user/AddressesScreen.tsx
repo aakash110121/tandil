@@ -16,6 +16,8 @@ import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { getUserAddresses, deleteAddress, UserAddress } from '../../services/userService';
 
+const MAX_ADDRESSES = 5;
+
 function addressLabel(type: string): string {
   const t = type?.toLowerCase() || '';
   if (t === 'home') return 'Home';
@@ -153,9 +155,23 @@ const AddressesScreen: React.FC = () => {
               </View>
             ))
           )}
+          {addresses.length >= MAX_ADDRESSES && (
+            <Text style={styles.maxAddressesText}>
+              {t('addressesScreen.maxAddresses', 'You can save up to 5 addresses. Delete one to add another.')}
+            </Text>
+          )}
           <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={() => navigation.navigate('AddAddress')}
+            style={[styles.primaryBtn, addresses.length >= MAX_ADDRESSES && styles.primaryBtnDisabled]}
+            onPress={() => {
+              if (addresses.length >= MAX_ADDRESSES) {
+                Alert.alert(
+                  t('addressesScreen.maxReachedTitle', 'Maximum addresses'),
+                  t('addressesScreen.maxAddresses', 'You can save up to 5 addresses. Delete one to add another.')
+                );
+                return;
+              }
+              navigation.navigate('AddAddress');
+            }}
           >
             <Text style={styles.primaryBtnText}>{t('addressesScreen.addNewAddress')}</Text>
           </TouchableOpacity>
@@ -219,7 +235,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: SPACING.sm,
   },
+  primaryBtnDisabled: { opacity: 0.7 },
   primaryBtnText: { color: '#fff', fontWeight: FONT_WEIGHTS.medium },
+  maxAddressesText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+  },
 });
 
 export default AddressesScreen;

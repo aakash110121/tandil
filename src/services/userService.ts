@@ -218,3 +218,66 @@ export async function updateAddress(
   }
   return null;
 }
+
+/** Single notification from GET /api/user/notifications */
+export interface UserNotification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  created_at: string;
+}
+
+/** Paginated notifications response */
+export interface UserNotificationsResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    current_page: number;
+    data: UserNotification[];
+    first_page_url: string;
+    from: number | null;
+    last_page: number;
+    last_page_url: string;
+    links: Array<{ url: string | null; label: string; page: number | null; active: boolean }>;
+    next_page_url: string | null;
+    path: string;
+    per_page: number;
+    prev_page_url: string | null;
+    to: number | null;
+    total: number;
+  };
+}
+
+export interface GetNotificationsResult {
+  list: UserNotification[];
+  currentPage: number;
+  lastPage: number;
+  total: number;
+  perPage: number;
+  nextPageUrl: string | null;
+}
+
+/**
+ * GET /api/user/notifications
+ * Returns the authenticated user's notifications (paginated). Requires Bearer token.
+ * Optional ?page= for pagination.
+ */
+export async function getNotifications(page: number = 1): Promise<GetNotificationsResult> {
+  const response = await apiClient.get<UserNotificationsResponse>('/user/notifications', {
+    params: { page },
+    timeout: 15000,
+  });
+  const d = response.data?.data;
+  if (!response.data?.success || !d) {
+    return { list: [], currentPage: 1, lastPage: 1, total: 0, perPage: 20, nextPageUrl: null };
+  }
+  return {
+    list: Array.isArray(d.data) ? d.data : [],
+    currentPage: d.current_page ?? 1,
+    lastPage: d.last_page ?? 1,
+    total: d.total ?? 0,
+    perPage: d.per_page ?? 20,
+    nextPageUrl: d.next_page_url ?? null,
+  };
+}

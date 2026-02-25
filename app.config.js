@@ -13,6 +13,7 @@ module.exports = {
       infoPlist: {
         ...expo.ios?.infoPlist,
         NSLocationWhenInUseUsageDescription: 'We use your location to show local weather on your dashboard.',
+        LSApplicationQueriesSchemes: ['tel', 'mailto', ...(expo.ios?.infoPlist?.LSApplicationQueriesSchemes || [])],
       },
     },
     android: {
