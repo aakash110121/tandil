@@ -14,13 +14,33 @@ import TechnicianOrderHistoryScreen from '../screens/technician/TechnicianOrderH
 import PayoutSummaryScreen from '../screens/technician/PayoutSummaryScreen';
 import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScreen';
 import TechnicianProfileEditScreen from '../screens/technician/TechnicianProfileEditScreen';
+import TechnicianSpecializationsScreen from '../screens/technician/TechnicianSpecializationsScreen';
+import TechnicianTodayTasksScreen from '../screens/technician/TechnicianTodayTasksScreen';
+import TechnicianAcceptedJobsScreen from '../screens/technician/TechnicianAcceptedJobsScreen';
+import TechnicianRejectedJobsScreen from '../screens/technician/TechnicianRejectedJobsScreen';
 import AvailabilityScreen from '../screens/technician/AvailabilityScreen';
+import TechnicianBreakTimeScreen from '../screens/technician/TechnicianBreakTimeScreen';
+import TechnicianVacationScreen from '../screens/technician/TechnicianVacationScreen';
+import TechnicianServiceAreasScreen from '../screens/technician/TechnicianServiceAreasScreen';
+import TechnicianServiceAreasSettingsScreen from '../screens/technician/TechnicianServiceAreasSettingsScreen';
 import SupervisorReportScreen from '../screens/technician/SupervisorReportScreen';
 import MembershipsScreen from '../screens/common/MembershipsScreen';
 import MembershipCheckoutScreen from '../screens/common/MembershipCheckoutScreen';
 
 const Stack = createStackNavigator<TechnicianStackParamList>();
 const Tab = createBottomTabNavigator();
+
+/** Stack for Profile tab so Settings items (Service Areas, Specializations, etc.) can navigate correctly */
+const ProfileStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Profile" component={TechnicianProfileScreen} />
+    <Stack.Screen name="ServiceAreasSettings" component={TechnicianServiceAreasSettingsScreen} />
+    <Stack.Screen name="TechnicianProfileEdit" component={TechnicianProfileEditScreen} />
+    <Stack.Screen name="Specializations" component={TechnicianSpecializationsScreen} />
+    <Stack.Screen name="Memberships" component={MembershipsScreen} />
+    <Stack.Screen name="MembershipCheckout" component={MembershipCheckoutScreen} />
+  </Stack.Navigator>
+);
 
 const TabNavigator = () => {
   return (
@@ -67,7 +87,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="ProfileTab"
-        component={TechnicianProfileScreen}
+        component={ProfileStack}
         options={{
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => (
@@ -90,11 +110,14 @@ const TechnicianAppNavigator = () => {
         <Stack.Screen name="Login" component={TechnicianLoginScreen} />
         <Stack.Screen name="Main" component={TabNavigator} />
         <Stack.Screen name="JobDetail" component={JobDetailScreen} />
+        <Stack.Screen name="TodayTasks" component={TechnicianTodayTasksScreen} />
+        <Stack.Screen name="AcceptedJobs" component={TechnicianAcceptedJobsScreen} />
+        <Stack.Screen name="RejectedJobs" component={TechnicianRejectedJobsScreen} />
+        <Stack.Screen name="SetBreakTime" component={TechnicianBreakTimeScreen} />
+        <Stack.Screen name="SetVacation" component={TechnicianVacationScreen} />
+        <Stack.Screen name="ServiceAreas" component={TechnicianServiceAreasScreen} />
         <Stack.Screen name="SupervisorReport" component={SupervisorReportScreen} />
         <Stack.Screen name="PayoutSummary" component={PayoutSummaryScreen} />
-        <Stack.Screen name="TechnicianProfileEdit" component={TechnicianProfileEditScreen} />
-        <Stack.Screen name="Memberships" component={MembershipsScreen} />
-        <Stack.Screen name="MembershipCheckout" component={MembershipCheckoutScreen} />
       </Stack.Navigator>
     </SafeAreaView>
   );

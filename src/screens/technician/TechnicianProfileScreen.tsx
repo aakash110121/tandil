@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { useAppStore } from '../../store';
-import { getTechnicianProfile, TechnicianProfileData } from '../../services/technicianService';
+import { getTechnicianProfile, getTechnicianSpecializations, getTechnicianServiceAreas, TechnicianProfileData } from '../../services/technicianService';
 
 function formatMemberSince(isoDate: string | null | undefined): string {
   if (!isoDate) return '—';
@@ -32,6 +32,8 @@ const TechnicianProfileScreen: React.FC = () => {
   const { user, logout } = useAppStore();
 
   const [profile, setProfile] = useState<TechnicianProfileData | null>(null);
+  const [specializationsList, setSpecializationsList] = useState<string[]>([]);
+  const [serviceAreasDisplay, setServiceAreasDisplay] = useState<string>('—');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -39,14 +41,27 @@ const TechnicianProfileScreen: React.FC = () => {
     if (!isRefresh) setLoading(true);
     else setRefreshing(true);
     try {
-      const data = await getTechnicianProfile();
+      const [data, specs, serviceAreasData] = await Promise.all([
+        getTechnicianProfile(),
+        getTechnicianSpecializations(),
+        getTechnicianServiceAreas(),
+      ]);
       setProfile(data ?? null);
+      setSpecializationsList(Array.isArray(specs) ? specs : []);
+      const areas = serviceAreasData.service_areas?.length
+        ? serviceAreasData.service_areas
+        : serviceAreasData.service_area
+          ? [serviceAreasData.service_area]
+          : [];
+      setServiceAreasDisplay(areas.length > 0 ? areas.join(', ') : '—');
       const pictureUrl = data?.profile_picture_url ?? data?.profile_picture;
       if (typeof pictureUrl === 'string' && pictureUrl.trim()) {
         Image.prefetch([pictureUrl.trim()], { cachePolicy: 'disk' }).catch(() => {});
       }
     } catch (_) {
       setProfile(null);
+      setSpecializationsList([]);
+      setServiceAreasDisplay('—');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -128,13 +143,10 @@ const TechnicianProfileScreen: React.FC = () => {
   };
 
   const menuItems = [
-    { icon: 'trophy-outline', title: 'Memberships', onPress: () => navigation.navigate('Memberships' as never) },
-    { icon: 'person-outline', title: 'Personal Information', onPress: () => {} },
-    { icon: 'location-outline', title: 'Service Areas', onPress: () => {} },
-    { icon: 'construct-outline', title: 'Skills & Specializations', onPress: () => {} },
-    { icon: 'card-outline', title: 'Payment Methods', onPress: () => {} },
+    { icon: 'person-outline', title: 'Profile information', onPress: () => navigation.navigate('TechnicianProfileEdit') },
+    { icon: 'location-outline', title: 'Service Areas', onPress: () => navigation.navigate('ServiceAreasSettings') },
+    { icon: 'construct-outline', title: 'Skills & Specializations', onPress: () => navigation.navigate('Specializations') },
     { icon: 'notifications-outline', title: 'Notifications', onPress: () => {} },
-    { icon: 'shield-outline', title: 'Privacy & Security', onPress: () => {} },
     { icon: 'help-circle-outline', title: 'Help & Support', onPress: () => {} },
     { icon: 'log-out-outline', title: 'Logout', onPress: handleLogout, color: COLORS.error },
   ];
@@ -167,7 +179,7 @@ const TechnicianProfileScreen: React.FC = () => {
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Profile</Text>
-          <View style={styles.editButton} />
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.centeredContent}>
           <ActivityIndicator size="large" color={COLORS.primary} />
@@ -188,12 +200,7 @@ const TechnicianProfileScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => navigation.navigate('TechnicianProfileEdit')}
-        >
-          <Ionicons name="create-outline" size={24} color={COLORS.text} />
-        </TouchableOpacity>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView
@@ -260,12 +267,12 @@ const TechnicianProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Specializations */}
+        {/* Specializations - from GET /api/technician/specializations */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Specializations</Text>
           <View style={styles.specializationsContainer}>
-            {technician.specializations.length > 0 ? (
-              technician.specializations.map((spec, index) => (
+            {specializationsList.length > 0 ? (
+              specializationsList.map((spec, index) => (
                 <View key={index} style={styles.specializationTag}>
                   <Text style={styles.specializationText}>{spec}</Text>
                 </View>
@@ -276,12 +283,12 @@ const TechnicianProfileScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Service Area */}
+        {/* Service Area - from GET /api/technician/service-areas */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Service Area</Text>
           <View style={styles.serviceAreaCard}>
             <Ionicons name="location-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.serviceAreaText}>{technician.serviceArea}</Text>
+            <Text style={styles.serviceAreaText}>{serviceAreasDisplay}</Text>
           </View>
         </View>
 
@@ -334,8 +341,8 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.text,
   },
-  editButton: {
-    padding: SPACING.sm,
+  headerSpacer: {
+    width: 40,
   },
   centeredContent: {
     flex: 1,

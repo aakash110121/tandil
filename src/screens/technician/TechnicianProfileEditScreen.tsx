@@ -26,9 +26,6 @@ const TechnicianProfileEditScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [serviceArea, setServiceArea] = useState('');
-  const [specializationsText, setSpecializationsText] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [profilePicture, setProfilePicture] = useState<{ uri: string; type?: string; name?: string } | null>(null);
@@ -40,8 +37,6 @@ const TechnicianProfileEditScreen: React.FC = () => {
         setName(data.name || '');
         setEmail(data.email || '');
         setPhone(data.phone || '');
-        setServiceArea(data.service_area || '');
-        setSpecializationsText(Array.isArray(data.specializations) ? data.specializations.join(', ') : '');
       }
       setLoading(false);
     }).catch(() => setLoading(false));
@@ -81,11 +76,7 @@ const TechnicianProfileEditScreen: React.FC = () => {
       Alert.alert('Error', 'Email is required.');
       return;
     }
-    if (password || passwordConfirmation || currentPassword) {
-      if (!currentPassword) {
-        Alert.alert('Error', 'Enter current password to change password.');
-        return;
-      }
+    if (password || passwordConfirmation) {
       if (password !== passwordConfirmation) {
         Alert.alert('Error', 'New password and confirmation do not match.');
         return;
@@ -101,9 +92,6 @@ const TechnicianProfileEditScreen: React.FC = () => {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
-        service_area: serviceArea.trim() || undefined,
-        specializations: specializationsText.trim() ? specializationsText.trim().split(/\s*,\s*/).join(',') : undefined,
-        current_password: currentPassword || undefined,
         password: password || undefined,
         password_confirmation: passwordConfirmation || undefined,
         profile_picture: profilePicture || undefined,
@@ -180,17 +168,7 @@ const TechnicianProfileEditScreen: React.FC = () => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service</Text>
-          <Text style={styles.label}>Service Area</Text>
-          <TextInput style={styles.input} value={serviceArea} onChangeText={setServiceArea} placeholder="e.g. Dubai" />
-          <Text style={styles.label}>Specializations (comma-separated)</Text>
-          <TextInput style={styles.input} value={specializationsText} onChangeText={setSpecializationsText} placeholder="e.g. AC, Plumbing" />
-        </View>
-
-        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Change Password</Text>
-          <Text style={styles.label}>Current Password</Text>
-          <TextInput style={styles.input} value={currentPassword} onChangeText={setCurrentPassword} placeholder="Leave blank to keep" secureTextEntry />
           <Text style={styles.label}>New Password</Text>
           <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Min 6 characters" secureTextEntry />
           <Text style={styles.label}>Confirm New Password</Text>

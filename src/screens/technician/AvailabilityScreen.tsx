@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,149 @@ import {
   TouchableOpacity,
   Switch,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { updateTechnicianAvailability, getTechnicianDashboard, getTechnicianAvailability } from '../../services/technicianService';
+
+const DAY_TO_API: Record<string, string> = {
+  monday: 'mon',
+  tuesday: 'tue',
+  wednesday: 'wed',
+  thursday: 'thu',
+  friday: 'fri',
+  saturday: 'sat',
+  sunday: 'sun',
+};
+
+const API_TO_DAY: Record<string, string> = {
+  mon: 'monday',
+  tue: 'tuesday',
+  wed: 'wednesday',
+  thu: 'thursday',
+  fri: 'friday',
+  sat: 'saturday',
+  sun: 'sunday',
+};
+
+/** Normalize "12:00:00" -> "12:00" for break times */
+function toHHmm(s: string): string {
+  if (!s) return s;
+  const part = s.split(':').slice(0, 2).join(':');
+  return part.length >= 5 ? part : s;
+}
+
+const SLOT_DEFINITIONS = [
+  { id: 'morning', label: 'Morning', time: '9:00 AM - 12:00 PM', start: '09:00', end: '12:00' },
+  { id: 'afternoon', label: 'Afternoon', time: '12:00 PM - 5:00 PM', start: '12:00', end: '17:00' },
+  { id: 'evening', label: 'Evening', time: '5:00 PM - 9:00 PM', start: '17:00', end: '21:00' },
+];
+
+type AvailabilityParams = {
+  breaks?: Array<{ date: string; start_time: string; end_time: string; reason?: string }>;
+  vacations?: Array<{ start_date: string; end_date: string; reason?: string }>;
+  service_areas?: string[];
+};
+
+const SLOT_HOURS: Record<string, number> = { morning: 3, afternoon: 5, evening: 4 };
 
 const AvailabilityScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute();
   const [isOnline, setIsOnline] = useState(true);
   const [autoAccept, setAutoAccept] = useState(false);
   const [selectedDays, setSelectedDays] = useState(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']);
+  const [slotEnabled, setSlotEnabled] = useState<Record<string, boolean>>({
+    morning: true,
+    afternoon: true,
+    evening: false,
+  });
+  const [breaks, setBreaks] = useState<Array<{ date: string; start_time: string; end_time: string; reason?: string }>>([]);
+  const [vacations, setVacations] = useState<Array<{ start_date: string; end_date: string; reason?: string }>>([]);
+  const [serviceAreas, setServiceAreas] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [weekStats, setWeekStats] = useState<{ availableDays: number; totalHours: number; completedJobs: number }>({
+    availableDays: 0,
+    totalHours: 0,
+    completedJobs: 0,
+  });
+
+  const params = (route.params ?? {}) as AvailabilityParams;
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+
+  useEffect(() => {
+    if (params.breaks != null) setBreaks(params.breaks);
+    if (params.vacations != null) setVacations(params.vacations);
+    if (params.service_areas != null) setServiceAreas(params.service_areas);
+  }, [params.breaks, params.vacations, params.service_areas]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      let cancelled = false;
+      setLoadingSchedule(true);
+      getTechnicianAvailability()
+        .then(data => {
+          if (cancelled) return;
+          const fromParams = paramsRef.current;
+          if (data) {
+            setIsOnline(data.is_online);
+            setAutoAccept(data.auto_accept_jobs);
+            const days = (data.working_days ?? [])
+              .map(d => API_TO_DAY[d?.toLowerCase?.()] ?? d)
+              .filter(Boolean);
+            if (days.length > 0) setSelectedDays(days);
+            const slots = (data.working_hours_slots ?? []).map(s => s.slot);
+            setSlotEnabled(prev => {
+              const next = { ...prev };
+              SLOT_DEFINITIONS.forEach(s => {
+                next[s.id] = slots.includes(s.id);
+              });
+              return next;
+            });
+            const areas = data.service_areas?.length
+              ? data.service_areas
+              : data.service_area
+                ? [data.service_area]
+                : [];
+            if (fromParams.service_areas == null) setServiceAreas(areas);
+            if (fromParams.breaks == null) {
+              setBreaks((data.breaks ?? []).map(b => ({
+                date: b.date,
+                start_time: toHHmm(b.start_time),
+                end_time: toHHmm(b.end_time),
+                reason: b.reason,
+              })));
+            }
+            if (fromParams.vacations == null) {
+              setVacations((data.vacations ?? []).map(v => ({
+                start_date: v.start_date,
+                end_date: v.end_date,
+                reason: v.reason,
+              })));
+            }
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoadingSchedule(false);
+        });
+      getTechnicianDashboard().then(dashboard => {
+        if (cancelled) return;
+        const completedJobs = dashboard?.weekly_kpis?.visits_done ?? 0;
+        setWeekStats(prev => ({ ...prev, completedJobs }));
+      });
+      return () => { cancelled = true; };
+    }, [])
+  );
+
+  useEffect(() => {
+    const days = selectedDays.length;
+    const hoursPerDay = SLOT_DEFINITIONS.reduce((sum, s) => sum + (slotEnabled[s.id] ? (SLOT_HOURS[s.id] ?? 0) : 0), 0);
+    setWeekStats(prev => ({ ...prev, availableDays: days, totalHours: days * hoursPerDay }));
+  }, [selectedDays.length, slotEnabled]);
 
   const weekDays = [
     { id: 'monday', label: 'Monday', short: 'Mon' },
@@ -28,12 +161,6 @@ const AvailabilityScreen: React.FC = () => {
     { id: 'sunday', label: 'Sunday', short: 'Sun' },
   ];
 
-  const timeSlots = [
-    { id: 'morning', label: 'Morning', time: '9:00 AM - 12:00 PM', enabled: true },
-    { id: 'afternoon', label: 'Afternoon', time: '12:00 PM - 5:00 PM', enabled: true },
-    { id: 'evening', label: 'Evening', time: '5:00 PM - 9:00 PM', enabled: false },
-  ];
-
   const handleDayToggle = (dayId: string) => {
     if (selectedDays.includes(dayId)) {
       setSelectedDays(selectedDays.filter(day => day !== dayId));
@@ -43,12 +170,38 @@ const AvailabilityScreen: React.FC = () => {
   };
 
   const handleTimeSlotToggle = (slotId: string) => {
-    // Toggle time slot availability
-    Alert.alert('Time Slot', `Toggle ${slotId} availability?`);
+    setSlotEnabled(prev => ({ ...prev, [slotId]: !prev[slotId] }));
   };
 
-  const handleSaveSchedule = () => {
-    Alert.alert('Success', 'Your availability schedule has been saved!');
+  const handleSaveSchedule = async () => {
+    setSaving(true);
+    try {
+      const working_days = selectedDays.map(d => DAY_TO_API[d] ?? d).filter(Boolean);
+      const working_hours_slots = SLOT_DEFINITIONS.filter(s => slotEnabled[s.id]).map(s => ({
+        slot: s.id,
+        start: s.start,
+        end: s.end,
+      }));
+      const result = await updateTechnicianAvailability({
+        is_online: isOnline,
+        auto_accept_jobs: autoAccept,
+        working_days,
+        working_hours_slots,
+        ...(breaks.length > 0 && { breaks }),
+        ...(vacations.length > 0 && { vacations }),
+        service_areas: serviceAreas,
+        ...(serviceAreas.length === 1 && { service_area: serviceAreas[0] }),
+      });
+      setSaving(false);
+      if (result.success) {
+        Alert.alert('Saved', result.message ?? 'Your availability has been saved.');
+      } else {
+        Alert.alert('Error', result.message ?? 'Failed to save availability.');
+      }
+    } catch {
+      setSaving(false);
+      Alert.alert('Error', 'Failed to save availability. Please try again.');
+    }
   };
 
   const renderDayItem = (day: any) => (
@@ -69,7 +222,7 @@ const AvailabilityScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const renderTimeSlot = (slot: any) => (
+  const renderTimeSlot = (slot: (typeof SLOT_DEFINITIONS)[0]) => (
     <View key={slot.id} style={styles.timeSlotCard}>
       <View style={styles.timeSlotHeader}>
         <View>
@@ -77,7 +230,7 @@ const AvailabilityScreen: React.FC = () => {
           <Text style={styles.timeSlotTime}>{slot.time}</Text>
         </View>
         <Switch
-          value={slot.enabled}
+          value={slotEnabled[slot.id] ?? false}
           onValueChange={() => handleTimeSlotToggle(slot.id)}
           trackColor={{ false: COLORS.border, true: COLORS.primary }}
           thumbColor={COLORS.background}
@@ -85,6 +238,15 @@ const AvailabilityScreen: React.FC = () => {
       </View>
     </View>
   );
+
+  if (loadingSchedule) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Loading schedule…</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -97,8 +259,16 @@ const AvailabilityScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Availability</Text>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSaveSchedule}>
-          <Text style={styles.saveButtonText}>Save</Text>
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSaveSchedule}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Text style={styles.saveButtonText}>Save</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -159,7 +329,7 @@ const AvailabilityScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Working Hours</Text>
           <View style={styles.timeSlotsContainer}>
-            {timeSlots.map(renderTimeSlot)}
+            {SLOT_DEFINITIONS.map(renderTimeSlot)}
           </View>
         </View>
 
@@ -167,17 +337,26 @@ const AvailabilityScreen: React.FC = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity
+              style={styles.quickAction}
+              onPress={() => navigation.navigate('SetBreakTime', { initialBreaks: breaks })}
+            >
               <Ionicons name="time-outline" size={24} color={COLORS.primary} />
               <Text style={styles.quickActionText}>Set Break Time</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity
+              style={styles.quickAction}
+              onPress={() => navigation.navigate('SetVacation', { initialVacations: vacations })}
+            >
               <Ionicons name="calendar-outline" size={24} color={COLORS.primary} />
               <Text style={styles.quickActionText}>Set Vacation</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.quickAction}>
+            <TouchableOpacity
+              style={styles.quickAction}
+              onPress={() => navigation.navigate('ServiceAreas', { initialServiceAreas: serviceAreas })}
+            >
               <Ionicons name="location-outline" size={24} color={COLORS.primary} />
               <Text style={styles.quickActionText}>Service Areas</Text>
             </TouchableOpacity>
@@ -189,25 +368,25 @@ const AvailabilityScreen: React.FC = () => {
           </View>
         </View>
 
-        {/* Statistics */}
+        {/* Statistics - from dashboard API and local availability */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>This Week</Text>
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
               <Ionicons name="calendar-outline" size={24} color={COLORS.success} />
-              <Text style={styles.statValue}>6 days</Text>
+              <Text style={styles.statValue}>{weekStats.availableDays} days</Text>
               <Text style={styles.statLabel}>Available</Text>
             </View>
             
             <View style={styles.statCard}>
               <Ionicons name="time-outline" size={24} color={COLORS.primary} />
-              <Text style={styles.statValue}>32 hours</Text>
+              <Text style={styles.statValue}>{weekStats.totalHours} hours</Text>
               <Text style={styles.statLabel}>Total Hours</Text>
             </View>
             
             <View style={styles.statCard}>
               <Ionicons name="construct-outline" size={24} color={COLORS.warning} />
-              <Text style={styles.statValue}>8 jobs</Text>
+              <Text style={styles.statValue}>{weekStats.completedJobs} jobs</Text>
               <Text style={styles.statLabel}>Completed</Text>
             </View>
           </View>
@@ -221,6 +400,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
   },
   header: {
     flexDirection: 'row',

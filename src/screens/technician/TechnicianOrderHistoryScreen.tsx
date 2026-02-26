@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,106 +6,129 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { getTechnicianJobs, type TechnicianJob, type TechnicianJobsPeriod, type TechnicianJobsSummary } from '../../services/technicianService';
+import dayjs from 'dayjs';
+
+function normalizeStatus(status: string | undefined): 'completed' | 'cancelled' | 'in_progress' | string {
+  const s = (status ?? '').toLowerCase();
+  if (s === 'completed' || s === 'done') return 'completed';
+  if (s === 'cancelled' || s === 'rejected' || s === 'canceled') return 'cancelled';
+  if (s === 'in_progress' || s === 'in progress') return 'in_progress';
+  return s || 'completed';
+}
 
 const TechnicianOrderHistoryScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'in_progress' | 'completed' | 'cancelled'>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<TechnicianJobsPeriod>('week');
+  const [jobs, setJobs] = useState<TechnicianJob[]>([]);
+  const [summary, setSummary] = useState<TechnicianJobsSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const jobHistory = [
-    {
-      id: 'job_001',
-      customerName: 'Sarah Johnson',
-      service: 'Premium Shoe Cleaning',
-      completedAt: '2024-01-15',
-      earnings: 89.99,
-      rating: 5,
-      status: 'completed',
-    },
-    {
-      id: 'job_002',
-      customerName: 'Mike Davis',
-      service: 'Basic Cleaning',
-      completedAt: '2024-01-14',
-      earnings: 45.50,
-      rating: 4,
-      status: 'completed',
-    },
-    {
-      id: 'job_003',
-      customerName: 'Lisa Wilson',
-      service: 'Deep Cleaning',
-      completedAt: '2024-01-13',
-      earnings: 75.00,
-      rating: 5,
-      status: 'completed',
-    },
-    {
-      id: 'job_004',
-      customerName: 'David Brown',
-      service: 'Express Service',
-      completedAt: '2024-01-12',
-      earnings: 35.00,
-      rating: 4,
-      status: 'completed',
-    },
-    {
-      id: 'job_005',
-      customerName: 'Emma Thompson',
-      service: 'Premium Polish',
-      completedAt: '2024-01-11',
-      earnings: 65.00,
-      rating: 5,
-      status: 'completed',
-    },
-  ];
+  const loadJobs = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const { list, summary: apiSummary } = await getTechnicianJobs(selectedPeriod, 15, 1);
+      setJobs(list);
+      setSummary(apiSummary ?? null);
+    } catch {
+      setJobs([]);
+      setSummary(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [selectedPeriod]);
 
-  const filteredJobs = jobHistory.filter(job => {
+  useFocusEffect(
+    useCallback(() => {
+      loadJobs();
+    }, [loadJobs])
+  );
+
+  useEffect(() => {
+    loadJobs();
+  }, [selectedPeriod]);
+
+  const onPeriodChange = (period: TechnicianJobsPeriod) => {
+    setSelectedPeriod(period);
+  };
+
+  const onFilterChange = (filter: 'all' | 'in_progress' | 'completed' | 'cancelled') => {
+    setSelectedFilter(filter);
+  };
+
+  const filteredJobs = jobs.filter(job => {
     if (selectedFilter === 'all') return true;
-    return job.status === selectedFilter;
+    return normalizeStatus(job.status) === selectedFilter;
   });
 
-  const totalEarnings = jobHistory.reduce((sum, job) => sum + job.earnings, 0);
-  const averageRating = jobHistory.reduce((sum, job) => sum + job.rating, 0) / jobHistory.length;
+  const displayJobs = filteredJobs.map(job => ({
+    id: String(job.id),
+    customerName: job.farm_name ?? job.client_name ?? '—',
+    service: job.service_name ?? '—',
+    completedAt: job.date ?? job.scheduled_date ?? job.completed_at ?? '—',
+    dateFormatted: job.date ? dayjs(job.date).format('YYYY-MM-DD') : (job.scheduled_date ? dayjs(job.scheduled_date).format('YYYY-MM-DD') : '—'),
+    earnings: job.price ?? 0,
+    earningsDisplay: job.price_display ?? (job.price != null ? `AED ${Number(job.price).toFixed(2)}` : '—'),
+    rating: job.rating ?? 0,
+    status: normalizeStatus(job.status),
+  }));
+
+  const totalEarnings = summary?.total_earnings ?? displayJobs.reduce((sum, j) => sum + j.earnings, 0);
+  const completedCount = summary?.jobs_completed ?? displayJobs.filter(j => j.status === 'completed').length;
+  const avgRating = summary?.avg_rating ?? (displayJobs.length > 0
+    ? displayJobs.reduce((sum, j) => sum + j.rating, 0) / displayJobs.length
+    : 0);
 
   const renderJobItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.jobCard}
-      onPress={() => navigation.navigate('JobDetail', { jobId: item.id })}
+      onPress={() => navigation.navigate('JobDetail', { orderId: item.id })}
     >
       <View style={styles.jobHeader}>
         <Text style={styles.customerName}>{item.customerName}</Text>
-        <Text style={styles.earnings}>${item.earnings}</Text>
+        <Text style={styles.earnings}>{item.earningsDisplay}</Text>
       </View>
-      
+
       <Text style={styles.serviceName}>{item.service}</Text>
-      <Text style={styles.completedDate}>{item.completedAt}</Text>
-      
+      <Text style={styles.completedDate}>{item.dateFormatted}</Text>
+
       <View style={styles.jobFooter}>
         <View style={styles.ratingContainer}>
           <Ionicons name="star" size={16} color={COLORS.warning} />
           <Text style={styles.ratingText}>{item.rating}/5</Text>
         </View>
         <View style={styles.statusContainer}>
-          <View style={[styles.statusDot, { backgroundColor: COLORS.success }]} />
-          <Text style={styles.statusText}>Completed</Text>
+          <View style={[styles.statusDot, {
+            backgroundColor: item.status === 'cancelled' ? COLORS.error : item.status === 'in_progress' ? COLORS.primary : COLORS.success,
+          }]} />
+          <Text style={[styles.statusText, {
+            color: item.status === 'cancelled' ? COLORS.error : item.status === 'in_progress' ? COLORS.primary : COLORS.success,
+          }]}>
+            {item.status === 'cancelled' ? 'Cancelled' : item.status === 'in_progress' ? 'In Progress' : 'Completed'}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 
-  const renderFilterTab = (filter: any) => (
+  const renderFilterTab = (filter: { id: 'all' | 'in_progress' | 'completed' | 'cancelled'; label: string }) => (
     <TouchableOpacity
       key={filter.id}
       style={[
         styles.filterTab,
         selectedFilter === filter.id && styles.filterTabActive
       ]}
-      onPress={() => setSelectedFilter(filter.id)}
+      onPress={() => onFilterChange(filter.id)}
     >
       <Text style={[
         styles.filterTabText,
@@ -116,14 +139,14 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const renderPeriodTab = (period: any) => (
+  const renderPeriodTab = (period: { id: TechnicianJobsPeriod; label: string }) => (
     <TouchableOpacity
       key={period.id}
       style={[
         styles.periodTab,
         selectedPeriod === period.id && styles.periodTabActive
       ]}
-      onPress={() => setSelectedPeriod(period.id)}
+      onPress={() => onPeriodChange(period.id)}
     >
       <Text style={[
         styles.periodTabText,
@@ -136,6 +159,7 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
 
   const filterTabs = [
     { id: 'all', label: 'All Jobs' },
+    { id: 'in_progress', label: 'In Progress' },
     { id: 'completed', label: 'Completed' },
     { id: 'cancelled', label: 'Cancelled' },
   ];
@@ -162,24 +186,29 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadJobs(true)} colors={[COLORS.primary]} />
+        }
+      >
         {/* Summary Cards */}
         <View style={styles.summaryContainer}>
           <View style={styles.summaryCard}>
             <Ionicons name="cash-outline" size={24} color={COLORS.primary} />
-            <Text style={styles.summaryValue}>${totalEarnings.toFixed(2)}</Text>
+            <Text style={styles.summaryValue}>AED {totalEarnings.toFixed(2)}</Text>
             <Text style={styles.summaryLabel}>Total Earnings</Text>
           </View>
-          
+
           <View style={styles.summaryCard}>
             <Ionicons name="checkmark-circle-outline" size={24} color={COLORS.success} />
-            <Text style={styles.summaryValue}>{jobHistory.length}</Text>
+            <Text style={styles.summaryValue}>{completedCount}</Text>
             <Text style={styles.summaryLabel}>Jobs Completed</Text>
           </View>
-          
+
           <View style={styles.summaryCard}>
             <Ionicons name="star-outline" size={24} color={COLORS.warning} />
-            <Text style={styles.summaryValue}>{averageRating.toFixed(1)}</Text>
+            <Text style={styles.summaryValue}>{avgRating.toFixed(1)}</Text>
             <Text style={styles.summaryLabel}>Avg Rating</Text>
           </View>
         </View>
@@ -204,12 +233,17 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Jobs</Text>
-            <Text style={styles.jobCount}>{filteredJobs.length} jobs</Text>
+            <Text style={styles.jobCount}>{displayJobs.length} jobs</Text>
           </View>
-          
-          {filteredJobs.length > 0 ? (
+
+          {loading && jobs.length === 0 ? (
+            <View style={styles.emptyState}>
+              <ActivityIndicator size="large" color={COLORS.primary} />
+              <Text style={styles.emptyStateDescription}>Loading jobs...</Text>
+            </View>
+          ) : displayJobs.length > 0 ? (
             <FlatList
-              data={filteredJobs}
+              data={displayJobs}
               renderItem={renderJobItem}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}

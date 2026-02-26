@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { useTranslation } from 'react-i18next';
-import { getTechnicianDashboard, TechnicianDashboardData, TechnicianTodayTask, TechnicianRecentVisit } from '../../services/technicianService';
+import { getTechnicianDashboard, acceptTechnicianTask, rejectTechnicianTask, TechnicianDashboardData, TechnicianTodayTask, TechnicianRecentVisit } from '../../services/technicianService';
 import { buildProfilePictureUrl } from '../../config/api';
 import dayjs from 'dayjs';
 
@@ -105,7 +105,8 @@ const TechnicianDashboardScreen: React.FC = () => {
         rating: 0,
       };
 
-  const currentJobs = (dashboard?.today_tasks ?? []).map(mapTaskToJob);
+  const allTodayJobs = (dashboard?.today_tasks ?? []).map(mapTaskToJob);
+  const currentJobs = allTodayJobs.slice(0, 4);
   const recentJobs = (dashboard?.recent_visits ?? []).map(mapRecentVisitToJob);
 
   const showProfileImage = Boolean(technician.profilePictureUrl?.trim()) && !profileImageError;
@@ -170,10 +171,22 @@ const TechnicianDashboardScreen: React.FC = () => {
                 `Accept job for ${item.customerName}?`,
                 [
                   { text: 'Cancel', style: 'cancel' },
-                  { text: 'Accept', onPress: () => {
-                    // Handle accept logic here
-                    Alert.alert('Job Accepted', 'Job has been accepted successfully!');
-                  }},
+                  {
+                    text: 'Accept',
+                    onPress: async () => {
+                      try {
+                        const result = await acceptTechnicianTask(item.id);
+                        if (result.success) {
+                          fetchDashboard(true);
+                          Alert.alert('Job Accepted', result.message ?? 'Job has been accepted successfully!');
+                        } else {
+                          Alert.alert('Error', result.message ?? 'Failed to accept job.');
+                        }
+                      } catch {
+                        Alert.alert('Error', 'Failed to accept job. Please try again.');
+                      }
+                    },
+                  },
                 ]
               );
             }}
@@ -190,10 +203,23 @@ const TechnicianDashboardScreen: React.FC = () => {
                 `Reject job for ${item.customerName}?`,
                 [
                   { text: 'Cancel', style: 'cancel' },
-                  { text: 'Reject', style: 'destructive', onPress: () => {
-                    // Handle reject logic here
-                    Alert.alert('Job Rejected', 'Job has been rejected.');
-                  }},
+                  {
+                    text: 'Reject',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        const result = await rejectTechnicianTask(item.id, 'Not available');
+                        if (result.success) {
+                          fetchDashboard(true);
+                          Alert.alert('Job Rejected', result.message ?? 'Job has been rejected.');
+                        } else {
+                          Alert.alert('Error', result.message ?? 'Failed to reject job.');
+                        }
+                      } catch {
+                        Alert.alert('Error', 'Failed to reject job. Please try again.');
+                      }
+                    },
+                  },
                 ]
               );
             }}
@@ -306,12 +332,12 @@ const TechnicianDashboardScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today's Tasks</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('TodayTasks')}>
               <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
             </TouchableOpacity>
           </View>
           
-          {currentJobs.length > 0 ? (
+          {allTodayJobs.length > 0 ? (
             <FlatList
               data={currentJobs}
               renderItem={renderCurrentJob}
@@ -409,9 +435,7 @@ const TechnicianDashboardScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.quickAction}
-              onPress={() => {
-                Alert.alert('Accept Jobs', 'Navigate to accept pending jobs?');
-              }}
+              onPress={() => navigation.navigate('AcceptedJobs')}
             >
               <View style={styles.quickActionIcon}>
                 <Ionicons name="checkmark-circle-outline" size={24} color={COLORS.success} />
@@ -421,9 +445,7 @@ const TechnicianDashboardScreen: React.FC = () => {
 
             <TouchableOpacity
               style={styles.quickAction}
-              onPress={() => {
-                Alert.alert('Reject Jobs', 'Navigate to reject pending jobs?');
-              }}
+              onPress={() => navigation.navigate('RejectedJobs')}
             >
               <View style={styles.quickActionIcon}>
                 <Ionicons name="close-circle-outline" size={24} color={COLORS.error} />
