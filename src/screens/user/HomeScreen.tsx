@@ -585,10 +585,10 @@ const HomeScreen: React.FC = () => {
         return (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Maintenance Photos</Text>
+              <Text style={styles.sectionTitle}>{t('home.maintenancePhotos')}</Text>
               {orderWithPhotos?.id ? (
                 <TouchableOpacity onPress={() => navigation.navigate('OrderTracking', { orderId: orderWithPhotos.id })}>
-                  <Text style={styles.viewAllText}>View Order</Text>
+                  <Text style={styles.viewAllText}>{t('home.viewOrder')}</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -613,7 +613,7 @@ const HomeScreen: React.FC = () => {
       {/* Exclusive Offers – dynamic from GET /api/exclusive-offers (first 3) */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Exclusive Offers</Text>
+          <Text style={styles.sectionTitle}>{t('home.exclusiveOffers')}</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Offers')}>
             <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
           </TouchableOpacity>
@@ -628,8 +628,8 @@ const HomeScreen: React.FC = () => {
               <OfferCardBackground uri={getOfferImageUrl(exclusiveOffers[0])} style={styles.offerImageFull} />
               <View style={styles.offerOverlay} />
               <View style={styles.offerContentFull}>
-                <Text style={styles.offerTitle} numberOfLines={1}>{offerTitle(exclusiveOffers[0])}</Text>
-                <Text style={styles.offerSubtitle} numberOfLines={1}>{offerSubtitle(exclusiveOffers[0])}</Text>
+                <Text style={styles.offerTitle} numberOfLines={1} ellipsizeMode="tail">{offerTitle(exclusiveOffers[0])}</Text>
+                <Text style={styles.offerSubtitle} numberOfLines={2} ellipsizeMode="tail">{offerSubtitle(exclusiveOffers[0])}</Text>
               </View>
             </TouchableOpacity>
             {exclusiveOffers.length >= 2 && (
@@ -638,8 +638,8 @@ const HomeScreen: React.FC = () => {
                   <OfferCardBackground uri={getOfferImageUrl(exclusiveOffers[1])} style={styles.offerImageHalf} />
                   <View style={styles.offerOverlay} />
                   <View style={styles.offerContentHalf}>
-                    <Text style={styles.offerTitleSm} numberOfLines={1}>{offerTitle(exclusiveOffers[1])}</Text>
-                    <Text style={styles.offerSubtitleSm} numberOfLines={1}>{offerSubtitle(exclusiveOffers[1])}</Text>
+                    <Text style={styles.offerTitleSm} numberOfLines={1} ellipsizeMode="tail">{offerTitle(exclusiveOffers[1])}</Text>
+                    <Text style={styles.offerSubtitleSm} numberOfLines={2} ellipsizeMode="tail">{offerSubtitle(exclusiveOffers[1])}</Text>
                   </View>
                 </TouchableOpacity>
                 {exclusiveOffers.length >= 3 ? (
@@ -647,8 +647,8 @@ const HomeScreen: React.FC = () => {
                     <OfferCardBackground uri={getOfferImageUrl(exclusiveOffers[2])} style={styles.offerImageHalf} />
                     <View style={styles.offerOverlay} />
                     <View style={styles.offerContentHalf}>
-                      <Text style={styles.offerTitleSm} numberOfLines={1}>{offerTitle(exclusiveOffers[2])}</Text>
-                      <Text style={styles.offerSubtitleSm} numberOfLines={1}>{offerSubtitle(exclusiveOffers[2])}</Text>
+                      <Text style={styles.offerTitleSm} numberOfLines={1} ellipsizeMode="tail">{offerTitle(exclusiveOffers[2])}</Text>
+                      <Text style={styles.offerSubtitleSm} numberOfLines={2} ellipsizeMode="tail">{offerSubtitle(exclusiveOffers[2])}</Text>
                     </View>
                   </TouchableOpacity>
                 ) : (
@@ -1698,13 +1698,13 @@ const styles = StyleSheet.create({
   },
   offerImageFull: { width: '100%', height: '100%' },
   offerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
-  offerContentFull: { position: 'absolute', left: SPACING.lg, bottom: SPACING.lg },
+  offerContentFull: { position: 'absolute', left: SPACING.lg, right: SPACING.lg, bottom: SPACING.lg },
   offerTitle: { color: COLORS.background, fontSize: FONT_SIZES.xl, fontWeight: FONT_WEIGHTS.bold },
   offerSubtitle: { color: COLORS.background, opacity: 0.9, marginTop: 2 },
   offerRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.md },
   offerHalf: { width: '48%', height: 120, borderRadius: BORDER_RADIUS.lg, overflow: 'hidden' },
   offerImageHalf: { width: '100%', height: '100%' },
-  offerContentHalf: { position: 'absolute', left: SPACING.md, bottom: SPACING.md },
+  offerContentHalf: { position: 'absolute', left: SPACING.md, right: SPACING.md, bottom: SPACING.md },
   offerTitleSm: { color: COLORS.background, fontWeight: FONT_WEIGHTS.semiBold },
   offerSubtitleSm: { color: COLORS.background, opacity: 0.9, fontSize: FONT_SIZES.xs },
 });

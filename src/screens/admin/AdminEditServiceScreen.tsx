@@ -62,7 +62,7 @@ const AdminEditServiceScreen: React.FC = () => {
         setIsActive(data.is_active !== false);
       }
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || t('admin.services.loadError', 'Failed to load service');
+      const msg = err.response?.data?.message || err.message || t('admin.services.loadError');
       setDetailError(msg);
     } finally {
       setLoadingDetail(false);
@@ -85,7 +85,7 @@ const AdminEditServiceScreen: React.FC = () => {
         Alert.alert(
           t('admin.categoryForm.permissionTitle'),
           t('admin.categoryForm.permissionBody'),
-          [{ text: t('common.done') }]
+          [{ text: t('common.ok') }]
         );
         return;
       }
@@ -93,7 +93,7 @@ const AdminEditServiceScreen: React.FC = () => {
         Alert.alert(
           t('admin.categoryForm.notAvailableTitle'),
           t('admin.categoryForm.notAvailableBody'),
-          [{ text: t('common.done') }]
+          [{ text: t('common.ok') }]
         );
         return;
       }
@@ -111,7 +111,7 @@ const AdminEditServiceScreen: React.FC = () => {
       Alert.alert(
         t('admin.categoryForm.unableToOpenTitle'),
         err?.message ?? t('admin.categoryForm.unableToOpenBody'),
-        [{ text: t('common.done') }]
+        [{ text: t('common.ok') }]
       );
     } finally {
       setPickingImage(false);
@@ -125,7 +125,7 @@ const AdminEditServiceScreen: React.FC = () => {
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
-    if (!name.trim()) newErrors.name = t('admin.services.errorNameRequired', 'Service name is required');
+    if (!name.trim()) newErrors.name = t('admin.services.errorNameRequired');
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -136,7 +136,7 @@ const AdminEditServiceScreen: React.FC = () => {
       Alert.alert(
         t('admin.categoryForm.missingFieldTitle'),
         t('admin.categoryForm.missingFieldMessage'),
-        [{ text: t('common.done') }]
+        [{ text: t('common.ok') }]
       );
       return;
     }
@@ -153,15 +153,15 @@ const AdminEditServiceScreen: React.FC = () => {
       });
       Alert.alert(
         t('admin.users.success'),
-        t('admin.services.successUpdate', 'Service updated successfully.'),
-        [{ text: t('common.done'), onPress: () => navigation.goBack() }]
+        t('admin.services.successUpdate'),
+        [{ text: t('common.ok'), onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
       const message =
         err.response?.data?.message ||
         err.response?.data?.error ||
         err.message ||
-        t('admin.services.updateFailed', 'Failed to update service');
+        t('admin.services.updateFailed');
       Alert.alert(t('admin.users.error'), message);
     } finally {
       setLoading(false);
@@ -175,11 +175,11 @@ const AdminEditServiceScreen: React.FC = () => {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('admin.services.editTitle', 'Edit Service')}</Text>
+          <Text style={styles.headerTitle}>{t('admin.services.editTitle')}</Text>
           <View style={styles.headerRight} />
         </View>
         <View style={styles.centerWrap}>
-          <Text style={styles.errorText}>{t('admin.services.notFound', 'Service not found.')}</Text>
+          <Text style={styles.errorText}>{t('admin.services.notFound')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -192,12 +192,12 @@ const AdminEditServiceScreen: React.FC = () => {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('admin.services.editTitle', 'Edit Service')}</Text>
+          <Text style={styles.headerTitle}>{t('admin.services.editTitle')}</Text>
           <View style={styles.headerRight} />
         </View>
         <View style={styles.centerWrap}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>{t('admin.services.loading', 'Loading service…')}</Text>
+          <Text style={styles.loadingText}>{t('admin.services.loading')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -210,14 +210,14 @@ const AdminEditServiceScreen: React.FC = () => {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('admin.services.editTitle', 'Edit Service')}</Text>
+          <Text style={styles.headerTitle}>{t('admin.services.editTitle')}</Text>
           <View style={styles.headerRight} />
         </View>
         <View style={styles.centerWrap}>
           <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
           <Text style={styles.errorText}>{detailError}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={fetchServiceDetail}>
-            <Text style={styles.retryBtnText}>{t('admin.users.retry', 'Retry')}</Text>
+            <Text style={styles.retryBtnText}>{t('admin.users.retry')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -230,7 +230,7 @@ const AdminEditServiceScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('admin.services.editTitle', 'Edit Service')}</Text>
+        <Text style={styles.headerTitle}>{t('admin.services.editTitle')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -246,11 +246,11 @@ const AdminEditServiceScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('admin.services.detailsSection', 'Service details')}</Text>
+            <Text style={styles.sectionTitle}>{t('admin.services.detailsSection')}</Text>
 
             <Input
-              label={t('admin.services.nameLabel', 'Name')}
-              placeholder={t('admin.services.namePlaceholder', 'Service name')}
+              label={t('admin.services.nameLabel')}
+              placeholder={t('admin.services.namePlaceholder')}
               value={name}
               onChangeText={(txt) => { setName(txt); if (errors.name) setErrors({ ...errors, name: '' }); }}
               leftIcon="construct-outline"
@@ -258,16 +258,16 @@ const AdminEditServiceScreen: React.FC = () => {
             />
 
             <Input
-              label={t('admin.services.slugLabel', 'Slug')}
-              placeholder={t('admin.services.slugPlaceholder', 'service-slug')}
+              label={t('admin.services.slugLabel')}
+              placeholder={t('admin.services.slugPlaceholder')}
               value={slug}
               onChangeText={setSlug}
               autoCapitalize="none"
             />
 
             <Input
-              label={t('admin.services.descriptionLabel', 'Description')}
-              placeholder={t('admin.services.descriptionPlaceholder', 'Description')}
+              label={t('admin.services.descriptionLabel')}
+              placeholder={t('admin.services.descriptionPlaceholder')}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -275,7 +275,7 @@ const AdminEditServiceScreen: React.FC = () => {
             />
 
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>{t('admin.services.isActive', 'Active')}</Text>
+              <Text style={styles.switchLabel}>{t('admin.services.isActive')}</Text>
               <Switch
                 value={isActive}
                 onValueChange={setIsActive}
@@ -286,11 +286,11 @@ const AdminEditServiceScreen: React.FC = () => {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('admin.categoryForm.imageSection', 'Image')}</Text>
-            <Text style={styles.uploadedHint}>{t('admin.categoryForm.currentImageHint', 'Current image (if any)')}</Text>
+            <Text style={styles.sectionTitle}>{t('admin.categoryForm.imageSection')}</Text>
+            <Text style={styles.uploadedHint}>{t('admin.categoryForm.currentImageHint')}</Text>
             {!image && currentImageUri && (
               <View style={styles.imagePreviewWrap}>
-                <Text style={styles.currentLabel}>{t('admin.categoryForm.currentImageLabel', 'Current')}</Text>
+                <Text style={styles.currentLabel}>{t('admin.categoryForm.currentImageLabel')}</Text>
                 <View style={styles.thumbWrap}>
                   <Image source={{ uri: currentImageUri }} style={styles.thumb} contentFit="cover" />
                 </View>
@@ -324,7 +324,7 @@ const AdminEditServiceScreen: React.FC = () => {
           </View>
 
           <Button
-            title={t('admin.services.submitUpdate', 'Update Service')}
+            title={t('admin.services.submitUpdate')}
             onPress={handleUpdateService}
             disabled={loading}
             loading={loading}

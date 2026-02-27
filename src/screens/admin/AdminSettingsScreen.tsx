@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,13 +8,16 @@ import {
   Switch,
   Alert,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { useAppStore } from '../../store';
 import { setAppLanguage } from '../../i18n';
+import { adminService, AdminDashboardProfile } from '../../services/adminService';
 
 const LANGUAGES = [
   { code: 'en' as const, label: 'English' },
@@ -27,9 +30,35 @@ const AdminSettingsScreen: React.FC = () => {
   const { t, i18n } = useTranslation();
   const { logout, setLanguage } = useAppStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [autoAssignEnabled, setAutoAssignEnabled] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
+  const [profile, setProfile] = useState<AdminDashboardProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      setProfileLoading(true);
+      const res = await adminService.getDashboardProfile();
+      if (res.success && res.data) setProfile(res.data);
+      else setProfile(null);
+    } catch (_) {
+      setProfile(null);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, [fetchProfile])
+  );
+
+  const profileName = profile?.name?.trim() || '';
+  const profileEmail = profile?.email?.trim() || '';
+  const profileId = profile?.formatted_id?.trim() || '';
+  const profilePictureUrl = profile?.profile_picture_url?.trim() || null;
+  const avatarInitial = profileName ? profileName.charAt(0).toUpperCase() : 'A';
 
   const settingsSections = [
     {
@@ -44,12 +73,11 @@ const AdminSettingsScreen: React.FC = () => {
           onToggle: setNotificationsEnabled,
         },
         {
-          icon: 'refresh',
-          titleKey: 'admin.settings.autoAssignTasks.title',
-          subtitleKey: 'admin.settings.autoAssignTasks.subtitle',
-          type: 'toggle',
-          value: autoAssignEnabled,
-          onToggle: setAutoAssignEnabled,
+          icon: 'person',
+          titleKey: 'admin.settings.profileSetting.title',
+          subtitleKey: 'admin.settings.profileSetting.subtitle',
+          type: 'navigation',
+          onPress: () => navigation.navigate('AdminProfileEdit'),
         },
         {
           icon: 'warning',
@@ -206,15 +234,25 @@ const AdminSettingsScreen: React.FC = () => {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Admin Info Card */}
+        {/* Admin Info Card – from GET /admin/dashboard/profile */}
         <View style={styles.adminCard}>
-          <View style={styles.adminAvatar}>
-            <Text style={styles.adminAvatarText}>A</Text>
-          </View>
+          {profilePictureUrl ? (
+            <Image source={{ uri: profilePictureUrl }} style={styles.adminAvatarImage} contentFit="cover" />
+          ) : (
+            <View style={styles.adminAvatar}>
+              <Text style={styles.adminAvatarText}>{avatarInitial}</Text>
+            </View>
+          )}
           <View style={styles.adminInfo}>
-            <Text style={styles.adminName}>Admin User</Text>
-            <Text style={styles.adminEmail}>admin@tandil.com</Text>
-            <Text style={styles.adminId}>ADMIN-001</Text>
+            {profileLoading ? (
+              <ActivityIndicator size="small" color={COLORS.primary} style={styles.profileLoading} />
+            ) : (
+              <>
+                <Text style={styles.adminName}>{profileName || '—'}</Text>
+                {profileEmail ? <Text style={styles.adminEmail}>{profileEmail}</Text> : null}
+                {profileId ? <Text style={styles.adminId}>{profileId}</Text> : null}
+              </>
+            )}
           </View>
         </View>
 
@@ -361,10 +399,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: SPACING.md,
   },
+  adminAvatarImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    marginRight: SPACING.md,
+  },
   adminAvatarText: {
     fontSize: FONT_SIZES.xxl,
     fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.background,
+  },
+  profileLoading: {
+    marginVertical: SPACING.sm,
   },
   adminInfo: {
     flex: 1,

@@ -47,6 +47,39 @@ export interface UsersResponse {
   };
 }
 
+/** Admin dashboard profile from GET /admin/dashboard/profile */
+export interface AdminDashboardProfile {
+  id: number;
+  formatted_id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: string;
+  role_display_name: string;
+  status: string;
+  greeting: string;
+  profile_picture?: string | null;
+  profile_picture_url?: string | null;
+  created_at: string;
+}
+
+/** Support ticket from GET /admin/support-tickets */
+export interface AdminSupportTicket {
+  id: number;
+  ticket_number: string;
+  subject: string;
+  message: string;
+  email: string;
+  status: string;
+  priority?: string;
+  category?: string;
+  user_id?: number;
+  user_name?: string;
+  user_role?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export const adminService = {
   getUsers: async (params?: { 
     page?: number; 
@@ -204,6 +237,48 @@ export const adminService = {
     return response.data;
   },
 
+  /** GET /admin/dashboard/profile – admin profile for dashboard header */
+  getDashboardProfile: async (): Promise<{ success: boolean; data: AdminDashboardProfile }> => {
+    const response = await apiClient.get<{ success: boolean; data: AdminDashboardProfile }>(
+      '/admin/dashboard/profile',
+      { timeout: 15000 }
+    );
+    return response.data;
+  },
+
+  /**
+   * PUT /admin/dashboard/profile – update admin profile (form-data).
+   * Body: name?, email?, phone?, profile_picture? (file), password?, password_confirmation? (required when password is set).
+   */
+  updateDashboardProfile: async (params: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    profile_picture?: { uri: string; type?: string; name?: string };
+    password?: string;
+    password_confirmation?: string;
+  }): Promise<{ success: boolean; data?: AdminDashboardProfile; message?: string }> => {
+    const formData = new FormData();
+    if (params.name != null) formData.append('name', params.name.trim());
+    if (params.email != null) formData.append('email', params.email.trim());
+    if (params.phone != null) formData.append('phone', params.phone.trim());
+    if (params.password != null) formData.append('password', params.password);
+    if (params.password_confirmation != null) formData.append('password_confirmation', params.password_confirmation);
+    if (params.profile_picture?.uri) {
+      formData.append('profile_picture', {
+        uri: params.profile_picture.uri,
+        type: params.profile_picture.type || 'image/jpeg',
+        name: params.profile_picture.name || 'profile.jpg',
+      } as any);
+    }
+    const response = await apiClient.put<{ success: boolean; data?: AdminDashboardProfile; message?: string }>(
+      '/admin/dashboard/profile',
+      formData,
+      { timeout: 30000 }
+    );
+    return response.data ?? { success: false };
+  },
+
   // Reports API
   getReports: async (params?: {
     page?: number;
@@ -263,6 +338,31 @@ export const adminService = {
     const response = await apiClient.delete<{ success?: boolean; message: string }>(
       `/admin/reports/${reportId}/cancel`
     );
+    return response.data;
+  },
+
+  /** Admin support tickets: GET /admin/support-tickets?status=&per_page=&page=&search= */
+  getSupportTickets: async (params?: {
+    status?: 'open' | 'in_progress' | 'resolved' | 'closed';
+    per_page?: number;
+    page?: number;
+    search?: string;
+  }): Promise<{
+    success: boolean;
+    message?: string;
+    data: {
+      data: AdminSupportTicket[];
+      pagination: { current_page: number; last_page: number; per_page: number; total: number };
+    };
+  }> => {
+    const response = await apiClient.get<{
+      success: boolean;
+      message?: string;
+      data: {
+        data: AdminSupportTicket[];
+        pagination: { current_page: number; last_page: number; per_page: number; total: number };
+      };
+    }>('/admin/support-tickets', { params, timeout: 15000 });
     return response.data;
   },
 

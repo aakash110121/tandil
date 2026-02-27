@@ -602,3 +602,114 @@ export async function updateTechnicianAvailability(
     message: (response.data as any)?.message ?? 'Failed to save availability.',
   };
 }
+
+/** Notification from GET /api/technician/notifications */
+export interface TechnicianNotification {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  created_at: string;
+}
+
+export interface GetTechnicianNotificationsResult {
+  list: TechnicianNotification[];
+  currentPage: number;
+  lastPage: number;
+  total: number;
+  perPage: number;
+}
+
+/**
+ * GET /api/technician/notifications?per_page=20&page=1
+ * Returns technician notifications. Requires Bearer token.
+ */
+export async function getTechnicianNotifications(params?: {
+  per_page?: number;
+  page?: number;
+}): Promise<GetTechnicianNotificationsResult> {
+  const response = await apiClient.get<{
+    success: boolean;
+    message?: string;
+    data: {
+      current_page: number;
+      data: TechnicianNotification[];
+      last_page?: number;
+      total?: number;
+      per_page?: number;
+    };
+  }>('/technician/notifications', {
+    params: { per_page: params?.per_page ?? 20, page: params?.page ?? 1 },
+    timeout: 15000,
+  });
+  const d = response.data?.data;
+  if (!response.data?.success || !d) {
+    return { list: [], currentPage: 1, lastPage: 1, total: 0, perPage: 20 };
+  }
+  return {
+    list: Array.isArray(d.data) ? d.data : [],
+    currentPage: d.current_page ?? 1,
+    lastPage: d.last_page ?? 1,
+    total: d.total ?? 0,
+    perPage: d.per_page ?? 20,
+  };
+}
+
+/**
+ * POST /api/technician/notifications/clear-all
+ * Clear all notifications for the technician. Requires Bearer token.
+ */
+export async function clearTechnicianNotifications(): Promise<{ success: boolean; message?: string }> {
+  const response = await apiClient.post<{ success?: boolean; message?: string }>(
+    '/technician/notifications/clear-all',
+    {},
+    { timeout: 15000 }
+  );
+  if (response.data?.success) {
+    return { success: true, message: response.data.message };
+  }
+  return {
+    success: false,
+    message: (response.data as any)?.message ?? 'Failed to clear notifications.',
+  };
+}
+
+/**
+ * POST /api/technician/notifications/:notification_id/read
+ * Mark a single notification as read. Requires Bearer token.
+ */
+export async function markTechnicianNotificationRead(
+  notificationId: number | string
+): Promise<{ success: boolean; message?: string }> {
+  const response = await apiClient.post<{ success?: boolean; message?: string }>(
+    `/technician/notifications/${notificationId}/read`,
+    {},
+    { timeout: 15000 }
+  );
+  if (response.data?.success) {
+    return { success: true, message: response.data.message };
+  }
+  return {
+    success: false,
+    message: (response.data as any)?.message ?? 'Failed to mark as read.',
+  };
+}
+
+/**
+ * POST /api/technician/notifications/read-all
+ * Mark all notifications as read. Requires Bearer token.
+ */
+export async function markTechnicianNotificationsReadAll(): Promise<{ success: boolean; message?: string }> {
+  const response = await apiClient.post<{ success?: boolean; message?: string }>(
+    '/technician/notifications/read-all',
+    {},
+    { timeout: 15000 }
+  );
+  if (response.data?.success) {
+    return { success: true, message: response.data.message };
+  }
+  return {
+    success: false,
+    message: (response.data as any)?.message ?? 'Failed to mark all as read.',
+  };
+}

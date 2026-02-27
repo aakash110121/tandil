@@ -46,7 +46,7 @@ const TechnicianLoginScreen: React.FC = () => {
       // Verify the role is technician
       const userRole = response.data?.role || response.data?.user?.role;
       if (userRole !== 'technician') {
-        Alert.alert('Access Denied', 'This account is not authorized for technician access.');
+        Alert.alert(t('technician.accessDenied'), t('technician.notTechnicianAccount'));
         setIsLoading(false);
         return;
       }
@@ -66,13 +66,13 @@ const TechnicianLoginScreen: React.FC = () => {
       const errorMessage = 
         err.response?.data?.message || 
         err.message || 
-        'Login failed. Please check your credentials and try again.';
+        t('technician.loginFailed');
       
       setError(errorMessage);
       Alert.alert(
-        'Login Error',
+        t('technician.loginError'),
         errorMessage,
-        [{ text: 'OK' }]
+        [{ text: t('technician.ok') }]
       );
     } finally {
       setIsLoading(false);

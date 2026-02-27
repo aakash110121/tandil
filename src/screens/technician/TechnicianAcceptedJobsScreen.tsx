@@ -126,7 +126,7 @@ const TechnicianAcceptedJobsScreen: React.FC = () => {
                 },
               ]}
             >
-              {item.status === 'in_progress' ? 'In Progress' : 'Accepted'}
+              {item.status === 'in_progress' ? t('technician.status.inProgress') : t('technician.status.accepted')}
             </Text>
           </View>
         </View>
@@ -141,7 +141,7 @@ const TechnicianAcceptedJobsScreen: React.FC = () => {
           </View>
           <View style={styles.jobInfo}>
             <Ionicons name="timer-outline" size={16} color={COLORS.textSecondary} />
-            <Text style={styles.jobInfoText}>{item.estimatedDuration}</Text>
+            <Text style={styles.jobInfoText}>{item.estimatedDuration.replace(/ min$/, ' ' + t('technician.min'))}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -151,10 +151,10 @@ const TechnicianAcceptedJobsScreen: React.FC = () => {
   if (loading && !result) {
     return (
       <View style={styles.container}>
-        <Header title={t('technician.acceptedJobs', 'Accept Jobs')} showBack={true} />
+        <Header title={t('technician.acceptedJobs')} showBack={true} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>{t('home.loading', 'Loading...')}</Text>
+          <Text style={styles.loadingText}>{t('technician.loadingJobs')}</Text>
         </View>
       </View>
     );
@@ -162,10 +162,10 @@ const TechnicianAcceptedJobsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Header title={t('technician.acceptedJobs', 'Accept Jobs')} showBack={true} />
+      <Header title={t('technician.acceptedJobs')} showBack={true} />
 
       <View style={styles.periodSection}>
-        <Text style={styles.periodLabel}>Time Period</Text>
+        <Text style={styles.periodLabel}>{t('technician.timePeriod')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodScroll}>
           {PERIOD_TABS.map(tab => (
             <TouchableOpacity
@@ -174,7 +174,7 @@ const TechnicianAcceptedJobsScreen: React.FC = () => {
               onPress={() => onPeriodChange(tab.id)}
             >
               <Text style={[styles.periodTabText, period === tab.id && styles.periodTabTextActive]}>
-                {tab.label}
+                {tab.id === 'week' ? t('technician.thisWeek') : tab.id === 'month' ? t('technician.thisMonth') : t('technician.thisYear')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -185,9 +185,9 @@ const TechnicianAcceptedJobsScreen: React.FC = () => {
         <View style={styles.centered}>
           <View style={styles.emptyState}>
             <Ionicons name="checkmark-circle-outline" size={48} color={COLORS.textSecondary} />
-            <Text style={styles.emptyStateText}>No accepted jobs</Text>
+            <Text style={styles.emptyStateText}>{t('technician.noAcceptedJobs')}</Text>
             <Text style={styles.emptyStateSubtext}>
-              Jobs you accept will appear here
+              {t('technician.noAcceptedJobsSubtext')}
             </Text>
           </View>
         </View>

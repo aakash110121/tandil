@@ -41,17 +41,17 @@ const AdminAddServiceScreen: React.FC = () => {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          t('admin.categoryForm.permissionTitle', 'Permission needed'),
-          t('admin.categoryForm.permissionBody', 'Allow access to your photos to add an image.'),
-          [{ text: t('common.done', 'OK') }]
+          t('admin.categoryForm.permissionTitle'),
+          t('admin.categoryForm.permissionBody'),
+          [{ text: t('common.ok') }]
         );
         return;
       }
       if (typeof ImagePicker.launchImageLibraryAsync !== 'function') {
         Alert.alert(
-          t('admin.categoryForm.notAvailableTitle', 'Not available'),
-          t('admin.categoryForm.notAvailableBody', 'Image picker is not available.'),
-          [{ text: t('common.done', 'OK') }]
+          t('admin.categoryForm.notAvailableTitle'),
+          t('admin.categoryForm.notAvailableBody'),
+          [{ text: t('common.ok') }]
         );
         return;
       }
@@ -66,9 +66,9 @@ const AdminAddServiceScreen: React.FC = () => {
       }
     } catch (err: any) {
       Alert.alert(
-        t('admin.categoryForm.unableToOpenTitle', 'Unable to open photos'),
-        err?.message ?? t('admin.categoryForm.unableToOpenBody', 'Could not open photo library.'),
-        [{ text: t('common.done', 'OK') }]
+        t('admin.categoryForm.unableToOpenTitle'),
+        err?.message ?? t('admin.categoryForm.unableToOpenBody'),
+        [{ text: t('common.ok') }]
       );
     } finally {
       setPickingImage(false);
@@ -79,7 +79,7 @@ const AdminAddServiceScreen: React.FC = () => {
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
-    if (!name.trim()) newErrors.name = t('admin.services.errorNameRequired', 'Service name is required');
+    if (!name.trim()) newErrors.name = t('admin.services.errorNameRequired');
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -87,9 +87,9 @@ const AdminAddServiceScreen: React.FC = () => {
   const handleCreateService = async () => {
     if (!validateForm()) {
       Alert.alert(
-        t('admin.categoryForm.missingFieldTitle', 'Missing required field'),
-        t('admin.categoryForm.missingFieldMessage', 'Please enter a service name.'),
-        [{ text: t('common.done', 'OK') }]
+        t('admin.categoryForm.missingFieldTitle'),
+        t('admin.categoryForm.missingFieldMessage'),
+        [{ text: t('common.ok') }]
       );
       return;
     }
@@ -104,17 +104,17 @@ const AdminAddServiceScreen: React.FC = () => {
         is_active: isActive,
       });
       Alert.alert(
-        t('admin.users.success', 'Success'),
-        t('admin.services.createSuccess', 'Service created successfully.'),
-        [{ text: t('common.done', 'OK'), onPress: () => navigation.goBack() }]
+        t('admin.users.success'),
+        t('admin.services.createSuccess'),
+        [{ text: t('common.ok'), onPress: () => navigation.goBack() }]
       );
     } catch (err: any) {
       const message =
         err.response?.data?.message ||
         err.response?.data?.error ||
         err.message ||
-        t('admin.services.createFailed', 'Failed to create service. Please try again.');
-      Alert.alert(t('admin.users.error', 'Error'), message);
+        t('admin.services.createFailed');
+      Alert.alert(t('admin.users.error'), message);
     } finally {
       setLoading(false);
     }
@@ -126,7 +126,7 @@ const AdminAddServiceScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('admin.services.addTitle', 'Add Service')}</Text>
+        <Text style={styles.headerTitle}>{t('admin.services.addTitle')}</Text>
         <View style={styles.headerRight} />
       </View>
 
@@ -142,11 +142,11 @@ const AdminAddServiceScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('admin.services.detailsSection', 'Service details')}</Text>
+            <Text style={styles.sectionTitle}>{t('admin.services.detailsSection')}</Text>
 
             <Input
-              label={t('admin.services.nameLabel', 'Name *')}
-              placeholder={t('admin.services.namePlaceholder', 'e.g. Tree Care')}
+              label={t('admin.services.nameLabel')}
+              placeholder={t('admin.services.namePlaceholder')}
               value={name}
               onChangeText={(txt) => { setName(txt); if (errors.name) setErrors({ ...errors, name: '' }); }}
               leftIcon="construct-outline"
@@ -154,16 +154,16 @@ const AdminAddServiceScreen: React.FC = () => {
             />
 
             <Input
-              label={t('admin.services.slugLabel', 'Slug (optional)')}
-              placeholder={t('admin.services.slugPlaceholder', 'e.g. tree-care')}
+              label={t('admin.services.slugLabel')}
+              placeholder={t('admin.services.slugPlaceholder')}
               value={slug}
               onChangeText={setSlug}
               autoCapitalize="none"
             />
 
             <Input
-              label={t('admin.services.descriptionLabel', 'Description (optional)')}
-              placeholder={t('admin.services.descriptionPlaceholder', 'e.g. Professional tree care services')}
+              label={t('admin.services.descriptionLabel')}
+              placeholder={t('admin.services.descriptionPlaceholder')}
               value={description}
               onChangeText={setDescription}
               multiline
@@ -171,7 +171,7 @@ const AdminAddServiceScreen: React.FC = () => {
             />
 
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>{t('admin.services.isActive', 'Active')}</Text>
+              <Text style={styles.switchLabel}>{t('admin.services.isActive')}</Text>
               <Switch
                 value={isActive}
                 onValueChange={setIsActive}
@@ -182,8 +182,8 @@ const AdminAddServiceScreen: React.FC = () => {
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{t('admin.categoryForm.imageSection', 'Image (optional)')}</Text>
-            <Text style={styles.uploadedHint}>{t('admin.categoryForm.imageHint', 'Add an image for the service.')}</Text>
+            <Text style={styles.sectionTitle}>{t('admin.categoryForm.imageSection')}</Text>
+            <Text style={styles.uploadedHint}>{t('admin.categoryForm.imageHint')}</Text>
             <TouchableOpacity
               style={[styles.uploadBtn, pickingImage && styles.uploadBtnDisabled]}
               onPress={pickImageFromDevice}
@@ -192,7 +192,7 @@ const AdminAddServiceScreen: React.FC = () => {
             >
               <Ionicons name="image-outline" size={24} color={COLORS.primary} />
               <Text style={styles.uploadBtnText}>
-                {pickingImage ? t('admin.categoryForm.opening', 'Opening…') : t('admin.categoryForm.uploadFromDevice', 'Upload from device')}
+                {pickingImage ? t('admin.categoryForm.opening') : t('admin.categoryForm.uploadFromDevice')}
               </Text>
             </TouchableOpacity>
             {image && (
@@ -208,7 +208,7 @@ const AdminAddServiceScreen: React.FC = () => {
           </View>
 
           <Button
-            title={t('admin.services.submitCreate', 'Create Service')}
+            title={t('admin.services.submitCreate')}
             onPress={handleCreateService}
             disabled={loading}
             loading={loading}

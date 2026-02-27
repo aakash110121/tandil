@@ -13,17 +13,19 @@ import { useNavigation } from '@react-navigation/native';
 import MapPickerModal from '../../components/MapPickerModal';
 import type { AddressFromLocation } from '../../utils/addressFromLocation';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { useTranslation } from 'react-i18next';
 import { getTechnicianServiceAreas, updateTechnicianServiceAreas } from '../../services/technicianService';
 
 /** Show city/country (e.g. Dubai, Abu Dhabi) from current location or map. */
-function formatAddressForArea(a: AddressFromLocation): string {
+function formatAddressForArea(a: AddressFromLocation, selectedLocationLabel: string): string {
   if (a.city?.trim()) return a.city.trim();
   if (a.state?.trim()) return a.state.trim();
   if (a.country?.trim()) return a.country.trim();
-  return a.street_address?.trim() || 'Selected location';
+  return a.street_address?.trim() || selectedLocationLabel;
 }
 
 const TechnicianServiceAreasSettingsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [serviceAreas, setServiceAreas] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,7 @@ const TechnicianServiceAreasSettingsScreen: React.FC = () => {
   }, []);
 
   const onMapSelect = (address: AddressFromLocation) => {
-    const label = formatAddressForArea(address);
+    const label = formatAddressForArea(address, t('technician.selectedLocation'));
     setServiceAreas(prev => (prev.includes(label) ? prev : [...prev, label]));
     setMapVisible(false);
   };
@@ -62,15 +64,15 @@ const TechnicianServiceAreasSettingsScreen: React.FC = () => {
       });
       setSaving(false);
       if (result.success) {
-        Alert.alert('Saved', result.message ?? 'Service areas updated.', [
-          { text: 'OK', onPress: () => navigation.goBack() },
+        Alert.alert(t('technician.saved'), result.message ?? t('technician.serviceAreasUpdated'), [
+          { text: t('technician.ok'), onPress: () => navigation.goBack() },
         ]);
       } else {
-        Alert.alert('Error', result.message ?? 'Failed to save service areas.');
+        Alert.alert(t('technician.error'), result.message ?? t('technician.saveFailed'));
       }
     } catch {
       setSaving(false);
-      Alert.alert('Error', 'Failed to save service areas. Please try again.');
+      Alert.alert(t('technician.error'), t('technician.saveFailed') + ' ' + t('technician.tryAgain'));
     }
   };
 
@@ -78,7 +80,7 @@ const TechnicianServiceAreasSettingsScreen: React.FC = () => {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading…</Text>
+        <Text style={styles.loadingText}>{t('technician.loadingJobs')}</Text>
       </View>
     );
   }
@@ -89,26 +91,26 @@ const TechnicianServiceAreasSettingsScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Service Areas</Text>
+        <Text style={styles.headerTitle}>{t('technician.serviceAreas')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Add area from map</Text>
+          <Text style={styles.sectionTitle}>{t('technician.serviceAreasScreen.addAddressFromMap')}</Text>
           <Text style={styles.hint}>
-            Pick a location on the map to add it as a service area (city/country). You can add single or multiple areas.
+            {t('technician.serviceAreasScreen.pickLocationHint')}
           </Text>
           <TouchableOpacity style={styles.mapButton} onPress={() => setMapVisible(true)}>
             <Ionicons name="location-outline" size={28} color={COLORS.primary} />
-            <Text style={styles.mapButtonText}>Pick location from map</Text>
+            <Text style={styles.mapButtonText}>{t('technician.serviceAreasScreen.pickLocationFromMap')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your service areas ({serviceAreas.length})</Text>
+          <Text style={styles.sectionTitle}>{t('technician.serviceAreasScreen.yourServiceAreas', { count: serviceAreas.length })}</Text>
           {serviceAreas.length === 0 ? (
-            <Text style={styles.emptyText}>No service areas added. Use the map above to add one or more.</Text>
+            <Text style={styles.emptyText}>{t('technician.serviceAreasScreen.noServiceAreasAdded')}</Text>
           ) : (
             serviceAreas.map((area, index) => (
               <View key={index} style={styles.areaCard}>
@@ -130,7 +132,7 @@ const TechnicianServiceAreasSettingsScreen: React.FC = () => {
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.saveBtnText}>Save</Text>
+            <Text style={styles.saveBtnText}>{t('technician.availability.save')}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -139,7 +141,7 @@ const TechnicianServiceAreasSettingsScreen: React.FC = () => {
         visible={mapVisible}
         onClose={() => setMapVisible(false)}
         onSelect={onMapSelect}
-        confirmMessage="Add as service area"
+        confirmMessage={t('technician.addAsServiceArea')}
       />
     </View>
   );

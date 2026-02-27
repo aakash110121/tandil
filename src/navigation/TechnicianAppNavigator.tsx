@@ -3,6 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { COLORS } from '../constants';
 import { TechnicianStackParamList } from '../types';
 
@@ -12,6 +13,7 @@ import TechnicianDashboardScreen from '../screens/technician/TechnicianDashboard
 import JobDetailScreen from '../screens/technician/JobDetailScreen';
 import TechnicianOrderHistoryScreen from '../screens/technician/TechnicianOrderHistoryScreen';
 import PayoutSummaryScreen from '../screens/technician/PayoutSummaryScreen';
+import TechnicianAddBankAccountScreen from '../screens/technician/TechnicianAddBankAccountScreen';
 import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScreen';
 import TechnicianProfileEditScreen from '../screens/technician/TechnicianProfileEditScreen';
 import TechnicianSpecializationsScreen from '../screens/technician/TechnicianSpecializationsScreen';
@@ -26,6 +28,12 @@ import TechnicianServiceAreasSettingsScreen from '../screens/technician/Technici
 import SupervisorReportScreen from '../screens/technician/SupervisorReportScreen';
 import MembershipsScreen from '../screens/common/MembershipsScreen';
 import MembershipCheckoutScreen from '../screens/common/MembershipCheckoutScreen';
+import HelpCenterScreen from '../screens/user/HelpCenterScreen';
+import SubmitTicketScreen from '../screens/user/SubmitTicketScreen';
+import TechnicianNotificationsScreen from '../screens/technician/TechnicianNotificationsScreen';
+
+/** Technician uses own notifications screen (GET /technician/notifications); alias for Stack.Screen */
+const NotificationsScreen = TechnicianNotificationsScreen;
 
 const Stack = createStackNavigator<TechnicianStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -43,6 +51,7 @@ const ProfileStack = () => (
 );
 
 const TabNavigator = () => {
+  const { t } = useTranslation();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -59,7 +68,7 @@ const TabNavigator = () => {
         name="DashboardTab"
         component={TechnicianDashboardScreen}
         options={{
-          tabBarLabel: 'Dashboard',
+          tabBarLabel: t('technician.tabs.dashboard'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -69,7 +78,7 @@ const TabNavigator = () => {
         name="TasksTab"
         component={TechnicianOrderHistoryScreen}
         options={{
-          tabBarLabel: 'Tasks',
+          tabBarLabel: t('technician.tabs.tasks'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="list-outline" size={size} color={color} />
           ),
@@ -79,7 +88,7 @@ const TabNavigator = () => {
         name="ScheduleTab"
         component={AvailabilityScreen}
         options={{
-          tabBarLabel: 'Schedule',
+          tabBarLabel: t('technician.tabs.schedule'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
@@ -89,7 +98,7 @@ const TabNavigator = () => {
         name="ProfileTab"
         component={ProfileStack}
         options={{
-          tabBarLabel: 'Profile',
+          tabBarLabel: t('technician.tabs.profile'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),
@@ -118,6 +127,10 @@ const TechnicianAppNavigator = () => {
         <Stack.Screen name="ServiceAreas" component={TechnicianServiceAreasScreen} />
         <Stack.Screen name="SupervisorReport" component={SupervisorReportScreen} />
         <Stack.Screen name="PayoutSummary" component={PayoutSummaryScreen} />
+        <Stack.Screen name="AddBankAccount" component={TechnicianAddBankAccountScreen} />
+        <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+        <Stack.Screen name="SubmitTicket" component={SubmitTicketScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
       </Stack.Navigator>
     </SafeAreaView>
   );

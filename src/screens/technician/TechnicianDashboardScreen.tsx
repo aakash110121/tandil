@@ -140,7 +140,7 @@ const TechnicianDashboardScreen: React.FC = () => {
                   : COLORS.textSecondary,
               }
             ]}>
-              {item.status === 'in_progress' ? 'In Progress' : item.status === 'accepted' ? 'Accepted' : item.status === 'pending' ? 'Pending' : 'Assigned'}
+              {item.status === 'in_progress' ? t('technician.status.inProgress') : item.status === 'accepted' ? t('technician.status.accepted') : item.status === 'pending' ? t('technician.status.pending') : t('technician.status.assigned')}
             </Text>
           </View>
         </View>
@@ -167,23 +167,23 @@ const TechnicianDashboardScreen: React.FC = () => {
             style={[styles.actionButton, styles.acceptButton]}
             onPress={() => {
               Alert.alert(
-                'Accept Job',
-                `Accept job for ${item.customerName}?`,
+                t('technician.acceptJob'),
+                t('technician.acceptJobConfirm', { name: item.customerName }),
                 [
-                  { text: 'Cancel', style: 'cancel' },
+                  { text: t('technician.cancel'), style: 'cancel' },
                   {
-                    text: 'Accept',
+                    text: t('technician.accept'),
                     onPress: async () => {
                       try {
                         const result = await acceptTechnicianTask(item.id);
                         if (result.success) {
                           fetchDashboard(true);
-                          Alert.alert('Job Accepted', result.message ?? 'Job has been accepted successfully!');
+                          Alert.alert(t('technician.acceptJob'), result.message ?? t('technician.jobAccepted'), [{ text: t('technician.ok') }]);
                         } else {
-                          Alert.alert('Error', result.message ?? 'Failed to accept job.');
+                          Alert.alert(t('technician.error'), result.message ?? t('technician.failedAccept'));
                         }
                       } catch {
-                        Alert.alert('Error', 'Failed to accept job. Please try again.');
+                        Alert.alert(t('technician.error'), t('technician.failedAccept') + ' ' + t('technician.tryAgain'));
                       }
                     },
                   },
@@ -192,31 +192,31 @@ const TechnicianDashboardScreen: React.FC = () => {
             }}
           >
             <Ionicons name="checkmark" size={16} color={COLORS.background} />
-            <Text style={styles.actionButtonText}>Accept</Text>
+            <Text style={styles.actionButtonText}>{t('technician.accept')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.actionButton, styles.rejectButton]}
             onPress={() => {
               Alert.alert(
-                'Reject Job',
-                `Reject job for ${item.customerName}?`,
+                t('technician.rejectJob'),
+                t('technician.rejectJobConfirm', { name: item.customerName }),
                 [
-                  { text: 'Cancel', style: 'cancel' },
+                  { text: t('technician.cancel'), style: 'cancel' },
                   {
-                    text: 'Reject',
+                    text: t('technician.reject'),
                     style: 'destructive',
                     onPress: async () => {
                       try {
                         const result = await rejectTechnicianTask(item.id, 'Not available');
                         if (result.success) {
                           fetchDashboard(true);
-                          Alert.alert('Job Rejected', result.message ?? 'Job has been rejected.');
+                          Alert.alert(t('technician.rejectJob'), result.message ?? t('technician.jobRejected'), [{ text: t('technician.ok') }]);
                         } else {
-                          Alert.alert('Error', result.message ?? 'Failed to reject job.');
+                          Alert.alert(t('technician.error'), result.message ?? t('technician.failedReject'));
                         }
                       } catch {
-                        Alert.alert('Error', 'Failed to reject job. Please try again.');
+                        Alert.alert(t('technician.error'), t('technician.failedReject') + ' ' + t('technician.tryAgain'));
                       }
                     },
                   },
@@ -225,7 +225,7 @@ const TechnicianDashboardScreen: React.FC = () => {
             }}
           >
             <Ionicons name="close" size={16} color={COLORS.background} />
-            <Text style={styles.actionButtonText}>Reject</Text>
+            <Text style={styles.actionButtonText}>{t('technician.reject')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -266,9 +266,9 @@ const TechnicianDashboardScreen: React.FC = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.greeting}>Good afternoon!</Text>
+            <Text style={styles.greeting}>{t('technician.greeting')}</Text>
             <Text style={styles.technicianName}>{technician.name}</Text>
-            <Text style={styles.employeeId}>ID: {technician.employeeId}</Text>
+            <Text style={styles.employeeId}>{t('technician.id')}: {technician.employeeId}</Text>
           </View>
           <TouchableOpacity
             style={styles.profileButton}
@@ -311,27 +311,27 @@ const TechnicianDashboardScreen: React.FC = () => {
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Ionicons name="cash-outline" size={24} color={COLORS.primary} />
-            <Text style={styles.statValue}>AED {Number(technician.thisWeekEarnings).toFixed(2)}</Text>
-            <Text style={styles.statLabel}>This Week</Text>
+            <Text style={styles.statValue}>{t('orders.currency', { defaultValue: 'AED' })} {Number(technician.thisWeekEarnings).toFixed(2)}</Text>
+            <Text style={styles.statLabel}>{t('technician.thisWeek')}</Text>
           </View>
           
           <View style={styles.statCard}>
             <Ionicons name="checkmark-circle-outline" size={24} color={COLORS.success} />
             <Text style={styles.statValue}>{technician.completedVisits}</Text>
-            <Text style={styles.statLabel}>Visits Done</Text>
+            <Text style={styles.statLabel}>{t('technician.visitsDone')}</Text>
           </View>
           
           <View style={styles.statCard}>
             <Ionicons name="star-outline" size={24} color={COLORS.warning} />
             <Text style={styles.statValue}>{Number(technician.rating) ? Number(technician.rating).toFixed(1) : '0'}</Text>
-            <Text style={styles.statLabel}>Rating</Text>
+            <Text style={styles.statLabel}>{t('technician.rating')}</Text>
           </View>
         </View>
 
         {/* Today's Tasks */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Tasks</Text>
+            <Text style={styles.sectionTitle}>{t('technician.todaysTasks')}</Text>
             <TouchableOpacity onPress={() => navigation.navigate('TodayTasks')}>
               <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
             </TouchableOpacity>
@@ -347,8 +347,8 @@ const TechnicianDashboardScreen: React.FC = () => {
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="leaf-outline" size={48} color={COLORS.textSecondary} />
-              <Text style={styles.emptyStateText}>No active tasks</Text>
-              <Text style={styles.emptyStateSubtext}>You'll see assigned farm visits here</Text>
+              <Text style={styles.emptyStateText}>{t('technician.noActiveTasks')}</Text>
+              <Text style={styles.emptyStateSubtext}>{t('technician.noActiveTasksSubtext')}</Text>
             </View>
           )}
         </View>
@@ -356,7 +356,7 @@ const TechnicianDashboardScreen: React.FC = () => {
         {/* Recent Visits */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Visits</Text>
+            <Text style={styles.sectionTitle}>{t('technician.recentVisits')}</Text>
             <TouchableOpacity onPress={() => {
               navigation.navigate('Main' as never, { screen: 'TasksTab' } as never);
             }}>
@@ -374,27 +374,26 @@ const TechnicianDashboardScreen: React.FC = () => {
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="time-outline" size={48} color={COLORS.textSecondary} />
-              <Text style={styles.emptyStateText}>No recent visits</Text>
-              <Text style={styles.emptyStateSubtext}>Completed visits will appear here</Text>
+              <Text style={styles.emptyStateText}>{t('technician.noRecentVisits')}</Text>
+              <Text style={styles.emptyStateSubtext}>{t('technician.noRecentVisitsSubtext')}</Text>
             </View>
           )}
         </View>
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={styles.sectionTitle}>{t('technician.quickActions')}</Text>
           <View style={styles.quickActions}>
             <TouchableOpacity
               style={styles.quickAction}
               onPress={() => {
-                // Navigate to Schedule tab through parent Stack 'Main'
                 navigation.navigate('Main' as never, { screen: 'ScheduleTab' } as never);
               }}
             >
               <View style={styles.quickActionIcon}>
                 <Ionicons name="calendar-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.quickActionText}>Availability</Text>
+              <Text style={styles.quickActionText}>{t('technician.availability.title')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -404,33 +403,31 @@ const TechnicianDashboardScreen: React.FC = () => {
               <View style={styles.quickActionIcon}>
                 <Ionicons name="wallet-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.quickActionText}>Payouts</Text>
+              <Text style={styles.quickActionText}>{t('technician.payouts')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickAction}
               onPress={() => {
-                // Navigate to Tasks tab through parent Stack 'Main'
                 navigation.navigate('Main' as never, { screen: 'TasksTab' } as never);
               }}
             >
               <View style={styles.quickActionIcon}>
                 <Ionicons name="list-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.quickActionText}>History</Text>
+              <Text style={styles.quickActionText}>{t('technician.history')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickAction}
               onPress={() => {
-                // Navigate to Profile tab through parent Stack 'Main'
                 navigation.navigate('Main' as never, { screen: 'ProfileTab' } as never);
               }}
             >
               <View style={styles.quickActionIcon}>
                 <Ionicons name="person-outline" size={24} color={COLORS.primary} />
               </View>
-              <Text style={styles.quickActionText}>Profile</Text>
+              <Text style={styles.quickActionText}>{t('technician.tabs.profile')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -440,7 +437,7 @@ const TechnicianDashboardScreen: React.FC = () => {
               <View style={styles.quickActionIcon}>
                 <Ionicons name="checkmark-circle-outline" size={24} color={COLORS.success} />
               </View>
-              <Text style={styles.quickActionText}>Accept Jobs</Text>
+              <Text style={styles.quickActionText}>{t('technician.acceptJobs')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -450,7 +447,7 @@ const TechnicianDashboardScreen: React.FC = () => {
               <View style={styles.quickActionIcon}>
                 <Ionicons name="close-circle-outline" size={24} color={COLORS.error} />
               </View>
-              <Text style={styles.quickActionText}>Reject Jobs</Text>
+              <Text style={styles.quickActionText}>{t('technician.rejectJobs')}</Text>
             </TouchableOpacity>
           </View>
         </View>

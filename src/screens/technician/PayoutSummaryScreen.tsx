@@ -10,54 +10,32 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { Button } from '../../components/common/Button';
 
 const PayoutSummaryScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const [selectedPeriod, setSelectedPeriod] = useState('week');
 
+  // No dummy data – show 0 until real payout API is connected; balance visible after jobs are completed
   const technician = {
     id: 'tech_001',
-    name: 'John Smith',
-    totalEarnings: 2847.50,
-    availableBalance: 1250.75,
-    pendingAmount: 342.25,
-    thisWeekEarnings: 342.75,
-    thisMonthEarnings: 1250.75,
+    name: '',
+    totalEarnings: 0,
+    availableBalance: 0,
+    pendingAmount: 0,
+    thisWeekEarnings: 0,
+    thisMonthEarnings: 0,
   };
 
-  const payoutHistory = [
-    {
-      id: 'payout_001',
-      amount: 450.00,
-      date: '2024-01-15',
-      status: 'completed',
-      method: 'Bank Transfer',
-      reference: 'TXN-2024-001',
-    },
-    {
-      id: 'payout_002',
-      amount: 325.50,
-      date: '2024-01-08',
-      status: 'completed',
-      method: 'Bank Transfer',
-      reference: 'TXN-2024-002',
-    },
-    {
-      id: 'payout_003',
-      amount: 280.25,
-      date: '2024-01-01',
-      status: 'completed',
-      method: 'Bank Transfer',
-      reference: 'TXN-2024-003',
-    },
-  ];
+  const payoutHistory: any[] = [];
 
   const earningsBreakdown = [
-    { period: 'This Week', amount: technician.thisWeekEarnings, jobs: 8 },
-    { period: 'This Month', amount: technician.thisMonthEarnings, jobs: 32 },
-    { period: 'Last Month', amount: 1895.50, jobs: 45 },
+    { period: t('payout.thisWeek'), amount: 0, jobs: 0 },
+    { period: t('payout.thisMonth'), amount: 0, jobs: 0 },
+    { period: t('payout.lastMonth'), amount: 0, jobs: 0 },
   ];
 
   const renderPayoutItem = ({ item }: { item: any }) => (
@@ -72,7 +50,7 @@ const PayoutSummaryScreen: React.FC = () => {
             styles.statusText,
             { color: item.status === 'completed' ? COLORS.success : COLORS.warning }
           ]}>
-            {item.status === 'completed' ? 'Completed' : 'Pending'}
+            {item.status === 'completed' ? t('technician.status.completed') : t('technician.status.pending')}
           </Text>
         </View>
       </View>
@@ -87,31 +65,31 @@ const PayoutSummaryScreen: React.FC = () => {
     <View style={styles.earningsCard}>
       <Text style={styles.earningsPeriod}>{item.period}</Text>
       <Text style={styles.earningsAmount}>${item.amount}</Text>
-      <Text style={styles.earningsJobs}>{item.jobs} jobs</Text>
+      <Text style={styles.earningsJobs}>{t('payout.jobsCount', { count: item.jobs })}</Text>
     </View>
   );
 
   const handleWithdraw = () => {
     if (technician.availableBalance < 50) {
-      Alert.alert('Insufficient Balance', 'Minimum withdrawal amount is $50.');
+      Alert.alert(t('technician.insufficientBalance'), t('technician.minimumWithdrawal'));
       return;
     }
 
     Alert.alert(
-      'Withdraw Funds',
-      `Withdraw $${technician.availableBalance} to your bank account?`,
+      t('payout.withdrawFunds'),
+      t('payout.withdrawConfirm', { amount: technician.availableBalance }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('technician.cancel'), style: 'cancel' },
         { 
-          text: 'Withdraw', 
-          onPress: () => Alert.alert('Success', 'Withdrawal request submitted successfully!')
+          text: t('technician.withdraw'), 
+          onPress: () => Alert.alert(t('technician.success'), t('technician.withdrawalSubmitted'))
         },
       ]
     );
   };
 
   const handleAddBankAccount = () => {
-    Alert.alert('Add Bank Account', 'Redirect to bank account setup page?');
+    navigation.navigate('AddBankAccount');
   };
 
   return (
@@ -124,25 +102,28 @@ const PayoutSummaryScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Payout Summary</Text>
+        <Text style={styles.headerTitle}>{t('payout.title')}</Text>
         <TouchableOpacity style={styles.settingsButton}>
           <Ionicons name="settings-outline" size={24} color={COLORS.text} />
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Balance Summary */}
+        {/* Balance Summary – 0 until jobs completed */}
         <View style={styles.balanceCard}>
-          <Text style={styles.balanceTitle}>Available Balance</Text>
-          <Text style={styles.balanceAmount}>${technician.availableBalance}</Text>
+          <Text style={styles.balanceTitle}>{t('payout.availableBalance')}</Text>
+          <Text style={styles.balanceAmount}>$0</Text>
+          <Text style={styles.balanceMessage}>
+            {t('payout.balanceAfterJobs')}
+          </Text>
           <View style={styles.balanceDetails}>
             <View style={styles.balanceItem}>
-              <Text style={styles.balanceLabel}>Pending</Text>
-              <Text style={styles.balanceValue}>${technician.pendingAmount}</Text>
+              <Text style={styles.balanceLabel}>{t('payout.pending')}</Text>
+              <Text style={styles.balanceValue}>$0</Text>
             </View>
             <View style={styles.balanceItem}>
-              <Text style={styles.balanceLabel}>Total Earned</Text>
-              <Text style={styles.balanceValue}>${technician.totalEarnings}</Text>
+              <Text style={styles.balanceLabel}>{t('payout.totalEarned')}</Text>
+              <Text style={styles.balanceValue}>$0</Text>
             </View>
           </View>
         </View>
@@ -151,13 +132,13 @@ const PayoutSummaryScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.actionsContainer}>
             <Button
-              title="Withdraw Funds"
+              title={t('payout.withdrawFunds')}
               onPress={handleWithdraw}
               disabled={technician.availableBalance < 50}
               style={styles.withdrawButton}
             />
             <Button
-              title="Add Bank Account"
+              title={t('payout.addBankAccount')}
               variant="outline"
               onPress={handleAddBankAccount}
               style={styles.bankButton}
@@ -167,7 +148,7 @@ const PayoutSummaryScreen: React.FC = () => {
 
         {/* Earnings Breakdown */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Earnings Breakdown</Text>
+          <Text style={styles.sectionTitle}>{t('payout.earningsBreakdown')}</Text>
           <FlatList
             data={earningsBreakdown}
             renderItem={renderEarningsItem}
@@ -179,9 +160,9 @@ const PayoutSummaryScreen: React.FC = () => {
         {/* Payout History */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Payout History</Text>
+            <Text style={styles.sectionTitle}>{t('payout.payoutHistory')}</Text>
             <TouchableOpacity>
-              <Text style={styles.viewAllText}>View All</Text>
+              <Text style={styles.viewAllText}>{t('payout.viewAll')}</Text>
             </TouchableOpacity>
           </View>
           
@@ -195,32 +176,21 @@ const PayoutSummaryScreen: React.FC = () => {
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="wallet-outline" size={48} color={COLORS.textSecondary} />
-              <Text style={styles.emptyStateText}>No Payouts Yet</Text>
+              <Text style={styles.emptyStateText}>{t('payout.noPayoutsYet')}</Text>
               <Text style={styles.emptyStateDescription}>
-                Your payout history will appear here once you make withdrawals.
+                {t('payout.payoutHistoryAfterWithdrawals')}
               </Text>
             </View>
           )}
         </View>
 
-        {/* Payment Methods */}
+        {/* Payment Methods – no dummy data */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Methods</Text>
+          <Text style={styles.sectionTitle}>{t('payout.paymentMethods')}</Text>
           <View style={styles.paymentMethodsCard}>
-            <View style={styles.paymentMethod}>
-              <Ionicons name="card-outline" size={24} color={COLORS.primary} />
-              <View style={styles.paymentMethodInfo}>
-                <Text style={styles.paymentMethodName}>Bank Account</Text>
-                <Text style={styles.paymentMethodDetails}>****1234 - Chase Bank</Text>
-              </View>
-              <TouchableOpacity>
-                <Ionicons name="chevron-forward" size={20} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity style={styles.addPaymentMethod}>
+            <TouchableOpacity style={styles.addPaymentMethod} onPress={handleAddBankAccount}>
               <Ionicons name="add-circle-outline" size={24} color={COLORS.primary} />
-              <Text style={styles.addPaymentText}>Add Payment Method</Text>
+              <Text style={styles.addPaymentText}>{t('payout.addPaymentMethod')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -269,7 +239,14 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.xxxl,
     fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.background,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xs,
+  },
+  balanceMessage: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.background,
+    opacity: 0.9,
+    marginBottom: SPACING.md,
+    fontStyle: 'italic',
   },
   balanceDetails: {
     flexDirection: 'row',

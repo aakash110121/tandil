@@ -283,6 +283,7 @@ export type TechnicianStackParamList = {
   RejectedJobs: undefined;
   OrderHistory: undefined;
   PayoutSummary: undefined;
+  AddBankAccount: undefined;
   Profile: undefined;
   TechnicianProfileEdit: undefined;
   Specializations: undefined;
@@ -294,6 +295,9 @@ export type TechnicianStackParamList = {
   SupervisorReport?: { visitId?: string } | undefined;
   Memberships: undefined;
   MembershipCheckout: { tier: MembershipTier };
+  HelpCenter: undefined;
+  SubmitTicket: undefined;
+  Notifications: undefined;
 };
 
 export type DeliveryStackParamList = {

@@ -13,7 +13,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
-import { adminService, AdminActivity } from '../../services/adminService';
+import { Image } from 'expo-image';
+import { adminService, AdminActivity, AdminDashboardProfile } from '../../services/adminService';
 
 function getGreetingKey(): 'admin.dashboard.greetingMorning' | 'admin.dashboard.greetingAfternoon' | 'admin.dashboard.greetingEvening' {
   const hour = new Date().getHours();
@@ -64,14 +65,9 @@ const AdminDashboardScreen: React.FC = () => {
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [pendingReportsCount, setPendingReportsCount] = useState(0);
   const [newOrdersCount, setNewOrdersCount] = useState(0);
-
-  const admin = {
-    id: 'admin_001',
-    employeeId: 'ADMIN-5001',
-    name: 'Abdullah Al Mazrouei',
-    email: 'abdullah.mazrouei@tandil.com',
-    role: 'Executive Management',
-  };
+  const [supportTicketsCount, setSupportTicketsCount] = useState(0);
+  const [profile, setProfile] = useState<AdminDashboardProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   const fetchStatistics = useCallback(async () => {
     try {
@@ -168,22 +164,54 @@ const AdminDashboardScreen: React.FC = () => {
     }
   }, []);
 
+  const fetchSupportTicketsCount = useCallback(async () => {
+    try {
+      const res = await adminService.getSupportTickets({ per_page: 1, page: 1 });
+      const total = res?.data?.pagination?.total ?? 0;
+      setSupportTicketsCount(typeof total === 'number' ? total : 0);
+    } catch (_) {
+      setSupportTicketsCount(0);
+    }
+  }, []);
+
+  const fetchDashboardProfile = useCallback(async () => {
+    try {
+      setProfileLoading(true);
+      const res = await adminService.getDashboardProfile();
+      if (res.success && res.data) setProfile(res.data);
+      else setProfile(null);
+    } catch (_) {
+      setProfile(null);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       fetchStatistics();
       fetchRecentActivities();
       fetchPendingReportsCount();
       fetchNewOrdersCount();
-    }, [fetchStatistics, fetchRecentActivities, fetchPendingReportsCount, fetchNewOrdersCount])
+      fetchSupportTicketsCount();
+      fetchDashboardProfile();
+    }, [fetchStatistics, fetchRecentActivities, fetchPendingReportsCount, fetchNewOrdersCount, fetchSupportTicketsCount, fetchDashboardProfile])
   );
+
+  const greetingText = profile?.greeting?.trim() || t(getGreetingKey());
+  const adminName = profile?.name?.trim() || '';
+  const adminRole = profile?.role_display_name?.trim() || '';
+  const adminId = profile?.formatted_id?.trim() || '';
+  const profilePictureUrl = profile?.profile_picture_url?.trim() || null;
+  const avatarInitial = adminName ? adminName.charAt(0).toUpperCase() : 'A';
 
   const quickStats = useMemo(
     () => [
       { id: 'pending_reports', labelKey: 'admin.dashboard.pendingReports', value: String(pendingReportsCount), actionKey: 'admin.dashboard.view', color: COLORS.warning, navTarget: 'PendingReports' as const },
       { id: 'new_orders', labelKey: 'admin.dashboard.newOrders', value: String(newOrdersCount), actionKey: 'admin.dashboard.manage', color: COLORS.success, navTarget: 'AdminOrders' as const },
-      { id: 'support_tickets', labelKey: 'admin.dashboard.supportTickets', value: '8', actionKey: 'admin.dashboard.respond', color: COLORS.error, navTarget: 'UsersTab' as const },
+      { id: 'support_tickets', labelKey: 'admin.dashboard.supportTickets', value: String(supportTicketsCount), actionKey: 'admin.dashboard.respond', color: COLORS.error, navTarget: 'AdminSupportTickets' as const },
     ],
-    [pendingReportsCount, newOrdersCount]
+    [pendingReportsCount, newOrdersCount, supportTicketsCount]
   );
 
   const topProducts = [
@@ -237,19 +265,29 @@ const AdminDashboardScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>{t(getGreetingKey())}</Text>
-            <Text style={styles.adminName}>{admin.name}</Text>
-            <Text style={styles.adminRole}>{admin.role}</Text>
-            <Text style={styles.adminId}>{t('admin.dashboard.idPrefix')}{admin.employeeId}</Text>
+          <View style={styles.headerTextWrap}>
+            {profileLoading ? (
+              <Text style={styles.greeting}>{t('admin.dashboard.loading', 'Loading...')}</Text>
+            ) : (
+              <>
+                <Text style={styles.greeting}>{greetingText}</Text>
+                <Text style={styles.adminName}>{adminName || '—'}</Text>
+                {adminRole ? <Text style={styles.adminRole}>{adminRole}</Text> : null}
+                {adminId ? <Text style={styles.adminId}>{t('admin.dashboard.idPrefix')}{adminId}</Text> : null}
+              </>
+            )}
           </View>
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => navigation.navigate('Main' as never, { screen: 'SettingsTab' } as never)}
           >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{admin.name.charAt(0)}</Text>
-            </View>
+            {profilePictureUrl ? (
+              <Image source={{ uri: profilePictureUrl }} style={styles.avatarImage} contentFit="cover" />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{avatarInitial}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -750,6 +788,9 @@ const styles = StyleSheet.create({
   profileButton: {
     padding: SPACING.sm,
   },
+  headerTextWrap: {
+    flex: 1,
+  },
   avatar: {
     width: 40,
     height: 40,
@@ -757,6 +798,11 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   avatarText: {
     fontSize: FONT_SIZES.md,

@@ -190,7 +190,7 @@ const OrderTrackingScreen: React.FC = () => {
 
           return (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Maintenance Photos</Text>
+              <Text style={styles.sectionTitle}>{t('home.maintenancePhotos')}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row' }}>
                   {beforeList.slice(0, count).map((bUri, idx) => (

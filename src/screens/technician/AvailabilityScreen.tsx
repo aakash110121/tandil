@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { updateTechnicianAvailability, getTechnicianDashboard, getTechnicianAvailability } from '../../services/technicianService';
 
@@ -41,10 +42,10 @@ function toHHmm(s: string): string {
   return part.length >= 5 ? part : s;
 }
 
-const SLOT_DEFINITIONS = [
-  { id: 'morning', label: 'Morning', time: '9:00 AM - 12:00 PM', start: '09:00', end: '12:00' },
-  { id: 'afternoon', label: 'Afternoon', time: '12:00 PM - 5:00 PM', start: '12:00', end: '17:00' },
-  { id: 'evening', label: 'Evening', time: '5:00 PM - 9:00 PM', start: '17:00', end: '21:00' },
+const SLOT_IDS = [
+  { id: 'morning', start: '09:00', end: '12:00' },
+  { id: 'afternoon', start: '12:00', end: '17:00' },
+  { id: 'evening', start: '17:00', end: '21:00' },
 ];
 
 type AvailabilityParams = {
@@ -55,7 +56,18 @@ type AvailabilityParams = {
 
 const SLOT_HOURS: Record<string, number> = { morning: 3, afternoon: 5, evening: 4 };
 
+const DAY_IDS = [
+  { id: 'monday', shortKey: 'mon' },
+  { id: 'tuesday', shortKey: 'tue' },
+  { id: 'wednesday', shortKey: 'wed' },
+  { id: 'thursday', shortKey: 'thu' },
+  { id: 'friday', shortKey: 'fri' },
+  { id: 'saturday', shortKey: 'sat' },
+  { id: 'sunday', shortKey: 'sun' },
+];
+
 const AvailabilityScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute();
   const [isOnline, setIsOnline] = useState(true);
@@ -105,7 +117,7 @@ const AvailabilityScreen: React.FC = () => {
             const slots = (data.working_hours_slots ?? []).map(s => s.slot);
             setSlotEnabled(prev => {
               const next = { ...prev };
-              SLOT_DEFINITIONS.forEach(s => {
+              SLOT_IDS.forEach(s => {
                 next[s.id] = slots.includes(s.id);
               });
               return next;
@@ -147,19 +159,14 @@ const AvailabilityScreen: React.FC = () => {
 
   useEffect(() => {
     const days = selectedDays.length;
-    const hoursPerDay = SLOT_DEFINITIONS.reduce((sum, s) => sum + (slotEnabled[s.id] ? (SLOT_HOURS[s.id] ?? 0) : 0), 0);
+    const hoursPerDay = SLOT_IDS.reduce((sum, s) => sum + (slotEnabled[s.id] ? (SLOT_HOURS[s.id] ?? 0) : 0), 0);
     setWeekStats(prev => ({ ...prev, availableDays: days, totalHours: days * hoursPerDay }));
   }, [selectedDays.length, slotEnabled]);
 
-  const weekDays = [
-    { id: 'monday', label: 'Monday', short: 'Mon' },
-    { id: 'tuesday', label: 'Tuesday', short: 'Tue' },
-    { id: 'wednesday', label: 'Wednesday', short: 'Wed' },
-    { id: 'thursday', label: 'Thursday', short: 'Thu' },
-    { id: 'friday', label: 'Friday', short: 'Fri' },
-    { id: 'saturday', label: 'Saturday', short: 'Sat' },
-    { id: 'sunday', label: 'Sunday', short: 'Sun' },
-  ];
+  const weekDays = DAY_IDS.map(d => ({
+    id: d.id,
+    short: t(`technician.availability.days.${d.shortKey}`),
+  }));
 
   const handleDayToggle = (dayId: string) => {
     if (selectedDays.includes(dayId)) {
@@ -177,7 +184,7 @@ const AvailabilityScreen: React.FC = () => {
     setSaving(true);
     try {
       const working_days = selectedDays.map(d => DAY_TO_API[d] ?? d).filter(Boolean);
-      const working_hours_slots = SLOT_DEFINITIONS.filter(s => slotEnabled[s.id]).map(s => ({
+      const working_hours_slots = SLOT_IDS.filter(s => slotEnabled[s.id]).map(s => ({
         slot: s.id,
         start: s.start,
         end: s.end,
@@ -194,13 +201,13 @@ const AvailabilityScreen: React.FC = () => {
       });
       setSaving(false);
       if (result.success) {
-        Alert.alert('Saved', result.message ?? 'Your availability has been saved.');
+        Alert.alert(t('technician.saved'), result.message ?? t('technician.availability.availabilitySaved'), [{ text: t('technician.ok') }]);
       } else {
-        Alert.alert('Error', result.message ?? 'Failed to save availability.');
+        Alert.alert(t('technician.error'), result.message ?? t('technician.availability.saveFailed'));
       }
     } catch {
       setSaving(false);
-      Alert.alert('Error', 'Failed to save availability. Please try again.');
+      Alert.alert(t('technician.error'), t('technician.availability.saveFailed') + ' ' + t('technician.tryAgain'));
     }
   };
 
@@ -222,12 +229,15 @@ const AvailabilityScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const renderTimeSlot = (slot: (typeof SLOT_DEFINITIONS)[0]) => (
+  const getSlotLabel = (id: string) => t(`technician.availability.${id}`);
+  const getSlotTime = (id: string) => t(`technician.availability.${id}Time`);
+
+  const renderTimeSlot = (slot: (typeof SLOT_IDS)[0]) => (
     <View key={slot.id} style={styles.timeSlotCard}>
       <View style={styles.timeSlotHeader}>
         <View>
-          <Text style={styles.timeSlotLabel}>{slot.label}</Text>
-          <Text style={styles.timeSlotTime}>{slot.time}</Text>
+          <Text style={styles.timeSlotLabel}>{getSlotLabel(slot.id)}</Text>
+          <Text style={styles.timeSlotTime}>{getSlotTime(slot.id)}</Text>
         </View>
         <Switch
           value={slotEnabled[slot.id] ?? false}
@@ -243,7 +253,7 @@ const AvailabilityScreen: React.FC = () => {
     return (
       <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading schedule…</Text>
+        <Text style={styles.loadingText}>{t('technician.availability.loadingSchedule')}</Text>
       </View>
     );
   }
@@ -258,7 +268,7 @@ const AvailabilityScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Availability</Text>
+        <Text style={styles.headerTitle}>{t('technician.availability.title')}</Text>
         <TouchableOpacity
           style={styles.saveButton}
           onPress={handleSaveSchedule}
@@ -267,7 +277,7 @@ const AvailabilityScreen: React.FC = () => {
           {saving ? (
             <ActivityIndicator size="small" color={COLORS.primary} />
           ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
+            <Text style={styles.saveButtonText}>{t('technician.availability.save')}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -275,14 +285,14 @@ const AvailabilityScreen: React.FC = () => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Online Status */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Online Status</Text>
+          <Text style={styles.sectionTitle}>{t('technician.availability.onlineStatus')}</Text>
           <View style={styles.statusCard}>
             <View style={styles.statusHeader}>
               <View style={styles.statusInfo}>
                 <Ionicons name="wifi" size={24} color={COLORS.primary} />
                 <View style={styles.statusText}>
-                  <Text style={styles.statusTitle}>Go Online</Text>
-                  <Text style={styles.statusSubtitle}>Accept new job requests</Text>
+                  <Text style={styles.statusTitle}>{t('technician.availability.goOnline')}</Text>
+                  <Text style={styles.statusSubtitle}>{t('technician.availability.acceptNewJobRequests')}</Text>
                 </View>
               </View>
               <Switch
@@ -297,14 +307,14 @@ const AvailabilityScreen: React.FC = () => {
 
         {/* Auto Accept */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Job Acceptance</Text>
+          <Text style={styles.sectionTitle}>{t('technician.availability.jobAcceptance')}</Text>
           <View style={styles.autoAcceptCard}>
             <View style={styles.autoAcceptHeader}>
               <View style={styles.autoAcceptInfo}>
                 <Ionicons name="checkmark-circle" size={24} color={COLORS.primary} />
                 <View style={styles.autoAcceptText}>
-                  <Text style={styles.autoAcceptTitle}>Auto Accept Jobs</Text>
-                  <Text style={styles.autoAcceptSubtitle}>Automatically accept job requests</Text>
+                  <Text style={styles.autoAcceptTitle}>{t('technician.availability.autoAcceptJobs')}</Text>
+                  <Text style={styles.autoAcceptSubtitle}>{t('technician.availability.automaticallyAcceptJobRequests')}</Text>
                 </View>
               </View>
               <Switch
@@ -319,7 +329,7 @@ const AvailabilityScreen: React.FC = () => {
 
         {/* Working Days */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Working Days</Text>
+          <Text style={styles.sectionTitle}>{t('technician.availability.workingDays')}</Text>
           <View style={styles.daysContainer}>
             {weekDays.map(renderDayItem)}
           </View>
@@ -327,22 +337,22 @@ const AvailabilityScreen: React.FC = () => {
 
         {/* Time Slots */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Working Hours</Text>
+          <Text style={styles.sectionTitle}>{t('technician.availability.workingHours')}</Text>
           <View style={styles.timeSlotsContainer}>
-            {SLOT_DEFINITIONS.map(renderTimeSlot)}
+            {SLOT_IDS.map(renderTimeSlot)}
           </View>
         </View>
 
         {/* Quick Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={styles.sectionTitle}>{t('technician.quickActions')}</Text>
           <View style={styles.quickActions}>
             <TouchableOpacity
               style={styles.quickAction}
               onPress={() => navigation.navigate('SetBreakTime', { initialBreaks: breaks })}
             >
               <Ionicons name="time-outline" size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionText}>Set Break Time</Text>
+              <Text style={styles.quickActionText}>{t('technician.availability.setBreakTime')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -350,7 +360,7 @@ const AvailabilityScreen: React.FC = () => {
               onPress={() => navigation.navigate('SetVacation', { initialVacations: vacations })}
             >
               <Ionicons name="calendar-outline" size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionText}>Set Vacation</Text>
+              <Text style={styles.quickActionText}>{t('technician.availability.setVacation')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -358,36 +368,36 @@ const AvailabilityScreen: React.FC = () => {
               onPress={() => navigation.navigate('ServiceAreas', { initialServiceAreas: serviceAreas })}
             >
               <Ionicons name="location-outline" size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionText}>Service Areas</Text>
+              <Text style={styles.quickActionText}>{t('technician.availability.serviceAreas')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.quickAction}>
               <Ionicons name="settings-outline" size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionText}>Advanced Settings</Text>
+              <Text style={styles.quickActionText}>{t('technician.availability.advancedSettings')}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Statistics - from dashboard API and local availability */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>This Week</Text>
+          <Text style={styles.sectionTitle}>{t('technician.availability.thisWeek')}</Text>
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
               <Ionicons name="calendar-outline" size={24} color={COLORS.success} />
-              <Text style={styles.statValue}>{weekStats.availableDays} days</Text>
-              <Text style={styles.statLabel}>Available</Text>
+              <Text style={styles.statValue}>{t('technician.availability.daysLabel', { count: weekStats.availableDays })}</Text>
+              <Text style={styles.statLabel}>{t('technician.availability.available')}</Text>
             </View>
             
             <View style={styles.statCard}>
               <Ionicons name="time-outline" size={24} color={COLORS.primary} />
-              <Text style={styles.statValue}>{weekStats.totalHours} hours</Text>
-              <Text style={styles.statLabel}>Total Hours</Text>
+              <Text style={styles.statValue}>{t('technician.availability.hoursLabel', { count: weekStats.totalHours })}</Text>
+              <Text style={styles.statLabel}>{t('technician.availability.totalHours')}</Text>
             </View>
             
             <View style={styles.statCard}>
               <Ionicons name="construct-outline" size={24} color={COLORS.warning} />
-              <Text style={styles.statValue}>{weekStats.completedJobs} jobs</Text>
-              <Text style={styles.statLabel}>Completed</Text>
+              <Text style={styles.statValue}>{t('technician.availability.jobsLabel', { count: weekStats.completedJobs })}</Text>
+              <Text style={styles.statLabel}>{t('technician.status.completed')}</Text>
             </View>
           </View>
         </View>

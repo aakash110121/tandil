@@ -108,7 +108,7 @@ const TechnicianRejectedJobsScreen: React.FC = () => {
         <View style={styles.jobHeader}>
           <Text style={styles.customerName}>{item.customerName}</Text>
           <View style={[styles.statusBadge, { backgroundColor: COLORS.error + '20' }]}>
-            <Text style={[styles.jobStatusText, { color: COLORS.error }]}>Rejected</Text>
+            <Text style={[styles.jobStatusText, { color: COLORS.error }]}>{t('technician.status.rejected')}</Text>
           </View>
         </View>
 
@@ -122,7 +122,7 @@ const TechnicianRejectedJobsScreen: React.FC = () => {
           </View>
           <View style={styles.jobInfo}>
             <Ionicons name="timer-outline" size={16} color={COLORS.textSecondary} />
-            <Text style={styles.jobInfoText}>{item.estimatedDuration}</Text>
+            <Text style={styles.jobInfoText}>{item.estimatedDuration.replace(/ min$/, ' ' + t('technician.min'))}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -132,10 +132,10 @@ const TechnicianRejectedJobsScreen: React.FC = () => {
   if (loading && !result) {
     return (
       <View style={styles.container}>
-        <Header title={t('technician.rejectedJobs', 'Rejected Jobs')} showBack={true} />
+        <Header title={t('technician.rejectedJobs')} showBack={true} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>{t('home.loading', 'Loading...')}</Text>
+          <Text style={styles.loadingText}>{t('technician.loadingJobs')}</Text>
         </View>
       </View>
     );
@@ -143,10 +143,10 @@ const TechnicianRejectedJobsScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Header title={t('technician.rejectedJobs', 'Rejected Jobs')} showBack={true} />
+      <Header title={t('technician.rejectedJobs')} showBack={true} />
 
       <View style={styles.periodSection}>
-        <Text style={styles.periodLabel}>Time Period</Text>
+        <Text style={styles.periodLabel}>{t('technician.timePeriod')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodScroll}>
           {PERIOD_TABS.map(tab => (
             <TouchableOpacity
@@ -155,7 +155,7 @@ const TechnicianRejectedJobsScreen: React.FC = () => {
               onPress={() => onPeriodChange(tab.id)}
             >
               <Text style={[styles.periodTabText, period === tab.id && styles.periodTabTextActive]}>
-                {tab.label}
+                {tab.id === 'week' ? t('technician.thisWeek') : tab.id === 'month' ? t('technician.thisMonth') : t('technician.thisYear')}
               </Text>
             </TouchableOpacity>
           ))}
@@ -166,9 +166,9 @@ const TechnicianRejectedJobsScreen: React.FC = () => {
         <View style={styles.centered}>
           <View style={styles.emptyState}>
             <Ionicons name="close-circle-outline" size={48} color={COLORS.textSecondary} />
-            <Text style={styles.emptyStateText}>No rejected jobs</Text>
+            <Text style={styles.emptyStateText}>{t('technician.noRejectedJobs')}</Text>
             <Text style={styles.emptyStateSubtext}>
-              Jobs you reject will appear here
+              {t('technician.noRejectedJobsSubtext')}
             </Text>
           </View>
         </View>

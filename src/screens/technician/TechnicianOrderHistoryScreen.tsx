@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { getTechnicianJobs, type TechnicianJob, type TechnicianJobsPeriod, type TechnicianJobsSummary } from '../../services/technicianService';
 import dayjs from 'dayjs';
@@ -24,6 +25,7 @@ function normalizeStatus(status: string | undefined): 'completed' | 'cancelled' 
 }
 
 const TechnicianOrderHistoryScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'in_progress' | 'completed' | 'cancelled'>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<TechnicianJobsPeriod>('week');
@@ -114,7 +116,7 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
           <Text style={[styles.statusText, {
             color: item.status === 'cancelled' ? COLORS.error : item.status === 'in_progress' ? COLORS.primary : COLORS.success,
           }]}>
-            {item.status === 'cancelled' ? 'Cancelled' : item.status === 'in_progress' ? 'In Progress' : 'Completed'}
+            {item.status === 'cancelled' ? t('technician.status.cancelled') : item.status === 'in_progress' ? t('technician.status.inProgress') : t('technician.status.completed')}
           </Text>
         </View>
       </View>
@@ -158,16 +160,16 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
   );
 
   const filterTabs = [
-    { id: 'all', label: 'All Jobs' },
-    { id: 'in_progress', label: 'In Progress' },
-    { id: 'completed', label: 'Completed' },
-    { id: 'cancelled', label: 'Cancelled' },
+    { id: 'all', label: t('technician.allJobs') },
+    { id: 'in_progress', label: t('technician.status.inProgress') },
+    { id: 'completed', label: t('technician.status.completed') },
+    { id: 'cancelled', label: t('technician.status.cancelled') },
   ];
 
   const periodTabs = [
-    { id: 'week', label: 'This Week' },
-    { id: 'month', label: 'This Month' },
-    { id: 'year', label: 'This Year' },
+    { id: 'week', label: t('technician.thisWeek') },
+    { id: 'month', label: t('technician.thisMonth') },
+    { id: 'year', label: t('technician.thisYear') },
   ];
 
   return (
@@ -180,7 +182,7 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Job History</Text>
+        <Text style={styles.headerTitle}>{t('technician.jobHistory')}</Text>
         <TouchableOpacity style={styles.filterButton}>
           <Ionicons name="filter" size={24} color={COLORS.text} />
         </TouchableOpacity>
@@ -196,26 +198,26 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
         <View style={styles.summaryContainer}>
           <View style={styles.summaryCard}>
             <Ionicons name="cash-outline" size={24} color={COLORS.primary} />
-            <Text style={styles.summaryValue}>AED {totalEarnings.toFixed(2)}</Text>
-            <Text style={styles.summaryLabel}>Total Earnings</Text>
+            <Text style={styles.summaryValue}>{t('orders.currency', { defaultValue: 'AED' })} {totalEarnings.toFixed(2)}</Text>
+            <Text style={styles.summaryLabel}>{t('technician.totalEarnings')}</Text>
           </View>
 
           <View style={styles.summaryCard}>
             <Ionicons name="checkmark-circle-outline" size={24} color={COLORS.success} />
             <Text style={styles.summaryValue}>{completedCount}</Text>
-            <Text style={styles.summaryLabel}>Jobs Completed</Text>
+            <Text style={styles.summaryLabel}>{t('technician.jobsCompleted')}</Text>
           </View>
 
           <View style={styles.summaryCard}>
             <Ionicons name="star-outline" size={24} color={COLORS.warning} />
             <Text style={styles.summaryValue}>{avgRating.toFixed(1)}</Text>
-            <Text style={styles.summaryLabel}>Avg Rating</Text>
+            <Text style={styles.summaryLabel}>{t('technician.avgRating')}</Text>
           </View>
         </View>
 
         {/* Period Filter */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Time Period</Text>
+          <Text style={styles.sectionTitle}>{t('technician.timePeriod')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {periodTabs.map(renderPeriodTab)}
           </ScrollView>
@@ -223,7 +225,7 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
 
         {/* Status Filter */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Filter by Status</Text>
+          <Text style={styles.sectionTitle}>{t('technician.filterByStatus')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             {filterTabs.map(renderFilterTab)}
           </ScrollView>
@@ -232,14 +234,14 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
         {/* Jobs List */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Jobs</Text>
-            <Text style={styles.jobCount}>{displayJobs.length} jobs</Text>
+            <Text style={styles.sectionTitle}>{t('technician.recentJobs')}</Text>
+            <Text style={styles.jobCount}>{t('technician.jobsCount', { count: displayJobs.length })}</Text>
           </View>
 
           {loading && jobs.length === 0 ? (
             <View style={styles.emptyState}>
               <ActivityIndicator size="large" color={COLORS.primary} />
-              <Text style={styles.emptyStateDescription}>Loading jobs...</Text>
+              <Text style={styles.emptyStateDescription}>{t('technician.loadingJobs')}</Text>
             </View>
           ) : displayJobs.length > 0 ? (
             <FlatList
@@ -251,7 +253,7 @@ const TechnicianOrderHistoryScreen: React.FC = () => {
           ) : (
             <View style={styles.emptyState}>
               <Ionicons name="list-outline" size={64} color={COLORS.textSecondary} />
-              <Text style={styles.emptyStateTitle}>No Jobs Found</Text>
+              <Text style={styles.emptyStateTitle}>{t('technician.noJobsFound')}</Text>
               <Text style={styles.emptyStateDescription}>
                 No jobs match your current filters.
               </Text>

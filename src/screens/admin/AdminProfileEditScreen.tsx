@@ -11,17 +11,17 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
-import { getTechnicianProfile, updateTechnicianProfile, TechnicianProfileData } from '../../services/technicianService';
+import { adminService, AdminDashboardProfile } from '../../services/adminService';
+import Header from '../../components/common/Header';
 
-const TechnicianProfileEditScreen: React.FC = () => {
-  const { t } = useTranslation();
+const AdminProfileEditScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const route = useRoute<any>();
-  const [profile, setProfile] = useState<TechnicianProfileData | null>(null);
+  const { t } = useTranslation();
+  const [profile, setProfile] = useState<AdminDashboardProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -33,22 +33,28 @@ const TechnicianProfileEditScreen: React.FC = () => {
   const [profilePicture, setProfilePicture] = useState<{ uri: string; type?: string; name?: string } | null>(null);
 
   useEffect(() => {
-    getTechnicianProfile().then((data) => {
-      setProfile(data ?? null);
-      if (data) {
-        setName(data.name || '');
-        setEmail(data.email || '');
-        setPhone(data.phone || '');
-      }
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    adminService
+      .getDashboardProfile()
+      .then((res) => {
+        if (res.success && res.data) {
+          setProfile(res.data);
+          setName(res.data.name || '');
+          setEmail(res.data.email || '');
+          setPhone(res.data.phone || '');
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   const pickImage = async () => {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert(t('technician.permissionNeeded'), t('technician.allowPhotos'));
+        Alert.alert(
+          t('common.error'),
+          t('admin.settings.profileSetting.photoPermission')
+        );
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -65,32 +71,32 @@ const TechnicianProfileEditScreen: React.FC = () => {
         });
       }
     } catch (err: any) {
-      Alert.alert(t('technician.error'), err?.message ?? t('technician.profileEdit.openPhotosFailed'));
+      Alert.alert(t('common.error'), err?.message ?? t('admin.settings.profileSetting.openPhotosFailed'));
     }
   };
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert(t('technician.error'), t('technician.profileEdit.nameRequired'));
+      Alert.alert(t('common.error'), t('admin.settings.profileSetting.nameRequired'));
       return;
     }
     if (!email.trim()) {
-      Alert.alert(t('technician.error'), t('technician.profileEdit.emailRequired'));
+      Alert.alert(t('common.error'), t('admin.settings.profileSetting.emailRequired'));
       return;
     }
     if (password || passwordConfirmation) {
       if (password !== passwordConfirmation) {
-        Alert.alert(t('technician.error'), t('technician.profileEdit.passwordMismatch'));
+        Alert.alert(t('common.error'), t('admin.settings.profileSetting.passwordMismatch'));
         return;
       }
-      if (password.length < 6) {
-        Alert.alert(t('technician.error'), t('technician.profileEdit.passwordMinLength'));
+      if (password.length < 8) {
+        Alert.alert(t('common.error'), t('admin.settings.profileSetting.passwordMin'));
         return;
       }
     }
     setSaving(true);
     try {
-      const updated = await updateTechnicianProfile({
+      const res = await adminService.updateDashboardProfile({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
@@ -99,30 +105,26 @@ const TechnicianProfileEditScreen: React.FC = () => {
         profile_picture: profilePicture || undefined,
       });
       setSaving(false);
-      if (updated) {
-        Alert.alert(t('technician.success'), t('technician.profileEdit.profileUpdatedSuccess'), [
-          { text: t('technician.ok'), onPress: () => navigation.goBack() },
-        ]);
+      if (res.success) {
+        Alert.alert(
+          t('admin.settings.success'),
+          t('admin.settings.profileSetting.saved'),
+          [{ text: t('common.ok'), onPress: () => navigation.goBack() }]
+        );
       } else {
-        Alert.alert(t('technician.error'), t('technician.profileEdit.updateFailed'));
+        Alert.alert(t('common.error'), res.message ?? t('admin.settings.profileSetting.saveFailed'));
       }
     } catch (err: any) {
       setSaving(false);
-      const msg = err.response?.data?.message ?? err.message ?? t('technician.profileEdit.updateFailed');
-      Alert.alert(t('technician.error'), typeof msg === 'string' ? msg : JSON.stringify(msg));
+      const msg = err.response?.data?.message ?? err.message ?? t('admin.settings.profileSetting.saveFailed');
+      Alert.alert(t('common.error'), typeof msg === 'string' ? msg : JSON.stringify(msg));
     }
   };
 
   if (loading && !profile) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('technician.editProfile')}</Text>
-          <View style={styles.backBtn} />
-        </View>
+        <Header title={t('admin.settings.profileSetting.title')} showBack onBackPress={() => navigation.goBack()} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
@@ -134,20 +136,14 @@ const TechnicianProfileEditScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('technician.editProfile')}</Text>
-        <View style={styles.backBtn} />
-      </View>
+      <Header title={t('admin.settings.profileSetting.title')} showBack onBackPress={() => navigation.goBack()} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('technician.profileEdit.profilePhoto')}</Text>
+          <Text style={styles.sectionTitle}>{t('admin.settings.profileSetting.profilePhoto')}</Text>
           <TouchableOpacity onPress={pickImage} style={styles.avatarWrap}>
             {displayImageUri ? (
-              <Image source={{ uri: displayImageUri }} style={styles.avatarImage} />
+              <Image source={{ uri: displayImageUri }} style={styles.avatarImage} contentFit="cover" />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Ionicons name="camera" size={36} color={COLORS.textSecondary} />
@@ -160,25 +156,25 @@ const TechnicianProfileEditScreen: React.FC = () => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('technician.profileEdit.personalInfo')}</Text>
-          <Text style={styles.label}>{t('technician.profileEdit.nameLabel')}</Text>
-          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('technician.fullName')} />
-          <Text style={styles.label}>{t('technician.profileEdit.emailLabel')}</Text>
-          <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder={t('technician.profileEdit.emailPlaceholder')} keyboardType="email-address" autoCapitalize="none" />
-          <Text style={styles.label}>{t('technician.profileEdit.phoneLabel')}</Text>
-          <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder={t('technician.profileEdit.phonePlaceholder')} keyboardType="phone-pad" />
+          <Text style={styles.sectionTitle}>{t('admin.settings.profileSetting.personalInfo')}</Text>
+          <Text style={styles.label}>{t('admin.settings.profileSetting.name')} *</Text>
+          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('admin.settings.profileSetting.namePlaceholder')} />
+          <Text style={styles.label}>{t('admin.settings.profileSetting.email')} *</Text>
+          <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder={t('admin.settings.profileSetting.emailPlaceholder')} keyboardType="email-address" autoCapitalize="none" />
+          <Text style={styles.label}>{t('admin.settings.profileSetting.phone')}</Text>
+          <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder={t('admin.settings.profileSetting.phonePlaceholder')} keyboardType="phone-pad" />
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('technician.profileEdit.changePassword')}</Text>
-          <Text style={styles.label}>{t('technician.profileEdit.newPassword')}</Text>
-          <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder={t('technician.profileEdit.newPasswordPlaceholder')} secureTextEntry />
-          <Text style={styles.label}>{t('technician.profileEdit.confirmPassword')}</Text>
-          <TextInput style={styles.input} value={passwordConfirmation} onChangeText={setPasswordConfirmation} placeholder={t('technician.profileEdit.confirmPasswordPlaceholder')} secureTextEntry />
+          <Text style={styles.sectionTitle}>{t('admin.settings.profileSetting.changePassword')}</Text>
+          <Text style={styles.label}>{t('admin.settings.profileSetting.newPassword')}</Text>
+          <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder={t('admin.settings.profileSetting.passwordPlaceholder')} secureTextEntry />
+          <Text style={styles.label}>{t('admin.settings.profileSetting.confirmPassword')}</Text>
+          <TextInput style={styles.input} value={passwordConfirmation} onChangeText={setPasswordConfirmation} placeholder={t('admin.settings.profileSetting.confirmPasswordPlaceholder')} secureTextEntry />
         </View>
 
         <TouchableOpacity style={[styles.saveBtn, saving && styles.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>{t('technician.profileEdit.saveChanges')}</Text>}
+          {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>{t('admin.settings.profileSetting.save')}</Text>}
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -187,18 +183,6 @@ const TechnicianProfileEditScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  backBtn: { padding: SPACING.sm, minWidth: 40 },
-  headerTitle: { fontSize: FONT_SIZES.lg, fontWeight: FONT_WEIGHTS.semiBold, color: COLORS.text },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { flex: 1 },
   scrollContent: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
@@ -247,4 +231,4 @@ const styles = StyleSheet.create({
   saveBtnText: { fontSize: FONT_SIZES.md, fontWeight: FONT_WEIGHTS.semiBold, color: '#fff' },
 });
 
-export default TechnicianProfileEditScreen;
+export default AdminProfileEditScreen;

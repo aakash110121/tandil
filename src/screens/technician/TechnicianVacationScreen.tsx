@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 
@@ -26,6 +27,7 @@ function formatDateToYYYYMMDD(date: Date): string {
 type RouteParams = { initialVacations?: VacationItem[] };
 
 const TechnicianVacationScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const initialVacations = (route.params as RouteParams)?.initialVacations ?? [];
@@ -38,15 +40,15 @@ const TechnicianVacationScreen: React.FC = () => {
 
   const addVacation = () => {
     if (!startDate.trim()) {
-      Alert.alert('Error', 'Please select start date.');
+      Alert.alert(t('technician.error'), t('technician.vacation.pleaseSelectStartDate'));
       return;
     }
     if (!endDate.trim()) {
-      Alert.alert('Error', 'Please select end date.');
+      Alert.alert(t('technician.error'), t('technician.vacation.pleaseSelectEndDate'));
       return;
     }
     if (new Date(endDate) < new Date(startDate)) {
-      Alert.alert('Error', 'End date must be on or after start date.');
+      Alert.alert(t('technician.error'), t('technician.vacation.endDateAfterStart'));
       return;
     }
     setVacations(prev => [...prev, { start_date: startDate, end_date: endDate, reason: reason.trim() || undefined }]);
@@ -74,35 +76,35 @@ const TechnicianVacationScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Set Vacation</Text>
+        <Text style={styles.headerTitle}>{t('technician.setVacation')}</Text>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>Done</Text>
+          <Text style={styles.saveButtonText}>{t('technician.done')}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Add vacation</Text>
+          <Text style={styles.sectionTitle}>{t('technician.vacation.addVacation')}</Text>
           <TouchableOpacity style={styles.dateRow} onPress={() => setPickerOpen('start')}>
-            <Text style={styles.dateRowLabel}>Start date</Text>
-            <Text style={styles.dateRowValue}>{startDate || 'Select date'}</Text>
+            <Text style={styles.dateRowLabel}>{t('technician.vacation.startDate')}</Text>
+            <Text style={styles.dateRowValue}>{startDate || t('technician.selectDate')}</Text>
             <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.dateRow} onPress={() => setPickerOpen('end')}>
-            <Text style={styles.dateRowLabel}>End date</Text>
-            <Text style={styles.dateRowValue}>{endDate || 'Select date'}</Text>
+            <Text style={styles.dateRowLabel}>{t('technician.vacation.endDate')}</Text>
+            <Text style={styles.dateRowValue}>{endDate || t('technician.selectDate')}</Text>
             <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
           </TouchableOpacity>
           <TextInput
             style={styles.input}
-            placeholder="Reason (optional)"
+            placeholder={t('technician.vacation.reasonOptional')}
             placeholderTextColor={COLORS.textSecondary}
             value={reason}
             onChangeText={setReason}
           />
           <TouchableOpacity style={styles.addButton} onPress={addVacation}>
             <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>Add vacation</Text>
+            <Text style={styles.addButtonText}>{t('technician.vacation.addVacation')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -124,14 +126,14 @@ const TechnicianVacationScreen: React.FC = () => {
         )}
         {Platform.OS === 'ios' && pickerOpen !== null && (
           <TouchableOpacity style={styles.donePicker} onPress={() => setPickerOpen(null)}>
-            <Text style={styles.donePickerText}>Done</Text>
+            <Text style={styles.donePickerText}>{t('technician.done')}</Text>
           </TouchableOpacity>
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your vacations ({vacations.length})</Text>
+          <Text style={styles.sectionTitle}>{t('technician.vacation.yourVacations', { count: vacations.length })}</Text>
           {vacations.length === 0 ? (
-            <Text style={styles.emptyText}>No vacations added. Add one above.</Text>
+            <Text style={styles.emptyText}>{t('technician.vacation.noVacationsAdded')}</Text>
           ) : (
             vacations.map((v, index) => (
               <View key={index} style={styles.vacationCard}>

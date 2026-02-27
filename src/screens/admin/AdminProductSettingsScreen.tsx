@@ -57,23 +57,23 @@ const AdminProductSettingsScreen: React.FC = () => {
     const shipping = parseFloat(shippingAmount);
     const tax = parseFloat(taxPercent);
     if (Number.isNaN(shipping) || shipping < 0) {
-      Alert.alert(t('common.error', 'Error'), t('admin.settings.productSettings.shippingInvalid', 'Enter a valid shipping amount (≥ 0).'));
+      Alert.alert(t('common.error'), t('admin.settings.productSettings.shippingInvalid'));
       return;
     }
     if (Number.isNaN(tax) || tax < 0 || tax > 100) {
-      Alert.alert(t('common.error', 'Error'), t('admin.settings.productSettings.taxInvalid', 'Enter a valid tax percent (0–100).'));
+      Alert.alert(t('common.error'), t('admin.settings.productSettings.taxInvalid'));
       return;
     }
     setShopSettingsSaving(true);
     adminService
       .updateShopSettings({ shipping_amount: shipping, tax_percent: tax })
       .then(() => {
-        Alert.alert(t('admin.settings.success', 'Success'), t('admin.settings.productSettings.saved', 'Shipping and tax settings saved.'));
+        Alert.alert(t('admin.settings.success'), t('admin.settings.productSettings.saved'));
       })
       .catch((err: any) => {
         Alert.alert(
-          t('common.error', 'Error'),
-          err.response?.data?.message || err.message || t('admin.settings.productSettings.saveFailed', 'Failed to save settings.')
+          t('common.error'),
+          err.response?.data?.message || err.message || t('admin.settings.productSettings.saveFailed')
         );
       })
       .finally(() => setShopSettingsSaving(false));
@@ -82,7 +82,7 @@ const AdminProductSettingsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <Header
-        title={t('admin.settings.productSettings.title', 'Product Settings')}
+        title={t('admin.settings.productSettings.title')}
         showBack
         showLanguage={false}
         onBackPress={() => navigation.goBack()}
@@ -90,7 +90,7 @@ const AdminProductSettingsScreen: React.FC = () => {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            {t('admin.settings.productSettings.inventory', 'Inventory')}
+            {t('admin.settings.productSettings.inventory')}
           </Text>
           <View style={styles.sectionContent}>
             <View style={styles.settingItem}>
@@ -99,10 +99,10 @@ const AdminProductSettingsScreen: React.FC = () => {
               </View>
               <View style={styles.settingContent}>
                 <Text style={styles.settingTitle}>
-                  {t('admin.settings.productSettings.lowStockWarning.title', 'Low stock warning')}
+                  {t('admin.settings.productSettings.lowStockWarning.title')}
                 </Text>
                 <Text style={styles.settingSubtitle}>
-                  {t('admin.settings.productSettings.lowStockWarning.subtitle', 'Notify when stock is low')}
+                  {t('admin.settings.productSettings.lowStockWarning.subtitle')}
                 </Text>
               </View>
               <Switch
@@ -118,10 +118,10 @@ const AdminProductSettingsScreen: React.FC = () => {
               </View>
               <View style={styles.settingContent}>
                 <Text style={styles.settingTitle}>
-                  {t('admin.settings.productSettings.allowBackorders.title', 'Allow backorders')}
+                  {t('admin.settings.productSettings.allowBackorders.title')}
                 </Text>
                 <Text style={styles.settingSubtitle}>
-                  {t('admin.settings.productSettings.allowBackorders.subtitle', 'Let customers order out-of-stock items')}
+                  {t('admin.settings.productSettings.allowBackorders.subtitle')}
                 </Text>
               </View>
               <Switch
@@ -137,10 +137,10 @@ const AdminProductSettingsScreen: React.FC = () => {
               </View>
               <View style={styles.settingContent}>
                 <Text style={styles.settingTitle}>
-                  {t('admin.settings.productSettings.showOutOfStock.title', 'Show out of stock')}
+                  {t('admin.settings.productSettings.showOutOfStock.title')}
                 </Text>
                 <Text style={styles.settingSubtitle}>
-                  {t('admin.settings.productSettings.showOutOfStock.subtitle', 'Display out-of-stock products in store')}
+                  {t('admin.settings.productSettings.showOutOfStock.subtitle')}
                 </Text>
               </View>
               <Switch
@@ -155,13 +155,13 @@ const AdminProductSettingsScreen: React.FC = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            {t('admin.settings.productSettings.shippingTax', 'Shipping & Tax')}
+            {t('admin.settings.productSettings.shippingTax')}
           </Text>
           <View style={styles.sectionContent}>
             {shopSettingsLoading ? (
               <View style={styles.settingItem}>
                 <ActivityIndicator size="small" color={COLORS.primary} />
-                <Text style={styles.settingSubtitle}>{t('common.loading', 'Loading…')}</Text>
+                <Text style={styles.settingSubtitle}>{t('admin.settings.loading')}</Text>
               </View>
             ) : (
               <>
@@ -171,10 +171,10 @@ const AdminProductSettingsScreen: React.FC = () => {
                   </View>
                   <View style={styles.settingContent}>
                     <Text style={styles.settingTitle}>
-                      {t('admin.settings.productSettings.shippingAmount', 'Shipping amount (AED)')}
+                      {t('admin.settings.productSettings.shippingAmount')}
                     </Text>
                     <Text style={styles.settingSubtitle}>
-                      {t('admin.settings.productSettings.shippingAmountHint', '0 = Free shipping')}
+                      {t('admin.settings.productSettings.shippingAmountHint')}
                     </Text>
                   </View>
                   <TextInput
@@ -191,10 +191,10 @@ const AdminProductSettingsScreen: React.FC = () => {
                   </View>
                   <View style={styles.settingContent}>
                     <Text style={styles.settingTitle}>
-                      {t('admin.settings.productSettings.taxPercent', 'Tax (%)')}
+                      {t('admin.settings.productSettings.taxPercent')}
                     </Text>
                     <Text style={styles.settingSubtitle}>
-                      {t('admin.settings.productSettings.taxPercentHint', 'Applied to subtotal')}
+                      {t('admin.settings.productSettings.taxPercentHint')}
                     </Text>
                   </View>
                   <TextInput
@@ -213,7 +213,7 @@ const AdminProductSettingsScreen: React.FC = () => {
                   {shopSettingsSaving ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
-                    <Text style={styles.saveButtonText}>{t('admin.settings.productSettings.save', 'Save')}</Text>
+                    <Text style={styles.saveButtonText}>{t('admin.settings.productSettings.save')}</Text>
                   )}
                 </TouchableOpacity>
               </>
@@ -223,7 +223,7 @@ const AdminProductSettingsScreen: React.FC = () => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            {t('admin.settings.productSettings.display', 'Display & currency')}
+            {t('admin.settings.productSettings.display')}
           </Text>
           <View style={styles.sectionContent}>
             <View style={styles.settingItem}>
@@ -232,7 +232,7 @@ const AdminProductSettingsScreen: React.FC = () => {
               </View>
               <View style={styles.settingContent}>
                 <Text style={styles.settingTitle}>
-                  {t('admin.settings.productSettings.currency.title', 'Default currency')}
+                  {t('admin.settings.productSettings.currency.title')}
                 </Text>
                 <Text style={styles.settingSubtitle}>AED</Text>
               </View>

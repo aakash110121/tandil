@@ -65,8 +65,8 @@ const AdminServicesScreen: React.FC = () => {
           rawMessage.includes('Table ') ||
           rawMessage.includes('mysql'));
       const friendlyMessage = isServerOrDbError
-        ? t('admin.services.serverError', 'Services are not available right now. Please try again later or contact support.')
-        : (rawMessage || t('admin.services.loadError', 'Failed to load services'));
+        ? t('admin.services.serverError')
+        : (rawMessage || t('admin.services.loadError'));
       setError(friendlyMessage);
       if (page === 1) setServices([]);
     } finally {
@@ -101,12 +101,12 @@ const AdminServicesScreen: React.FC = () => {
   const handleDeleteService = useCallback(
     (service: AdminService) => {
       Alert.alert(
-        t('admin.services.deleteTitle', 'Delete service'),
-        t('admin.services.deleteMessage', { name: service.name, defaultValue: `Are you sure you want to delete "${service.name}"? This action cannot be undone.` }),
+        t('admin.services.deleteTitle'),
+        t('admin.services.deleteMessage', { name: service.name }),
         [
-          { text: t('admin.settings.cancel', 'Cancel'), style: 'cancel' },
+          { text: t('admin.settings.cancel'), style: 'cancel' },
           {
-            text: t('admin.users.delete', 'Delete'),
+            text: t('admin.users.delete'),
             style: 'destructive',
             onPress: async () => {
               try {
@@ -114,13 +114,13 @@ const AdminServicesScreen: React.FC = () => {
                 fetchServices(1, true);
                 Alert.alert(
                   t('admin.users.success'),
-                  t('admin.services.deleteSuccess', 'Service deleted successfully.'),
-                  [{ text: t('common.done') }]
+                  t('admin.services.deleteSuccess'),
+                  [{ text: t('common.ok') }]
                 );
               } catch (err: any) {
                 const apiMessage = (err.response?.data?.message || err.message || '') as string;
-                const msg = apiMessage || t('admin.services.deleteFailed', 'Failed to delete service');
-                Alert.alert(t('admin.users.error'), msg, [{ text: t('common.done') }]);
+                const msg = apiMessage || t('admin.services.deleteFailed');
+                Alert.alert(t('admin.users.error'), msg, [{ text: t('common.ok') }]);
               }
             },
           },
@@ -151,8 +151,8 @@ const AdminServicesScreen: React.FC = () => {
         setServices((prev) =>
           prev.map((s) => (s.id === item.id ? { ...s, is_active: previousActive } : s))
         );
-        const msg = err.response?.data?.message || err.message || t('admin.services.toggleFailed', 'Failed to update status');
-        Alert.alert(t('admin.users.error'), msg, [{ text: t('common.done') }]);
+        const msg = err.response?.data?.message || err.message || t('admin.services.toggleFailed');
+        Alert.alert(t('admin.users.error'), msg, [{ text: t('common.ok') }]);
       } finally {
         setTogglingId(null);
       }
@@ -224,7 +224,7 @@ const AdminServicesScreen: React.FC = () => {
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {t('admin.services.title', 'Services')}
+          {t('admin.services.title')}
         </Text>
         <TouchableOpacity
           style={styles.addBtn}
@@ -238,7 +238,7 @@ const AdminServicesScreen: React.FC = () => {
         <View style={styles.centerWrap}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>
-            {t('admin.services.loading', 'Loading services…')}
+            {t('admin.services.loading')}
           </Text>
         </View>
       ) : error && services.length === 0 ? (
@@ -247,7 +247,7 @@ const AdminServicesScreen: React.FC = () => {
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={() => fetchServices(1)}>
             <Text style={styles.retryBtnText}>
-              {t('admin.users.retry', 'Retry')}
+              {t('admin.users.retry')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -265,7 +265,7 @@ const AdminServicesScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyText}>
-                {t('admin.services.empty', 'No services found')}
+                {t('admin.services.empty')}
               </Text>
             </View>
           }

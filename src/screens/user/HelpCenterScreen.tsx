@@ -32,14 +32,14 @@ const HelpCenterScreen: React.FC = () => {
   const openPhone = () => {
     const url = `tel:${supportPhone}`;
     Linking.openURL(url).catch(() => {
-      Alert.alert(t('common.error', 'Error'), t('helpCenter.callNotAvailable', 'Cannot open phone app.'));
+      Alert.alert(t('common.error'), t('helpCenter.callNotAvailable'));
     });
   };
 
   const openEmail = () => {
     const url = `mailto:${supportEmail}`;
     Linking.openURL(url).catch(() => {
-      Alert.alert(t('common.error', 'Error'), t('helpCenter.emailNotAvailable', 'Cannot open email app.'));
+      Alert.alert(t('common.error'), t('helpCenter.emailNotAvailable'));
     });
   };
 

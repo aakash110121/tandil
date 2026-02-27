@@ -11,10 +11,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { getTechnicianSpecializations, updateTechnicianSpecializations } from '../../services/technicianService';
 
 const TechnicianSpecializationsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const [specializations, setSpecializations] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState('');
@@ -31,7 +33,7 @@ const TechnicianSpecializationsScreen: React.FC = () => {
     const trimmed = newSkill.trim();
     if (!trimmed) return;
     if (specializations.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
-      Alert.alert('Already added', `"${trimmed}" is already in your list.`);
+      Alert.alert(t('technician.alreadyAdded'), t('technician.alreadyInList', { value: trimmed }));
       return;
     }
     setSpecializations(prev => [...prev, trimmed]);
@@ -48,15 +50,15 @@ const TechnicianSpecializationsScreen: React.FC = () => {
       const result = await updateTechnicianSpecializations(specializations);
       setSaving(false);
       if (result.success) {
-        Alert.alert('Saved', result.message ?? 'Specializations updated.', [
-          { text: 'OK', onPress: () => navigation.goBack() },
+        Alert.alert(t('technician.specializationsScreen.saved'), result.message ?? t('technician.specializationsScreen.specializationsUpdated'), [
+          { text: t('technician.ok'), onPress: () => navigation.goBack() },
         ]);
       } else {
-        Alert.alert('Error', result.message ?? 'Failed to save.');
+        Alert.alert(t('technician.error'), result.message ?? t('technician.specializationsScreen.failedSave'));
       }
     } catch {
       setSaving(false);
-      Alert.alert('Error', 'Failed to save specializations. Please try again.');
+      Alert.alert(t('technician.error'), t('technician.specializationsScreen.failedSaveMessage'));
     }
   };
 
@@ -64,7 +66,7 @@ const TechnicianSpecializationsScreen: React.FC = () => {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Loading…</Text>
+        <Text style={styles.loadingText}>{t('technician.specializationsScreen.loading')}</Text>
       </View>
     );
   }
@@ -75,19 +77,19 @@ const TechnicianSpecializationsScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Skills & Specializations</Text>
+        <Text style={styles.headerTitle}>{t('technician.skillsSpecializations')}</Text>
         <View style={styles.backBtn} />
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <Text style={styles.hint}>Add skills or specializations (e.g. AC, Plumbing, Electrical). Tap Save to update.</Text>
+        <Text style={styles.hint}>{t('technician.specializationsScreen.hint')}</Text>
 
         <View style={styles.addRow}>
           <TextInput
             style={styles.input}
             value={newSkill}
             onChangeText={setNewSkill}
-            placeholder="e.g. AC, Plumbing"
+            placeholder={t('technician.specializationsScreen.placeholder')}
             placeholderTextColor={COLORS.textSecondary}
             onSubmitEditing={addSkill}
           />
@@ -97,9 +99,9 @@ const TechnicianSpecializationsScreen: React.FC = () => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your specializations ({specializations.length})</Text>
+          <Text style={styles.sectionTitle}>{t('technician.specializationsScreen.yourSpecializations', { count: specializations.length })}</Text>
           {specializations.length === 0 ? (
-            <Text style={styles.emptyText}>No specializations yet. Add one above.</Text>
+            <Text style={styles.emptyText}>{t('technician.specializationsScreen.noSpecializationsYet')}</Text>
           ) : (
             <View style={styles.tagsRow}>
               {specializations.map((spec, index) => (
@@ -115,7 +117,7 @@ const TechnicianSpecializationsScreen: React.FC = () => {
         </View>
 
         <TouchableOpacity style={[styles.saveBtn, saving && styles.saveBtnDisabled]} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+          {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>{t('technician.specializationsScreen.save')}</Text>}
         </TouchableOpacity>
       </ScrollView>
     </View>

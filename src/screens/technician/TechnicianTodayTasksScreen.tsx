@@ -128,12 +128,12 @@ const TechnicianTodayTasksScreen: React.FC = () => {
               ]}
             >
               {item.status === 'in_progress'
-                ? 'In Progress'
+                ? t('technician.status.inProgress')
                 : item.status === 'accepted'
-                ? 'Accepted'
+                ? t('technician.status.accepted')
                 : item.status === 'pending'
-                ? 'Pending'
-                : 'Assigned'}
+                ? t('technician.status.pending')
+                : t('technician.status.assigned')}
             </Text>
           </View>
         </View>
@@ -148,7 +148,11 @@ const TechnicianTodayTasksScreen: React.FC = () => {
           </View>
           <View style={styles.jobInfo}>
             <Ionicons name="timer-outline" size={16} color={COLORS.textSecondary} />
-            <Text style={styles.jobInfoText}>{item.estimatedDuration}</Text>
+            <Text style={styles.jobInfoText}>
+              {typeof item.estimatedDuration === 'string' && item.estimatedDuration.endsWith(' min')
+                ? item.estimatedDuration.replace(' min', '') + ' ' + t('technician.min')
+                : item.estimatedDuration}
+            </Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -158,21 +162,21 @@ const TechnicianTodayTasksScreen: React.FC = () => {
           <TouchableOpacity
             style={[styles.actionButton, styles.acceptButton]}
             onPress={() => {
-              Alert.alert('Accept Job', `Accept job for ${item.customerName}?`, [
-                { text: 'Cancel', style: 'cancel' },
+              Alert.alert(t('technician.acceptJob'), t('technician.acceptJobConfirm', { name: item.customerName }), [
+                { text: t('technician.cancel'), style: 'cancel' },
                 {
-                  text: 'Accept',
+                  text: t('technician.accept'),
                   onPress: async () => {
                     try {
                       const result = await acceptTechnicianTask(item.id);
                       if (result.success) {
                         loadTasks(1);
-                        Alert.alert('Job Accepted', result.message ?? 'Job has been accepted successfully!');
+                        Alert.alert(t('technician.acceptJob'), result.message ?? t('technician.jobAccepted'), [{ text: t('technician.ok') }]);
                       } else {
-                        Alert.alert('Error', result.message ?? 'Failed to accept job.');
+                        Alert.alert(t('technician.error'), result.message ?? t('technician.failedAccept'));
                       }
                     } catch {
-                      Alert.alert('Error', 'Failed to accept job. Please try again.');
+                      Alert.alert(t('technician.error'), t('technician.failedAccept') + ' ' + t('technician.tryAgain'));
                     }
                   },
                 },
@@ -180,28 +184,28 @@ const TechnicianTodayTasksScreen: React.FC = () => {
             }}
           >
             <Ionicons name="checkmark" size={16} color={COLORS.background} />
-            <Text style={styles.actionButtonText}>Accept</Text>
+            <Text style={styles.actionButtonText}>{t('technician.accept')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.actionButton, styles.rejectButton]}
             onPress={() => {
-              Alert.alert('Reject Job', `Reject job for ${item.customerName}?`, [
-                { text: 'Cancel', style: 'cancel' },
+              Alert.alert(t('technician.rejectJob'), t('technician.rejectJobConfirm', { name: item.customerName }), [
+                { text: t('technician.cancel'), style: 'cancel' },
                 {
-                  text: 'Reject',
+                  text: t('technician.reject'),
                   style: 'destructive',
                   onPress: async () => {
                     try {
                       const result = await rejectTechnicianTask(item.id, 'Not available');
                       if (result.success) {
                         loadTasks(1);
-                        Alert.alert('Job Rejected', result.message ?? 'Job has been rejected.');
+                        Alert.alert(t('technician.rejectJob'), result.message ?? t('technician.jobRejected'), [{ text: t('technician.ok') }]);
                       } else {
-                        Alert.alert('Error', result.message ?? 'Failed to reject job.');
+                        Alert.alert(t('technician.error'), result.message ?? t('technician.failedReject'));
                       }
                     } catch {
-                      Alert.alert('Error', 'Failed to reject job. Please try again.');
+                      Alert.alert(t('technician.error'), t('technician.failedReject') + ' ' + t('technician.tryAgain'));
                     }
                   },
                 },
@@ -209,7 +213,7 @@ const TechnicianTodayTasksScreen: React.FC = () => {
             }}
           >
             <Ionicons name="close" size={16} color={COLORS.background} />
-            <Text style={styles.actionButtonText}>Reject</Text>
+            <Text style={styles.actionButtonText}>{t('technician.reject')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -219,7 +223,7 @@ const TechnicianTodayTasksScreen: React.FC = () => {
   if (loading && !result) {
     return (
       <View style={styles.container}>
-        <Header title={t('technician.todayTasks', "Today's Tasks")} showBack={true} />
+        <Header title={t('technician.todaysTasks')} showBack={true} />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>{t('home.loading', 'Loading...')}</Text>
@@ -230,13 +234,13 @@ const TechnicianTodayTasksScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Header title={t('technician.todayTasks', "Today's Tasks")} showBack={true} />
+      <Header title={t('technician.todaysTasks')} showBack={true} />
       {jobs.length === 0 ? (
         <View style={styles.centered}>
           <View style={styles.emptyState}>
             <Ionicons name="leaf-outline" size={48} color={COLORS.textSecondary} />
-            <Text style={styles.emptyStateText}>No tasks for today</Text>
-            <Text style={styles.emptyStateSubtext}>You'll see assigned farm visits here</Text>
+            <Text style={styles.emptyStateText}>{t('technician.noTasksForToday')}</Text>
+            <Text style={styles.emptyStateSubtext}>{t('technician.noTasksSubtext')}</Text>
           </View>
         </View>
       ) : (

@@ -13,23 +13,25 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '../../store';
 import { getTechnicianProfile, getTechnicianSpecializations, getTechnicianServiceAreas, TechnicianProfileData } from '../../services/technicianService';
 
-function formatMemberSince(isoDate: string | null | undefined): string {
-  if (!isoDate) return '—';
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return '—';
-  const now = new Date();
-  const months = Math.max(0, (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth()));
-  if (months < 1) return 'Less than 1 month';
-  if (months === 1) return '1 month';
-  return `${months} months`;
-}
-
 const TechnicianProfileScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const { user, logout } = useAppStore();
+
+  const formatMemberSince = (isoDate: string | null | undefined): string => {
+    if (!isoDate) return '—';
+    const date = new Date(isoDate);
+    if (Number.isNaN(date.getTime())) return '—';
+    const now = new Date();
+    const months = Math.max(0, (now.getFullYear() - date.getFullYear()) * 12 + (now.getMonth() - date.getMonth()));
+    if (months < 1) return t('technician.lessThanMonth');
+    if (months === 1) return '1 month';
+    return `${months} months`;
+  };
 
   const [profile, setProfile] = useState<TechnicianProfileData | null>(null);
   const [specializationsList, setSpecializationsList] = useState<string[]>([]);
@@ -102,12 +104,12 @@ const TechnicianProfileScreen: React.FC = () => {
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      t('technician.logout'),
+      t('technician.logoutConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('technician.cancel'), style: 'cancel' },
         { 
-          text: 'Logout', 
+          text: t('technician.logout'), 
           style: 'destructive',
           onPress: async () => {
             try {
@@ -143,12 +145,12 @@ const TechnicianProfileScreen: React.FC = () => {
   };
 
   const menuItems = [
-    { icon: 'person-outline', title: 'Profile information', onPress: () => navigation.navigate('TechnicianProfileEdit') },
-    { icon: 'location-outline', title: 'Service Areas', onPress: () => navigation.navigate('ServiceAreasSettings') },
-    { icon: 'construct-outline', title: 'Skills & Specializations', onPress: () => navigation.navigate('Specializations') },
-    { icon: 'notifications-outline', title: 'Notifications', onPress: () => {} },
-    { icon: 'help-circle-outline', title: 'Help & Support', onPress: () => {} },
-    { icon: 'log-out-outline', title: 'Logout', onPress: handleLogout, color: COLORS.error },
+    { icon: 'person-outline', title: t('technician.profileInfo'), onPress: () => navigation.navigate('TechnicianProfileEdit') },
+    { icon: 'location-outline', title: t('technician.serviceAreas'), onPress: () => navigation.navigate('ServiceAreasSettings') },
+    { icon: 'construct-outline', title: t('technician.skillsSpecializations'), onPress: () => navigation.navigate('Specializations') },
+    { icon: 'notifications-outline', title: t('technician.notifications'), onPress: () => navigation.navigate('Notifications') },
+    { icon: 'help-circle-outline', title: t('technician.helpSupport'), onPress: () => navigation.navigate('HelpCenter') },
+    { icon: 'log-out-outline', title: t('technician.logout'), onPress: handleLogout, color: COLORS.error },
   ];
 
   const renderMenuItem = (item: any) => (
@@ -178,7 +180,7 @@ const TechnicianProfileScreen: React.FC = () => {
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerTitle}>{t('technician.tabs.profile')}</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.centeredContent}>
@@ -199,7 +201,7 @@ const TechnicianProfileScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitle}>{t('technician.tabs.profile')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -251,25 +253,25 @@ const TechnicianProfileScreen: React.FC = () => {
           <View style={styles.statCard}>
             <Ionicons name="checkmark-circle-outline" size={24} color={COLORS.success} />
             <Text style={styles.statValue}>{technician.completedJobs}</Text>
-            <Text style={styles.statLabel}>Jobs Completed</Text>
+            <Text style={styles.statLabel}>{t('technician.jobsCompleted')}</Text>
           </View>
           
           <View style={styles.statCard}>
             <Ionicons name="cash-outline" size={24} color={COLORS.primary} />
-            <Text style={styles.statValue}>AED {Number(technician.totalEarnings).toFixed(2)}</Text>
-            <Text style={styles.statLabel}>Total Earnings</Text>
+            <Text style={styles.statValue}>{t('orders.currency', { defaultValue: 'AED' })} {Number(technician.totalEarnings).toFixed(2)}</Text>
+            <Text style={styles.statLabel}>{t('technician.totalEarnings')}</Text>
           </View>
           
           <View style={styles.statCard}>
             <Ionicons name="calendar-outline" size={24} color={COLORS.info} />
             <Text style={styles.statValue}>{technician.memberSince}</Text>
-            <Text style={styles.statLabel}>Member Since</Text>
+            <Text style={styles.statLabel}>{t('technician.memberSince')}</Text>
           </View>
         </View>
 
         {/* Specializations - from GET /api/technician/specializations */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Specializations</Text>
+          <Text style={styles.sectionTitle}>{t('technician.specializations')}</Text>
           <View style={styles.specializationsContainer}>
             {specializationsList.length > 0 ? (
               specializationsList.map((spec, index) => (
@@ -278,14 +280,14 @@ const TechnicianProfileScreen: React.FC = () => {
                 </View>
               ))
             ) : (
-              <Text style={styles.placeholderText}>No specializations</Text>
+              <Text style={styles.placeholderText}>{t('technician.noSpecializations')}</Text>
             )}
           </View>
         </View>
 
         {/* Service Area - from GET /api/technician/service-areas */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service Area</Text>
+          <Text style={styles.sectionTitle}>{t('technician.serviceArea')}</Text>
           <View style={styles.serviceAreaCard}>
             <Ionicons name="location-outline" size={20} color={COLORS.primary} />
             <Text style={styles.serviceAreaText}>{serviceAreasDisplay}</Text>
@@ -294,7 +296,7 @@ const TechnicianProfileScreen: React.FC = () => {
 
         {/* Menu Items */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Settings</Text>
+          <Text style={styles.sectionTitle}>{t('technician.settings')}</Text>
           <View style={styles.menuContainer}>
             {menuItems.map(renderMenuItem)}
           </View>
@@ -302,16 +304,16 @@ const TechnicianProfileScreen: React.FC = () => {
 
         {/* Account Actions */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Actions</Text>
+          <Text style={styles.sectionTitle}>{t('technician.accountActions')}</Text>
           <View style={styles.accountActions}>
             <TouchableOpacity style={styles.accountAction}>
               <Ionicons name="download-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.accountActionText}>Download Data</Text>
+              <Text style={styles.accountActionText}>{t('technician.downloadData')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.accountAction}>
               <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-              <Text style={[styles.accountActionText, { color: COLORS.error }]}>Delete Account</Text>
+              <Text style={[styles.accountActionText, { color: COLORS.error }]}>{t('technician.deleteAccount')}</Text>
             </TouchableOpacity>
           </View>
         </View>

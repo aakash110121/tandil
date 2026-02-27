@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 
@@ -30,6 +31,7 @@ function formatTime(date: Date): string {
 type RouteParams = { initialBreaks?: BreakItem[] };
 
 const TechnicianBreakTimeScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const initialBreaks = (route.params as RouteParams)?.initialBreaks ?? [];
@@ -43,7 +45,7 @@ const TechnicianBreakTimeScreen: React.FC = () => {
 
   const addBreak = () => {
     if (!date.trim()) {
-      Alert.alert('Error', 'Please select a date.');
+      Alert.alert(t('technician.error'), t('technician.breakTime.pleaseSelectDate'));
       return;
     }
     setBreaks(prev => [...prev, { date, start_time: startTime, end_time: endTime, reason: reason.trim() || undefined }]);
@@ -78,28 +80,28 @@ const TechnicianBreakTimeScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Set Break Time</Text>
+        <Text style={styles.headerTitle}>{t('technician.setBreakTime')}</Text>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>Done</Text>
+          <Text style={styles.saveButtonText}>{t('technician.done')}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Add break</Text>
+          <Text style={styles.sectionTitle}>{t('technician.breakTime.addBreak')}</Text>
           <TouchableOpacity
             style={styles.dateRow}
             onPress={() => setPickerMode('date')}
           >
-            <Text style={styles.dateRowLabel}>Date</Text>
-            <Text style={styles.dateRowValue}>{date || 'Select date'}</Text>
+            <Text style={styles.dateRowLabel}>{t('technician.breakTime.date')}</Text>
+            <Text style={styles.dateRowValue}>{date || t('technician.selectDate')}</Text>
             <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.dateRow}
             onPress={() => setPickerMode('start')}
           >
-            <Text style={styles.dateRowLabel}>Start time</Text>
+            <Text style={styles.dateRowLabel}>{t('technician.breakTime.startTime')}</Text>
             <Text style={styles.dateRowValue}>{startTime}</Text>
             <Ionicons name="time-outline" size={22} color={COLORS.primary} />
           </TouchableOpacity>
@@ -107,13 +109,13 @@ const TechnicianBreakTimeScreen: React.FC = () => {
             style={styles.dateRow}
             onPress={() => setPickerMode('end')}
           >
-            <Text style={styles.dateRowLabel}>End time</Text>
+            <Text style={styles.dateRowLabel}>{t('technician.breakTime.endTime')}</Text>
             <Text style={styles.dateRowValue}>{endTime}</Text>
             <Ionicons name="time-outline" size={22} color={COLORS.primary} />
           </TouchableOpacity>
           <TouchableOpacity style={styles.addButton} onPress={addBreak}>
             <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>Add break</Text>
+            <Text style={styles.addButtonText}>{t('technician.breakTime.addBreak')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -135,21 +137,21 @@ const TechnicianBreakTimeScreen: React.FC = () => {
         )}
         {Platform.OS === 'ios' && pickerMode !== null && (
           <TouchableOpacity style={styles.donePicker} onPress={() => setPickerMode(null)}>
-            <Text style={styles.donePickerText}>Done</Text>
+            <Text style={styles.donePickerText}>{t('technician.done')}</Text>
           </TouchableOpacity>
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your breaks ({breaks.length})</Text>
+          <Text style={styles.sectionTitle}>{t('technician.breakTime.yourBreaks', { count: breaks.length })}</Text>
           {breaks.length === 0 ? (
-            <Text style={styles.emptyText}>No breaks added. Add one above.</Text>
+            <Text style={styles.emptyText}>{t('technician.breakTime.noBreaksAdded')}</Text>
           ) : (
             breaks.map((b, index) => (
               <View key={index} style={styles.breakCard}>
                 <View style={styles.breakCardContent}>
                   <Text style={styles.breakDate}>{b.date}</Text>
                   <Text style={styles.breakTime}>{b.start_time} – {b.end_time}</Text>
-                  {b.reason ? <Text style={styles.breakReason}>{b.reason}</Text> : null}
+                  {b.reason ? <Text style={styles.breakReason}>{b.reason === 'Lunch' ? t('technician.breakTime.lunch') : b.reason}</Text> : null}
                 </View>
                 <TouchableOpacity onPress={() => removeBreak(index)} style={styles.removeBtn}>
                   <Ionicons name="trash-outline" size={22} color={COLORS.error} />

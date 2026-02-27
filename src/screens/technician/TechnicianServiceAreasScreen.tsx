@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import MapPickerModal from '../../components/MapPickerModal';
 import type { AddressFromLocation } from '../../utils/addressFromLocation';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
@@ -16,14 +17,15 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 type RouteParams = { initialServiceAreas?: string[] };
 
 /** Show city name only (e.g. Dubai, Abu Dhabi), not full address. */
-function formatAddressForArea(a: AddressFromLocation): string {
+function formatAddressForArea(a: AddressFromLocation, selectedLocationLabel: string): string {
   if (a.city?.trim()) return a.city.trim();
   if (a.state?.trim()) return a.state.trim();
   if (a.country?.trim()) return a.country.trim();
-  return a.street_address?.trim() || 'Selected location';
+  return a.street_address?.trim() || selectedLocationLabel;
 }
 
 const TechnicianServiceAreasScreen: React.FC = () => {
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: RouteParams }, 'params'>>();
   const initialAreas = (route.params as RouteParams)?.initialServiceAreas ?? [];
@@ -32,7 +34,7 @@ const TechnicianServiceAreasScreen: React.FC = () => {
   const [mapVisible, setMapVisible] = useState(false);
 
   const onMapSelect = (address: AddressFromLocation) => {
-    const label = formatAddressForArea(address);
+    const label = formatAddressForArea(address, t('technician.selectedLocation'));
     setServiceAreas(prev => (prev.includes(label) ? prev : [...prev, label]));
     setMapVisible(false);
   };
@@ -51,26 +53,26 @@ const TechnicianServiceAreasScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Service Areas</Text>
+        <Text style={styles.headerTitle}>{t('technician.serviceAreas')}</Text>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>Done</Text>
+          <Text style={styles.saveButtonText}>{t('technician.done')}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Add address from map</Text>
-          <Text style={styles.hint}>Pick a location on the map to add it as a service area. You can add single or multiple areas.</Text>
+          <Text style={styles.sectionTitle}>{t('technician.serviceAreasScreen.addAddressFromMap')}</Text>
+          <Text style={styles.hint}>{t('technician.serviceAreasScreen.pickLocationHint')}</Text>
           <TouchableOpacity style={styles.mapButton} onPress={() => setMapVisible(true)}>
             <Ionicons name="location-outline" size={28} color={COLORS.primary} />
-            <Text style={styles.mapButtonText}>Pick location from map</Text>
+            <Text style={styles.mapButtonText}>{t('technician.serviceAreasScreen.pickLocationFromMap')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your service areas ({serviceAreas.length})</Text>
+          <Text style={styles.sectionTitle}>{t('technician.serviceAreasScreen.yourServiceAreas', { count: serviceAreas.length })}</Text>
           {serviceAreas.length === 0 ? (
-            <Text style={styles.emptyText}>No service areas added. Use the map above to add one or more.</Text>
+            <Text style={styles.emptyText}>{t('technician.serviceAreasScreen.noServiceAreasAdded')}</Text>
           ) : (
             serviceAreas.map((area, index) => (
               <View key={index} style={styles.areaCard}>
@@ -89,7 +91,7 @@ const TechnicianServiceAreasScreen: React.FC = () => {
         visible={mapVisible}
         onClose={() => setMapVisible(false)}
         onSelect={onMapSelect}
-        confirmMessage="Add as service area"
+        confirmMessage={t('technician.addAsServiceArea')}
       />
     </View>
   );

@@ -20,9 +20,9 @@ import MapPickerModal from '../../components/MapPickerModal';
 import type { AddressFromLocation } from '../../utils/addressFromLocation';
 
 const ADDRESS_TYPES = [
-  { value: 'home', label: 'Home' },
-  { value: 'office', label: 'Office' },
-  { value: 'other', label: 'Other' },
+  { value: 'home', labelKey: 'addAddress.types.home' as const },
+  { value: 'office', labelKey: 'addAddress.types.office' as const },
+  { value: 'other', labelKey: 'addAddress.types.other' as const },
 ];
 
 type EditAddressParams = { address: UserAddress };
@@ -59,8 +59,8 @@ const EditAddressScreen: React.FC = () => {
       if (a.zip_code) setZipCode(a.zip_code);
     } else {
       Alert.alert(
-        t('common.error', 'Error'),
-        t('addAddress.locationError', 'Could not get current location. Please allow location access or enter manually.')
+        t('common.error'),
+        t('addAddress.locationError')
       );
     }
   };
@@ -96,23 +96,23 @@ const EditAddressScreen: React.FC = () => {
     const trimmedCountry = country.trim();
 
     if (!trimmedFullName) {
-      Alert.alert(t('common.error', 'Error'), t('addAddress.fullNameRequired', 'Full name is required.'));
+      Alert.alert(t('common.error'), t('addAddress.fullNameRequired'));
       return;
     }
     if (!trimmedPhone) {
-      Alert.alert(t('common.error', 'Error'), t('addAddress.phoneRequired', 'Phone number is required.'));
+      Alert.alert(t('common.error'), t('addAddress.phoneRequired'));
       return;
     }
     if (!trimmedStreet) {
-      Alert.alert(t('common.error', 'Error'), t('addAddress.streetRequired', 'Street address is required.'));
+      Alert.alert(t('common.error'), t('addAddress.streetRequired'));
       return;
     }
     if (!trimmedCity) {
-      Alert.alert(t('common.error', 'Error'), t('addAddress.cityRequired', 'City is required.'));
+      Alert.alert(t('common.error'), t('addAddress.cityRequired'));
       return;
     }
     if (!trimmedCountry) {
-      Alert.alert(t('common.error', 'Error'), t('addAddress.countryRequired', 'Country is required.'));
+      Alert.alert(t('common.error'), t('addAddress.countryRequired'));
       return;
     }
 
@@ -131,15 +131,15 @@ const EditAddressScreen: React.FC = () => {
       };
       const updated = await updateAddress(address.id, params);
       if (updated) {
-        Alert.alert(t('common.success', 'Saved'), t('editAddress.saved', 'Address updated successfully.'), [
-          { text: 'OK', onPress: () => navigation.goBack() },
+        Alert.alert(t('common.success'), t('editAddress.saved'), [
+          { text: t('common.ok'), onPress: () => navigation.goBack() },
         ]);
       } else {
-        Alert.alert(t('common.error', 'Error'), t('editAddress.failed', 'Failed to update address.'));
+        Alert.alert(t('common.error'), t('editAddress.failed'));
       }
     } catch (err: any) {
-      const message = err.response?.data?.message ?? err.message ?? t('editAddress.failed', 'Failed to update address.');
-      Alert.alert(t('common.error', 'Error'), message);
+      const message = err.response?.data?.message ?? err.message ?? t('editAddress.failed');
+      Alert.alert(t('common.error'), message);
     } finally {
       setSaving(false);
     }
@@ -152,11 +152,11 @@ const EditAddressScreen: React.FC = () => {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={22} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('editAddress.title', 'Edit Address')}</Text>
+          <Text style={styles.headerTitle}>{t('editAddress.title')}</Text>
           <View style={{ width: 22 }} />
         </View>
         <View style={styles.loadingWrap}>
-          <Text style={styles.missingText}>{t('editAddress.missing', 'Address not found.')}</Text>
+          <Text style={styles.missingText}>{t('editAddress.missing')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -168,12 +168,12 @@ const EditAddressScreen: React.FC = () => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('editAddress.title', 'Edit Address')}</Text>
+        <Text style={styles.headerTitle}>{t('editAddress.title')}</Text>
         <View style={{ width: 22 }} />
       </View>
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.form} showsVerticalScrollIndicator={false}>
-        <Text style={styles.label}>{t('addAddress.type', 'Address type')}</Text>
+        <Text style={styles.label}>{t('addAddress.type')}</Text>
         <View style={styles.typeRow}>
           {ADDRESS_TYPES.map((opt) => (
             <TouchableOpacity
@@ -181,26 +181,26 @@ const EditAddressScreen: React.FC = () => {
               style={[styles.typeBtn, type === opt.value && styles.typeBtnActive]}
               onPress={() => setType(opt.value)}
             >
-              <Text style={[styles.typeBtnText, type === opt.value && styles.typeBtnTextActive]}>{opt.label}</Text>
+              <Text style={[styles.typeBtnText, type === opt.value && styles.typeBtnTextActive]}>{t(opt.labelKey)}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.label}>{t('addAddress.fullName', 'Full name')} *</Text>
+        <Text style={styles.label}>{t('addAddress.fullName')} *</Text>
         <TextInput
           style={styles.input}
           value={fullName}
           onChangeText={setFullName}
-          placeholder={t('addAddress.placeholderFullName', 'e.g. Client One')}
+          placeholder={t('addAddress.placeholderFullName')}
           placeholderTextColor={COLORS.textSecondary}
         />
 
-        <Text style={styles.label}>{t('addAddress.phoneNumber', 'Phone number')} *</Text>
+        <Text style={styles.label}>{t('addAddress.phoneNumber')} *</Text>
         <TextInput
           style={styles.input}
           value={phoneNumber}
           onChangeText={setPhoneNumber}
-          placeholder={t('addAddress.placeholderPhone', '+971501234567')}
+          placeholder={t('addAddress.placeholderPhone')}
           placeholderTextColor={COLORS.textSecondary}
           keyboardType="phone-pad"
         />
@@ -216,7 +216,7 @@ const EditAddressScreen: React.FC = () => {
             ) : (
               <>
                 <Ionicons name="location" size={18} color={COLORS.primary} />
-                <Text style={styles.useLocationText}>{t('addAddress.useCurrentLocation', 'Use current location')}</Text>
+                <Text style={styles.useLocationText}>{t('addAddress.useCurrentLocation')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -225,57 +225,57 @@ const EditAddressScreen: React.FC = () => {
             onPress={() => setMapPickerVisible(true)}
           >
             <Ionicons name="map" size={18} color={COLORS.primary} />
-            <Text style={styles.useLocationText}>{t('addAddress.pickFromMap', 'Pick from map')}</Text>
+            <Text style={styles.useLocationText}>{t('addAddress.pickFromMap')}</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.label}>{t('addAddress.streetAddress', 'Street address')} *</Text>
+        <Text style={styles.label}>{t('addAddress.streetAddress')} *</Text>
         <TextInput
           style={styles.input}
           value={streetAddress}
           onChangeText={setStreetAddress}
-          placeholder={t('addAddress.placeholderStreet', 'e.g. 123 Main St')}
+          placeholder={t('addAddress.placeholderStreet')}
           placeholderTextColor={COLORS.textSecondary}
         />
 
-        <Text style={styles.label}>{t('addAddress.city', 'City')} *</Text>
+        <Text style={styles.label}>{t('addAddress.city')} *</Text>
         <TextInput
           style={styles.input}
           value={city}
           onChangeText={setCity}
-          placeholder={t('addAddress.placeholderCity', 'e.g. Dubai')}
+          placeholder={t('addAddress.placeholderCity')}
           placeholderTextColor={COLORS.textSecondary}
         />
 
-        <Text style={styles.label}>{t('addAddress.state', 'State')}</Text>
+        <Text style={styles.label}>{t('addAddress.state')}</Text>
         <TextInput
           style={styles.input}
           value={state}
           onChangeText={setState}
-          placeholder={t('addAddress.placeholderState', 'Optional')}
+          placeholder={t('addAddress.placeholderState')}
           placeholderTextColor={COLORS.textSecondary}
         />
 
-        <Text style={styles.label}>{t('addAddress.zipCode', 'Zip code')}</Text>
+        <Text style={styles.label}>{t('addAddress.zipCode')}</Text>
         <TextInput
           style={styles.input}
           value={zipCode}
           onChangeText={setZipCode}
-          placeholder={t('addAddress.placeholderZip', 'Optional')}
+          placeholder={t('addAddress.placeholderZip')}
           placeholderTextColor={COLORS.textSecondary}
           keyboardType="number-pad"
         />
 
-        <Text style={styles.label}>{t('addAddress.country', 'Country')} *</Text>
+        <Text style={styles.label}>{t('addAddress.country')} *</Text>
         <TextInput
           style={styles.input}
           value={country}
           onChangeText={setCountry}
-          placeholder={t('addAddress.placeholderCountry', 'e.g. UAE')}
+          placeholder={t('addAddress.placeholderCountry')}
           placeholderTextColor={COLORS.textSecondary}
         />
 
         <TouchableOpacity style={styles.defaultRow} onPress={() => setIsDefault(!isDefault)} activeOpacity={0.8}>
-          <Text style={styles.defaultLabel}>{t('addAddress.setDefault', 'Set as default address')}</Text>
+          <Text style={styles.defaultLabel}>{t('addAddress.setDefault')}</Text>
           <View style={[styles.checkbox, isDefault && styles.checkboxChecked]}>
             {isDefault && <Ionicons name="checkmark" size={16} color={COLORS.background} />}
           </View>
@@ -289,7 +289,7 @@ const EditAddressScreen: React.FC = () => {
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.saveBtnText}>{t('editAddress.save', 'Update Address')}</Text>
+            <Text style={styles.saveBtnText}>{t('editAddress.save')}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
@@ -298,7 +298,7 @@ const EditAddressScreen: React.FC = () => {
         visible={mapPickerVisible}
         onClose={() => setMapPickerVisible(false)}
         onSelect={fillFromMapAddress}
-        confirmMessage={t('addAddress.useThisLocation', 'Use this location')}
+        confirmMessage={t('addAddress.useThisLocation')}
       />
     </SafeAreaView>
   );

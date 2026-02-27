@@ -18,13 +18,6 @@ import { getUserAddresses, deleteAddress, UserAddress } from '../../services/use
 
 const MAX_ADDRESSES = 5;
 
-function addressLabel(type: string): string {
-  const t = type?.toLowerCase() || '';
-  if (t === 'home') return 'Home';
-  if (t === 'work' || t === 'office') return 'Work';
-  if (t === 'other') return 'Other';
-  return type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Address';
-}
 
 function addressIcon(type: string): 'home-outline' | 'briefcase-outline' | 'location-outline' {
   const t = type?.toLowerCase() || '';
@@ -46,6 +39,13 @@ const AddressesScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  const getAddressTypeLabel = (type: string) => {
+    const v = (type || '').toLowerCase();
+    if (v === 'home') return t('addAddress.types.home');
+    if (v === 'office' || v === 'work') return t('addAddress.types.office');
+    return t('addAddress.types.other');
+  };
 
   const fetchAddresses = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -69,21 +69,21 @@ const AddressesScreen: React.FC = () => {
 
   const handleDelete = (addr: UserAddress) => {
     Alert.alert(
-      t('addressesScreen.deleteTitle', 'Delete address'),
-      t('addressesScreen.deleteMessage', 'Are you sure you want to delete this address?'),
+      t('addressesScreen.deleteTitle'),
+      t('addressesScreen.deleteMessage'),
       [
-        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('common.delete', 'Delete'),
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             setDeletingId(addr.id);
             try {
               const ok = await deleteAddress(addr.id);
               if (ok) fetchAddresses(false);
-              else Alert.alert(t('common.error', 'Error'), t('addressesScreen.deleteFailed', 'Could not delete address.'));
+              else Alert.alert(t('common.error'), t('addressesScreen.deleteFailed'));
             } catch {
-              Alert.alert(t('common.error', 'Error'), t('addressesScreen.deleteFailed', 'Could not delete address.'));
+              Alert.alert(t('common.error'), t('addressesScreen.deleteFailed'));
             } finally {
               setDeletingId(null);
             }
@@ -119,7 +119,7 @@ const AddressesScreen: React.FC = () => {
           {addresses.length === 0 ? (
             <View style={styles.emptyCard}>
               <Ionicons name="location-outline" size={32} color={COLORS.textSecondary} />
-              <Text style={styles.emptyText}>{t('addressesScreen.noAddresses', 'No saved addresses')}</Text>
+              <Text style={styles.emptyText}>{t('addressesScreen.noAddresses')}</Text>
             </View>
           ) : (
             addresses.map((addr) => (
@@ -127,7 +127,7 @@ const AddressesScreen: React.FC = () => {
                 <View style={styles.cardHeaderRow}>
                   <View style={styles.row}>
                     <Ionicons name={addressIcon(addr.type)} size={18} color={COLORS.primary} />
-                    <Text style={styles.addrTitle}>{addressLabel(addr.type)}</Text>
+                    <Text style={styles.addrTitle}>{getAddressTypeLabel(addr.type)}</Text>
                   </View>
                   <View style={styles.actionsRow}>
                     <TouchableOpacity
@@ -157,7 +157,7 @@ const AddressesScreen: React.FC = () => {
           )}
           {addresses.length >= MAX_ADDRESSES && (
             <Text style={styles.maxAddressesText}>
-              {t('addressesScreen.maxAddresses', 'You can save up to 5 addresses. Delete one to add another.')}
+              {t('addressesScreen.maxAddresses')}
             </Text>
           )}
           <TouchableOpacity
@@ -165,8 +165,8 @@ const AddressesScreen: React.FC = () => {
             onPress={() => {
               if (addresses.length >= MAX_ADDRESSES) {
                 Alert.alert(
-                  t('addressesScreen.maxReachedTitle', 'Maximum addresses'),
-                  t('addressesScreen.maxAddresses', 'You can save up to 5 addresses. Delete one to add another.')
+                  t('addressesScreen.maxReachedTitle'),
+                  t('addressesScreen.maxAddresses')
                 );
                 return;
               }
