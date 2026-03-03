@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,25 +6,95 @@ import {
   ScrollView,
   TouchableOpacity,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { getSupervisorDashboardSummary, SupervisorDashboardSummaryData, getSupervisorReports, SupervisorReportItem } from '../../services/supervisorService';
+
+const DASHBOARD_REPORTS_LIMIT = 3;
+
+function formatSubmittedAt(iso: string): string {
+  try {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return iso;
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 60) return diffMins <= 1 ? 'Just now' : `${diffMins} minutes ago`;
+    if (diffHours < 24) return diffHours === 1 ? '1 hour ago' : `${diffHours} hours ago`;
+    if (diffDays < 7) return diffDays === 1 ? '1 day ago' : `${diffDays} days ago`;
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return iso;
+  }
+}
+
+const getGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning!';
+  if (h < 17) return 'Good afternoon!';
+  return 'Good evening!';
+};
 
 const SupervisorDashboardScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const [summary, setSummary] = useState<SupervisorDashboardSummaryData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [profileImageError, setProfileImageError] = useState(false);
+  const [reports, setReports] = useState<SupervisorReportItem[]>([]);
 
-  const supervisor = {
-    id: 'sup_001',
-    employeeId: 'SUP-2001',
-    name: 'Hassan Ahmed',
-    email: 'hassan.ahmed@tandil.com',
-    phone: '+971 50 987 6543',
-    role: 'Team Leader',
-    teamSize: 8,
-    activeVisits: 12,
-    completedToday: 5,
-  };
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setLoading(true);
+      setProfileImageError(false);
+      Promise.all([
+        getSupervisorDashboardSummary(),
+        getSupervisorReports(1, 20),
+      ])
+        .then(([summaryData, reportsResult]) => {
+          if (!cancelled) {
+            setSummary(summaryData ?? null);
+            setReports(reportsResult.list);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setSummary(null);
+            setReports([]);
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+      return () => { cancelled = true; };
+    }, [])
+  );
+
+  const supervisor = summary
+    ? {
+        name: summary.name,
+        employeeId: summary.id,
+        role: 'Team Leader',
+        teamSize: summary.team_members,
+        activeVisits: summary.active_visits,
+        completedToday: summary.completed_visits,
+        profilePictureUrl: summary.profile_picture_url || summary.profile_picture || null,
+      }
+    : {
+        name: '—',
+        employeeId: '—',
+        role: 'Team Leader',
+        teamSize: 0,
+        activeVisits: 0,
+        completedToday: 0,
+        profilePictureUrl: null as string | null,
+      };
 
   const teamMembers = [
     {
@@ -56,26 +126,8 @@ const SupervisorDashboardScreen: React.FC = () => {
     },
   ];
 
-  const pendingReports = [
-    {
-      id: 'report_001',
-      technicianName: 'Ahmed Hassan',
-      employeeId: 'EMP-1001',
-      customerName: 'Mohammed Ali Farm',
-      service: 'Tree Watering',
-      submittedAt: '2 hours ago',
-      hasPhotos: true,
-    },
-    {
-      id: 'report_002',
-      technicianName: 'Khalid Ibrahim',
-      employeeId: 'EMP-1002',
-      customerName: 'Palm Grove Estate',
-      service: 'Garden Cleaning',
-      submittedAt: '4 hours ago',
-      hasPhotos: true,
-    },
-  ];
+  const pendingReportsPreview = reports.slice(0, DASHBOARD_REPORTS_LIMIT);
+  const pendingReportsTotal = reports.length;
 
   const renderTeamMember = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.memberCard}>
@@ -108,23 +160,23 @@ const SupervisorDashboardScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const renderPendingReport = ({ item }: { item: any }) => (
+  const renderPendingReport = ({ item }: { item: SupervisorReportItem }) => (
     <TouchableOpacity
       style={styles.reportCard}
-      onPress={() => navigation.navigate('Main' as never, { screen: 'ReportsTab', params: { visitId: item.id } } as never)}
+      onPress={() => navigation.navigate('SupervisorReport', { visitId: String(item.visit_id) })}
     >
       <View style={styles.reportHeader}>
         <View>
-          <Text style={styles.reportTechName}>{item.technicianName}</Text>
-          <Text style={styles.reportEmployeeId}>{item.employeeId}</Text>
+          <Text style={styles.reportTechName}>{item.technician_name}</Text>
+          <Text style={styles.reportEmployeeId}>ID: {item.employee_id}</Text>
         </View>
-        {item.hasPhotos && (
-          <Ionicons name="image" size={20} color={COLORS.primary} />
-        )}
+        {item.has_photos ? (
+          <Ionicons name="images" size={20} color={COLORS.primary} />
+        ) : null}
       </View>
-      <Text style={styles.reportCustomer}>{item.customerName}</Text>
+      <Text style={styles.reportCustomer}>{item.location}</Text>
       <Text style={styles.reportService}>{item.service}</Text>
-      <Text style={styles.reportTime}>{item.submittedAt}</Text>
+      <Text style={styles.reportTime}>{formatSubmittedAt(item.submitted_at)}</Text>
       <View style={styles.reportAction}>
         <Text style={styles.reviewButtonText}>Review Report →</Text>
       </View>
@@ -133,58 +185,80 @@ const SupervisorDashboardScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header – from GET /api/supervisor/dashboard/summary */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.greeting}>Good afternoon!</Text>
-            <Text style={styles.supervisorName}>{supervisor.name}</Text>
-            <Text style={styles.supervisorRole}>{supervisor.role} • ID: {supervisor.employeeId}</Text>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
+            {loading && !summary ? (
+              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginVertical: SPACING.sm }} />
+            ) : (
+              <>
+                <Text style={styles.supervisorName}>{supervisor.name}</Text>
+                <Text style={styles.supervisorRole}>{supervisor.role} • ID: {supervisor.employeeId}</Text>
+              </>
+            )}
           </View>
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => navigation.navigate('Main' as never, { screen: 'ProfileTab' } as never)}
           >
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{supervisor.name.charAt(0)}</Text>
+              {supervisor.profilePictureUrl && !profileImageError ? (
+                <Image
+                  source={{ uri: supervisor.profilePictureUrl }}
+                  style={styles.avatarImage}
+                  contentFit="cover"
+                  cachePolicy="disk"
+                  onError={() => setProfileImageError(true)}
+                />
+              ) : (
+                <Text style={styles.avatarText}>{(supervisor.name || 'S').charAt(0).toUpperCase()}</Text>
+              )}
             </View>
           </TouchableOpacity>
         </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Stats Cards */}
+        {/* Stats Cards – team_members, active_visits, completed_visits */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Ionicons name="people-outline" size={24} color={COLORS.primary} />
-            <Text style={styles.statValue}>{supervisor.teamSize}</Text>
+            <Text style={styles.statValue}>{loading && !summary ? '—' : supervisor.teamSize}</Text>
             <Text style={styles.statLabel}>Team Members</Text>
           </View>
           
           <View style={styles.statCard}>
             <Ionicons name="clipboard-outline" size={24} color={COLORS.warning} />
-            <Text style={styles.statValue}>{supervisor.activeVisits}</Text>
+            <Text style={styles.statValue}>{loading && !summary ? '—' : supervisor.activeVisits}</Text>
             <Text style={styles.statLabel}>Active Visits</Text>
           </View>
           
           <View style={styles.statCard}>
             <Ionicons name="checkmark-circle-outline" size={24} color={COLORS.success} />
-            <Text style={styles.statValue}>{supervisor.completedToday}</Text>
+            <Text style={styles.statValue}>{loading && !summary ? '—' : supervisor.completedToday}</Text>
             <Text style={styles.statLabel}>Completed</Text>
           </View>
         </View>
 
-        {/* Pending Reports */}
+        {/* Pending Field Reports – first 3, View All shows rest on Reports tab */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Pending Field Reports</Text>
-            <Text style={styles.sectionCount}>{pendingReports.length}</Text>
+            <TouchableOpacity
+              style={styles.sectionCountRow}
+              onPress={() => navigation.navigate('Main' as never, { screen: 'ReportsTab' } as never)}
+            >
+              <Text style={styles.sectionCount}>{pendingReportsTotal}</Text>
+              <Text style={styles.viewAllText}>View All</Text>
+            </TouchableOpacity>
           </View>
           
           <FlatList
-            data={pendingReports}
+            data={pendingReportsPreview}
             renderItem={renderPendingReport}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => String(item.id)}
             scrollEnabled={false}
           />
         </View>
@@ -289,6 +363,7 @@ const styles = StyleSheet.create({
   },
   profileButton: {
     padding: SPACING.sm,
+    position: 'relative',
   },
   avatar: {
     width: 40,
@@ -297,11 +372,17 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   avatarText: {
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.bold,
     color: COLORS.background,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -342,6 +423,11 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.text,
+  },
+  sectionCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   sectionCount: {
     fontSize: FONT_SIZES.md,

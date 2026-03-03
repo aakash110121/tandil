@@ -22,6 +22,8 @@ export interface TechnicianTodayTask {
   accepted_at?: string | null;
   started_at?: string | null;
   completed_at?: string | null;
+  price?: number;
+  price_display?: string;
   /** Legacy field names */
   customer_name?: string;
   customerName?: string;
@@ -184,24 +186,38 @@ export async function getTechnicianJobs(
   return { list: [], total: 0, summary: data.summary };
 }
 
-/** Paginated response for GET /api/technician/jobs/accepted */
+/** Paginated jobs wrapper (API returns data.jobs) */
+export interface TechnicianJobsPaginated {
+  current_page: number;
+  data: TechnicianTodayTask[];
+  first_page_url: string;
+  from: number | null;
+  last_page: number;
+  last_page_url: string;
+  links: Array<{ url: string | null; label: string; page: number | null; active: boolean }>;
+  next_page_url: string | null;
+  path: string;
+  per_page: number;
+  prev_page_url: string | null;
+  to: number | null;
+  total: number;
+}
+
+/** Response for GET /api/technician/jobs/accepted (data.jobs paginated) */
 export interface TechnicianAcceptedJobsResponse {
   success?: boolean;
   message?: string;
   data?: {
-    current_page: number;
-    data: TechnicianTodayTask[];
-    first_page_url: string;
-    from: number | null;
-    last_page: number;
-    last_page_url: string;
-    links: Array<{ url: string | null; label: string; page: number | null; active: boolean }>;
-    next_page_url: string | null;
-    path: string;
-    per_page: number;
-    prev_page_url: string | null;
-    to: number | null;
-    total: number;
+    jobs: TechnicianJobsPaginated;
+  };
+}
+
+/** Response for GET /api/technician/jobs/rejected – same shape as accepted (data.jobs) */
+export interface TechnicianRejectedJobsResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    jobs: TechnicianJobsPaginated;
   };
 }
 
@@ -227,45 +243,107 @@ export async function getTechnicianAcceptedJobs(
     params: { period, per_page, page },
     timeout: 15000,
   });
-  const d = response.data?.data;
-  if (!response.data?.success || !d) {
+  const jobs = response.data?.data?.jobs;
+  if (!response.data?.success || !jobs) {
     return { list: [], currentPage: 1, lastPage: 1, total: 0, perPage: per_page, nextPageUrl: null };
   }
   return {
-    list: Array.isArray(d.data) ? d.data : [],
-    currentPage: d.current_page ?? 1,
-    lastPage: d.last_page ?? 1,
-    total: d.total ?? 0,
-    perPage: d.per_page ?? per_page,
-    nextPageUrl: d.next_page_url ?? null,
+    list: Array.isArray(jobs.data) ? jobs.data : [],
+    currentPage: jobs.current_page ?? 1,
+    lastPage: jobs.last_page ?? 1,
+    total: jobs.total ?? 0,
+    perPage: jobs.per_page ?? per_page,
+    nextPageUrl: jobs.next_page_url ?? null,
   };
 }
 
 /**
- * GET /api/technician/jobs/rejected?period=week|month|year&per_page=15&page=1
- * Returns rejected jobs. Requires Bearer token.
+ * GET /api/technician/jobs/rejected?period=month&per_page=15&page=1
+ * Returns rejected jobs list. Response: success, message, data.jobs (current_page, data[], links, total, etc.).
+ * Query: period (week|month|year), per_page, page. Requires Bearer token.
  */
 export async function getTechnicianRejectedJobs(
   period: TechnicianJobsPeriod = 'month',
   per_page: number = 15,
   page: number = 1
 ): Promise<GetTechnicianAcceptedJobsResult> {
-  const response = await apiClient.get<TechnicianAcceptedJobsResponse>('/technician/jobs/rejected', {
+  const response = await apiClient.get<TechnicianRejectedJobsResponse>('/technician/jobs/rejected', {
     params: { period, per_page, page },
     timeout: 15000,
   });
-  const d = response.data?.data;
-  if (!response.data?.success || !d) {
+  const jobs = response.data?.data?.jobs;
+  if (!response.data?.success || !jobs) {
     return { list: [], currentPage: 1, lastPage: 1, total: 0, perPage: per_page, nextPageUrl: null };
   }
   return {
-    list: Array.isArray(d.data) ? d.data : [],
-    currentPage: d.current_page ?? 1,
-    lastPage: d.last_page ?? 1,
-    total: d.total ?? 0,
-    perPage: d.per_page ?? per_page,
-    nextPageUrl: d.next_page_url ?? null,
+    list: Array.isArray(jobs.data) ? jobs.data : [],
+    currentPage: jobs.current_page ?? 1,
+    lastPage: jobs.last_page ?? 1,
+    total: jobs.total ?? 0,
+    perPage: jobs.per_page ?? per_page,
+    nextPageUrl: jobs.next_page_url ?? null,
   };
+}
+
+/** GET /api/technician/tasks/:visit_id/detail – task/job detail response */
+export interface TechnicianTaskDetailResponse {
+  success?: boolean;
+  data?: {
+    job_id: number;
+    job_number: string;
+    status: string;
+    date: string;
+    service_information: {
+      title: string;
+      description: string;
+      time: string;
+      duration_minutes: number;
+      price: number | null;
+      price_display: string | null;
+    };
+    customer_information: {
+      name: string;
+      phone: string;
+      email: string;
+    };
+    service_address: {
+      label: string;
+      address: string;
+      get_directions: boolean;
+    };
+    special_instructions: string | null;
+    field_notes: string | null;
+    technician_notes?: string | null;
+    before_after_photos: {
+      before: Array<{ id: number; type: string; photo_url: string }>;
+      after: Array<{ id: number; type: string; photo_url: string }>;
+      other: Array<{ id: number; type: string; photo_url: string }>;
+    };
+    actions: {
+      can_submit_field_report: boolean;
+      can_complete_visit: boolean;
+      can_call_customer: boolean;
+    };
+  };
+}
+
+export type TechnicianTaskDetail = NonNullable<TechnicianTaskDetailResponse['data']>;
+
+/**
+ * GET /api/technician/tasks/:visit_id/detail
+ * Returns full task/job detail for a visit. Requires Bearer token.
+ */
+export async function getTechnicianTaskDetail(
+  visitId: number | string
+): Promise<TechnicianTaskDetail | null> {
+  const response = await apiClient.get<TechnicianTaskDetailResponse>(
+    `/technician/tasks/${visitId}/detail`,
+    { timeout: 15000 }
+  );
+  if (response.data?.success && response.data?.data) {
+    return response.data.data;
+  }
+  return null;
 }
 
 /**
@@ -773,4 +851,67 @@ export async function submitTechnicianSupportTicket(params: {
     success: false,
     message: (response.data as any)?.message ?? 'Failed to submit ticket.',
   };
+}
+
+/**
+ * POST /api/technician/reports
+ * Submit field report (observations + optional before/after photos). Body: form-data.
+ * Requires Bearer token.
+ */
+export async function submitTechnicianReport(params: {
+  visit_id: number;
+  technician_notes: string;
+  before_photo?: { uri: string };
+  after_photo?: { uri: string };
+}): Promise<{ success: boolean; message?: string }> {
+  const formData = new FormData();
+  formData.append('visit_id', String(params.visit_id));
+  formData.append('technician_notes', params.technician_notes.trim());
+  if (params.before_photo?.uri) {
+    const uri = params.before_photo.uri;
+    const name = uri.split('/').pop()?.includes('.') ? uri.split('/').pop()! : 'before.jpg';
+    formData.append('before_photo', {
+      uri,
+      type: 'image/jpeg',
+      name,
+    } as any);
+  }
+  if (params.after_photo?.uri) {
+    const uri = params.after_photo.uri;
+    const name = uri.split('/').pop()?.includes('.') ? uri.split('/').pop()! : 'after.jpg';
+    formData.append('after_photo', {
+      uri,
+      type: 'image/jpeg',
+      name,
+    } as any);
+  }
+  try {
+    const response = await apiClient.post<{ success?: boolean; message?: string } | unknown[]>(
+      '/technician/reports',
+      formData as any,
+      { timeout: 30000 }
+    );
+    // 201 Created with array of photos or { success: true }
+    if (response.status === 201) {
+      return { success: true, message: (response.data as any)?.message };
+    }
+    const data = response.data as any;
+    if (data?.success) {
+      return { success: true, message: data.message };
+    }
+    return {
+      success: false,
+      message: data?.message ?? 'Failed to submit report.',
+    };
+  } catch (err: any) {
+    const data = err.response?.data;
+    const message =
+      (typeof data?.message === 'string' && data.message) ||
+      (data?.errors && typeof data.errors === 'object' && Object.values(data.errors).flat().length > 0
+        ? (Object.values(data.errors).flat() as string[]).join(', ')
+        : null) ||
+      err.message ||
+      'Failed to submit report.';
+    return { success: false, message };
+  }
 }

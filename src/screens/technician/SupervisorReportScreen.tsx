@@ -80,6 +80,38 @@ const SupervisorReportScreen: React.FC = () => {
     );
   };
 
+  const handleApproveReport = () => {
+    Alert.alert(
+      'Approve Report',
+      'Are you sure you want to approve this report?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Approve',
+          onPress: () => {
+            Alert.alert('Success', 'Report approved successfully.');
+            navigation.goBack();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCancelReport = () => {
+    Alert.alert(
+      'Cancel Report',
+      'Are you sure you want to cancel this report?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: () => navigation.goBack(),
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -195,6 +227,23 @@ const SupervisorReportScreen: React.FC = () => {
             onPress={handleSubmitReport}
             style={styles.submitButton}
           />
+        </View>
+
+        {/* Approve / Cancel Report – at end of page */}
+        <View style={styles.section}>
+          <View style={styles.actionButtonsRow}>
+            <Button
+              title="Approve Report"
+              onPress={handleApproveReport}
+              style={styles.approveButton}
+            />
+            <Button
+              title="Cancel Report"
+              variant="outline"
+              onPress={handleCancelReport}
+              style={styles.cancelReportButton}
+            />
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -362,6 +411,16 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     width: '100%',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+  },
+  approveButton: {
+    flex: 1,
+  },
+  cancelReportButton: {
+    flex: 1,
   },
 });
 

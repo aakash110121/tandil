@@ -26,6 +26,8 @@ function mapTaskToJob(task: TechnicianTodayTask) {
     task.duration_minutes != null
       ? `${task.duration_minutes} min`
       : (task.estimated_duration ?? task.estimatedDuration ?? '—');
+  const price = task.price;
+  const priceDisplay = task.price_display ?? (price != null && Number(price) >= 0 ? `AED ${Number(price).toFixed(2)}` : undefined);
   return {
     id: String(task.id),
     customerName: task.farm_name ?? task.customer_name ?? task.customerName ?? '—',
@@ -33,6 +35,7 @@ function mapTaskToJob(task: TechnicianTodayTask) {
     address: task.location ?? task.address ?? '—',
     scheduledTime: task.scheduled_time ?? task.scheduledTime ?? '—',
     estimatedDuration: durationStr,
+    priceDisplay,
   };
 }
 
@@ -124,6 +127,12 @@ const TechnicianRejectedJobsScreen: React.FC = () => {
             <Ionicons name="timer-outline" size={16} color={COLORS.textSecondary} />
             <Text style={styles.jobInfoText}>{item.estimatedDuration.replace(/ min$/, ' ' + t('technician.min'))}</Text>
           </View>
+          {item.priceDisplay != null && (
+            <View style={styles.jobInfo}>
+              <Ionicons name="cash-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.jobPriceText}>{item.priceDisplay}</Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     </View>
@@ -293,6 +302,7 @@ const styles = StyleSheet.create({
   },
   jobFooter: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: SPACING.md,
   },
   jobInfo: {
@@ -302,6 +312,12 @@ const styles = StyleSheet.create({
   jobInfoText: {
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
+    marginLeft: SPACING.xs,
+  },
+  jobPriceText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.primary,
     marginLeft: SPACING.xs,
   },
   emptyState: {

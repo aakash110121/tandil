@@ -25,6 +25,8 @@ function mapTaskToJob(task: TechnicianTodayTask) {
   const durationStr = task.duration_minutes != null
     ? `${task.duration_minutes} min`
     : (task.estimated_duration ?? task.estimatedDuration ?? '—');
+  const price = task.price;
+  const priceDisplay = task.price_display;
   return {
     id: String(task.id),
     customerName: task.farm_name ?? task.customer_name ?? task.customerName ?? '—',
@@ -34,6 +36,8 @@ function mapTaskToJob(task: TechnicianTodayTask) {
     status,
     estimatedDuration: durationStr,
     taskType: task.task_type ?? task.taskType ?? 'care',
+    price,
+    priceDisplay: priceDisplay ?? (price != null && Number(price) >= 0 ? `AED ${Number(price).toFixed(2)}` : undefined),
   };
 }
 
@@ -166,6 +170,12 @@ const TechnicianDashboardScreen: React.FC = () => {
             <Ionicons name="timer-outline" size={16} color={COLORS.textSecondary} />
             <Text style={styles.jobInfoText}>{item.estimatedDuration}</Text>
           </View>
+          {item.priceDisplay != null && (
+            <View style={styles.jobInfo}>
+              <Ionicons name="cash-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.jobPriceText}>{item.priceDisplay}</Text>
+            </View>
+          )}
         </View>
       </TouchableOpacity>
 
@@ -242,13 +252,22 @@ const TechnicianDashboardScreen: React.FC = () => {
   );
 
   const renderRecentJob = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.recentJobCard}>
+    <TouchableOpacity style={styles.recentJobCard} activeOpacity={0.7}>
       <View style={styles.recentJobHeader}>
-        <Text style={styles.recentCustomerName}>{item.customerName}</Text>
-        <Text style={styles.recentEarnings}>{item.earningsDisplay ?? `AED ${Number(item.earnings).toFixed(2)}`}</Text>
+        <View style={styles.recentJobTitleWrap}>
+          <Text style={styles.recentCustomerName} numberOfLines={1} ellipsizeMode="tail">
+            {item.customerName}
+          </Text>
+        </View>
+        {/* Price positioned absolutely so it always shows even when title is very long */}
+        <View style={styles.recentEarningsWrap}>
+          <Text style={styles.recentEarnings} numberOfLines={1}>
+            {item.earningsDisplay ?? `AED ${Number(item.earnings).toFixed(2)}`}
+          </Text>
+        </View>
       </View>
       
-      <Text style={styles.recentServiceName}>{item.service}</Text>
+      <Text style={styles.recentServiceName} numberOfLines={2} ellipsizeMode="tail">{item.service}</Text>
       <Text style={styles.recentDate}>{item.dateFormatted ?? item.completedAt}</Text>
       
       <View style={styles.ratingContainer}>
@@ -669,6 +688,7 @@ const styles = StyleSheet.create({
   },
   jobFooter: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: SPACING.md,
   },
   jobInfo: {
@@ -680,6 +700,12 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginLeft: SPACING.xs,
   },
+  jobPriceText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.primary,
+    marginLeft: SPACING.xs,
+  },
   recentJobCard: {
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.lg,
@@ -688,14 +714,26 @@ const styles = StyleSheet.create({
   },
   recentJobHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: SPACING.xs,
+    minHeight: 24,
+  },
+  recentJobTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 92,
   },
   recentCustomerName: {
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.text,
+  },
+  recentEarningsWrap: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
   },
   recentEarnings: {
     fontSize: FONT_SIZES.md,

@@ -9,7 +9,8 @@ import { COLORS } from '../constants';
 import SupervisorLoginScreen from '../screens/supervisor/SupervisorLoginScreen';
 import SupervisorDashboardScreen from '../screens/supervisor/SupervisorDashboardScreen';
 import SupervisorReportScreen from '../screens/technician/SupervisorReportScreen';
-import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScreen';
+import PendingReportsListScreen from '../screens/supervisor/PendingReportsListScreen';
+import SupervisorProfileScreen from '../screens/supervisor/SupervisorProfileScreen';
 import AssignTasksScreen from '../screens/supervisor/AssignTasksScreen';
 import TeamStatsScreen from '../screens/supervisor/TeamStatsScreen';
 import HelpCenterScreen from '../screens/user/HelpCenterScreen';
@@ -45,7 +46,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="ReportsTab"
-        component={SupervisorReportScreen}
+        component={PendingReportsListScreen}
         options={{
           tabBarLabel: 'Reports',
           tabBarIcon: ({ color, size }) => (
@@ -55,7 +56,7 @@ const TabNavigator = () => {
       />
       <Tab.Screen
         name="ProfileTab"
-        component={TechnicianProfileScreen}
+        component={SupervisorProfileScreen}
         options={{
           tabBarLabel: 'Profile',
           tabBarIcon: ({ color, size }) => (
@@ -83,6 +84,7 @@ const SupervisorAppNavigator = () => {
         <Stack.Screen name="SubmitTicket" component={SupervisorSubmitTicketScreen} />
         <Stack.Screen name="MyTickets" component={MyTicketsScreen} />
         <Stack.Screen name="SupportTicketChat" component={SupportTicketChatScreen} />
+        <Stack.Screen name="SupervisorReport" component={SupervisorReportScreen} />
       </Stack.Navigator>
     </SafeAreaView>
   );
