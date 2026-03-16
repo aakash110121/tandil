@@ -70,6 +70,35 @@ export async function updateSupervisorProfile(params: {
   return null;
 }
 
+/**
+ * POST /api/supervisor/leave-requests
+ * Submit a leave request. Body: form-data leave_type (required), start_date (Y-m-d), end_date (Y-m-d), reason (optional), working_days (optional, comma-separated e.g. mon,tue,wed,thu,fri,sat).
+ */
+export async function submitSupervisorLeaveRequest(params: {
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  reason?: string;
+  working_days?: string;
+}): Promise<{ success: boolean; message?: string; data?: unknown }> {
+  const formData = new FormData();
+  formData.append('leave_type', params.leave_type);
+  formData.append('start_date', params.start_date);
+  formData.append('end_date', params.end_date);
+  if (params.reason != null && String(params.reason).trim() !== '') {
+    formData.append('reason', String(params.reason).trim());
+  }
+  if (params.working_days != null && String(params.working_days).trim() !== '') {
+    formData.append('working_days', String(params.working_days).trim());
+  }
+  const response = await apiClient.post<{ success?: boolean; message?: string; data?: unknown }>(
+    '/supervisor/leave-requests',
+    formData,
+    { timeout: 15000 }
+  );
+  return response.data ?? { success: false };
+}
+
 /** GET /api/supervisor/dashboard/summary – dashboard header and stats */
 export interface SupervisorDashboardSummaryData {
   profile_picture: string | null;

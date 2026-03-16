@@ -302,6 +302,7 @@ export type TechnicianStackParamList = {
   MyTickets: undefined;
   SupportTicketChat: { ticket: { id: number; ticket_number: string; subject: string; status: string; created_at: string; updated_at: string } };
   Notifications: undefined;
+  LeaveStatus: undefined;
 };
 
 export type DeliveryStackParamList = {

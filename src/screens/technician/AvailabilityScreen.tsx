@@ -367,7 +367,7 @@ const AvailabilityScreen: React.FC = () => {
               onPress={() => navigation.navigate('SetVacation', { initialVacations: vacations })}
             >
               <Ionicons name="calendar-outline" size={24} color={COLORS.primary} />
-              <Text style={styles.quickActionText}>{t('technician.availability.setVacation')}</Text>
+              <Text style={styles.quickActionText}>{t('technician.availability.setLeave')}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity

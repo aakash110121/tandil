@@ -111,6 +111,8 @@ const SupervisorProfileScreen: React.FC = () => {
 
   const menuItems = [
     { icon: 'person-outline' as const, title: t('technician.profileEdit.personalInfo', 'Profile information'), onPress: () => navigation.navigate('SupervisorProfileEdit') },
+    { icon: 'calendar-outline' as const, title: t('supervisor.availability.title', 'Availability & Leave'), onPress: () => navigation.navigate('Availability') },
+    { icon: 'document-text-outline' as const, title: t('technician.leaveStatus.title', 'Leave Status'), onPress: () => navigation.navigate('LeaveStatus') },
     { icon: 'notifications-outline' as const, title: t('technician.notifications', 'Notifications'), onPress: () => navigation.navigate('Notifications') },
     { icon: 'help-circle-outline' as const, title: t('technician.helpSupport', 'Help & Support'), onPress: () => navigation.navigate('HelpCenter') },
     { icon: 'log-out-outline' as const, title: t('technician.logout', 'Log out'), onPress: handleLogout, color: COLORS.error },

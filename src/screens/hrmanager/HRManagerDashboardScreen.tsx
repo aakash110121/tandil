@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,11 +7,15 @@ import {
   TouchableOpacity,
   FlatList,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
+import { hrService, HRDashboardSummary, HRPendingLeaveRequest, HRVisitAssignmentsData } from '../../services/hrService';
 
 function getGreetingKey(): 'greetingMorning' | 'greetingAfternoon' | 'greetingEvening' {
   const hour = new Date().getHours();
@@ -20,21 +24,105 @@ function getGreetingKey(): 'greetingMorning' | 'greetingAfternoon' | 'greetingEv
   return 'greetingEvening';
 }
 
+function formatLeaveTypeLabel(leaveType: string): string {
+  const map: Record<string, string> = {
+    annual: 'Annual Leave',
+    sick: 'Sick Leave',
+    unpaid: 'Unpaid Leave',
+    paternity: 'Paternity Leave',
+    other: 'Other',
+  };
+  const key = (leaveType || '').toLowerCase().replace(/\s+/g, '_');
+  return map[key] || leaveType;
+}
+
 const HRManagerDashboardScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
+  const [summary, setSummary] = useState<HRDashboardSummary | null>(null);
+  const [visitAssignments, setVisitAssignments] = useState<HRVisitAssignmentsData>({
+    today: { total: 0, assigned: 0, unassigned: 0 },
+    tomorrow: { total: 0, assigned: 0, unassigned: 0 },
+  });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [actionLeaveId, setActionLeaveId] = useState<number | null>(null);
 
-  const hrManager = {
-    id: 'hr_001',
-    employeeId: 'HR-4001',
-    name: 'Mariam Al Hashimi',
-    email: 'mariam.hashimi@tandil.com',
-    phone: '+971 50 333 4444',
-    role: 'HR Manager',
-    totalEmployees: 48,
-    newHires: 5,
-    pendingLeaves: 8,
-  };
+  const fetchSummary = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
+      setError(null);
+      const [summaryRes, visitRes] = await Promise.all([
+        hrService.getDashboardSummary(),
+        hrService.getVisitAssignments().catch(() => ({ success: false, data: null })),
+      ]);
+      if (summaryRes.success && summaryRes.data) {
+        setSummary(summaryRes.data);
+      } else {
+        setSummary(null);
+        setError('Failed to load dashboard');
+      }
+      if (visitRes && visitRes.success && visitRes.data) {
+        setVisitAssignments(visitRes.data);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to load dashboard');
+      setSummary(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchSummary();
+    }, [fetchSummary])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchSummary(false);
+  }, [fetchSummary]);
+
+  const removePendingLeave = useCallback((leaveId: number) => {
+    setSummary(prev => {
+      if (!prev) return prev;
+      const next = prev.pending_leave_requests.filter(r => r.id !== leaveId);
+      return { ...prev, pending_leave_requests: next };
+    });
+  }, []);
+
+  const handleApproveLeave = useCallback(async (item: HRPendingLeaveRequest) => {
+    setActionLeaveId(item.id);
+    try {
+      await hrService.approveLeaveRequest(item.id);
+      removePendingLeave(item.id);
+      Alert.alert(t('admin.hrManagerDashboard.successTitle'), t('admin.hrManagerDashboard.leaveApproved', { name: item.applicant_name }));
+      fetchSummary(false);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to approve leave';
+      Alert.alert(t('common.error') || 'Error', msg);
+    } finally {
+      setActionLeaveId(null);
+    }
+  }, [removePendingLeave, fetchSummary, t]);
+
+  const handleRejectLeave = useCallback(async (item: HRPendingLeaveRequest) => {
+    setActionLeaveId(item.id);
+    try {
+      await hrService.rejectLeaveRequest(item.id);
+      removePendingLeave(item.id);
+      Alert.alert(t('admin.hrManagerDashboard.leaveRejectedTitle'), t('admin.hrManagerDashboard.leaveRejectedMessage', { name: item.applicant_name }));
+      fetchSummary(false);
+    } catch (err: any) {
+      const msg = err.response?.data?.message || err.message || 'Failed to reject leave';
+      Alert.alert(t('common.error') || 'Error', msg);
+    } finally {
+      setActionLeaveId(null);
+    }
+  }, [removePendingLeave, fetchSummary, t]);
 
   const employees = [
     {
@@ -66,41 +154,20 @@ const HRManagerDashboardScreen: React.FC = () => {
     },
   ];
 
-  const leaveRequests = [
-    {
-      id: 'leave_001',
-      employeeId: 'EMP-1005',
-      employeeName: 'Mohammed Ali',
-      leaveType: 'Sick Leave',
-      duration: '2 days',
-      startDate: '2024-01-20',
-      status: 'pending',
-    },
-    {
-      id: 'leave_002',
-      employeeId: 'SUP-2003',
-      employeeName: 'Ali Rashid',
-      leaveType: 'Annual Leave',
-      duration: '5 days',
-      startDate: '2024-01-25',
-      status: 'pending',
-    },
-  ];
-
   const scheduleAssignments = [
     {
-      id: 'schedule_001',
+      id: 'today',
       date: 'Today',
-      totalVisits: 24,
-      assigned: 20,
-      unassigned: 4,
+      totalVisits: visitAssignments.today.total,
+      assigned: visitAssignments.today.assigned,
+      unassigned: visitAssignments.today.unassigned,
     },
     {
-      id: 'schedule_002',
+      id: 'tomorrow',
       date: 'Tomorrow',
-      totalVisits: 28,
-      assigned: 15,
-      unassigned: 13,
+      totalVisits: visitAssignments.tomorrow.total,
+      assigned: visitAssignments.tomorrow.assigned,
+      unassigned: visitAssignments.tomorrow.unassigned,
     },
   ];
 
@@ -134,66 +201,80 @@ const HRManagerDashboardScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  const renderLeaveRequest = ({ item }: { item: any }) => (
-    <View style={styles.leaveCard}>
-      <View style={styles.leaveHeader}>
-        <View>
-          <Text style={styles.leaveName}>{item.employeeName}</Text>
-          <Text style={styles.leaveEmployeeId}>{item.employeeId}</Text>
+  const renderLeaveRequest = ({ item }: { item: HRPendingLeaveRequest }) => {
+    const leaveTypeLabel = formatLeaveTypeLabel(item.leave_type);
+    const duration = `${item.duration_days} ${item.duration_days === 1 ? 'day' : 'days'}`;
+    return (
+      <View style={styles.leaveCard}>
+        <View style={styles.leaveHeader}>
+          <View>
+            <Text style={styles.leaveName}>{item.applicant_name}</Text>
+            <Text style={styles.leaveEmployeeId}>{item.applicant_id}</Text>
+          </View>
+          <View style={styles.pendingBadge}>
+            <Text style={styles.pendingText}>{t('admin.hrManagerDashboard.pending')}</Text>
+          </View>
         </View>
-        <View style={styles.pendingBadge}>
-          <Text style={styles.pendingText}>{t('admin.hrManagerDashboard.pending')}</Text>
+        <Text style={styles.leaveType}>{leaveTypeLabel} • {duration}</Text>
+        <Text style={styles.leaveDate}>From: {item.start_date}</Text>
+        <View style={styles.leaveActions}>
+          <TouchableOpacity
+            style={[styles.approveButton, actionLeaveId === item.id && styles.leaveActionDisabled]}
+            onPress={() => {
+              Alert.alert(
+                t('admin.hrManagerDashboard.approveLeaveTitle'),
+                t('admin.hrManagerDashboard.approveLeaveConfirm', { type: leaveTypeLabel, name: item.applicant_name, id: item.applicant_id }),
+                [
+                  { text: t('common.cancel'), style: 'cancel' },
+                  {
+                    text: t('admin.hrManagerDashboard.approve'),
+                    onPress: () => handleApproveLeave(item),
+                  },
+                ]
+              );
+            }}
+            disabled={actionLeaveId !== null}
+          >
+            {actionLeaveId === item.id ? (
+              <ActivityIndicator size="small" color={COLORS.background} />
+            ) : (
+              <>
+                <Ionicons name="checkmark" size={16} color={COLORS.background} />
+                <Text style={styles.approveText}>{t('admin.hrManagerDashboard.approve')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.rejectButton, actionLeaveId === item.id && styles.leaveActionDisabled]}
+            onPress={() => {
+              Alert.alert(
+                t('admin.hrManagerDashboard.rejectLeaveTitle'),
+                t('admin.hrManagerDashboard.rejectLeaveConfirm', { type: leaveTypeLabel, name: item.applicant_name, id: item.applicant_id }),
+                [
+                  { text: t('common.cancel'), style: 'cancel' },
+                  {
+                    text: t('admin.hrManagerDashboard.reject'),
+                    style: 'destructive',
+                    onPress: () => handleRejectLeave(item),
+                  },
+                ]
+              );
+            }}
+            disabled={actionLeaveId !== null}
+          >
+            {actionLeaveId === item.id ? (
+              <ActivityIndicator size="small" color={COLORS.background} />
+            ) : (
+              <>
+                <Ionicons name="close" size={16} color={COLORS.background} />
+                <Text style={styles.rejectText}>{t('admin.hrManagerDashboard.reject')}</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
-      <Text style={styles.leaveType}>{item.leaveType} • {item.duration}</Text>
-      <Text style={styles.leaveDate}>From: {item.startDate}</Text>
-      <View style={styles.leaveActions}>
-        <TouchableOpacity 
-          style={styles.approveButton}
-          onPress={() => {
-            Alert.alert(
-              t('admin.hrManagerDashboard.approveLeaveTitle'),
-              t('admin.hrManagerDashboard.approveLeaveConfirm', { type: item.leaveType, name: item.employeeName, id: item.employeeId }),
-              [
-                { text: t('common.cancel'), style: 'cancel' },
-                {
-                  text: t('admin.hrManagerDashboard.approve'),
-                  onPress: () => {
-                    Alert.alert(t('admin.hrManagerDashboard.successTitle'), t('admin.hrManagerDashboard.leaveApproved', { name: item.employeeName }));
-                  }
-                },
-              ]
-            );
-          }}
-        >
-          <Ionicons name="checkmark" size={16} color={COLORS.background} />
-          <Text style={styles.approveText}>{t('admin.hrManagerDashboard.approve')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.rejectButton}
-          onPress={() => {
-            Alert.alert(
-              t('admin.hrManagerDashboard.rejectLeaveTitle'),
-              t('admin.hrManagerDashboard.rejectLeaveConfirm', { type: item.leaveType, name: item.employeeName, id: item.employeeId }),
-              [
-                { text: t('common.cancel'), style: 'cancel' },
-                {
-                  text: t('admin.hrManagerDashboard.reject'),
-                  style: 'destructive',
-                  onPress: () => {
-                    Alert.alert(t('admin.hrManagerDashboard.leaveRejectedTitle'), t('admin.hrManagerDashboard.leaveRejectedMessage', { name: item.employeeName }));
-                  }
-                },
-              ]
-            );
-          }}
-        >
-          <Ionicons name="close" size={16} color={COLORS.background} />
-          <Text style={styles.rejectText}>{t('admin.hrManagerDashboard.reject')}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   const renderSchedule = ({ item }: { item: any }) => (
     <View style={styles.scheduleCard}>
@@ -217,61 +298,89 @@ const HRManagerDashboardScreen: React.FC = () => {
     </View>
   );
 
+  const pendingLeaves = summary?.pending_leave_requests ?? [];
+
+  if (loading && !summary) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
+  if (error && !summary) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => fetchSummary()}>
+          <Text style={styles.retryButtonText}>{t('common.retry') || 'Retry'}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header – from GET /hr/dashboard/summary */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.greeting}>Good afternoon!</Text>
-            <Text style={styles.managerName}>{hrManager.name}</Text>
-            <Text style={styles.managerRole}>{hrManager.role}</Text>
-            <Text style={styles.managerId}>ID: {hrManager.employeeId}</Text>
+            <Text style={styles.greeting}>{t(`admin.hrManagerDashboard.${getGreetingKey()}`)}</Text>
+            <Text style={styles.managerName}>{summary?.name ?? '—'}</Text>
+            <Text style={styles.managerRole}>{summary?.role ?? '—'}</Text>
+            <Text style={styles.managerId}>ID: {summary?.id ?? '—'}</Text>
           </View>
           <TouchableOpacity
             style={styles.profileButton}
             onPress={() => navigation.navigate('Main' as never, { screen: 'ProfileTab' } as never)}
           >
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{hrManager.name.charAt(0)}</Text>
-            </View>
+            {summary?.profile_picture_url ? (
+              <Image source={{ uri: summary.profile_picture_url }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{(summary?.name ?? 'M').charAt(0)}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Stats Cards */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
+      >
+        {/* Stats Cards – from API */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Ionicons name="people-outline" size={24} color={COLORS.primary} />
-            <Text style={styles.statValue}>{hrManager.totalEmployees}</Text>
+            <Text style={styles.statValue}>{summary?.total_staff ?? 0}</Text>
             <Text style={styles.statLabel}>{t('admin.hrManagerDashboard.totalStaff')}</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <Ionicons name="person-add-outline" size={24} color={COLORS.success} />
-            <Text style={styles.statValue}>{hrManager.newHires}</Text>
+            <Text style={styles.statValue}>{summary?.new_hires ?? 0}</Text>
             <Text style={styles.statLabel}>{t('admin.hrManagerDashboard.newHires')}</Text>
           </View>
-          
+
           <View style={styles.statCard}>
             <Ionicons name="calendar-outline" size={24} color={COLORS.warning} />
-            <Text style={styles.statValue}>{hrManager.pendingLeaves}</Text>
+            <Text style={styles.statValue}>{summary?.leave_requests ?? 0}</Text>
             <Text style={styles.statLabel}>{t('admin.hrManagerDashboard.leaveRequests')}</Text>
           </View>
         </View>
 
-        {/* Leave Requests */}
+        {/* Pending Leave Requests – from API */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{t('admin.hrManagerDashboard.pendingLeaveRequests')}</Text>
-            <Text style={styles.sectionCount}>{leaveRequests.length}</Text>
+            <Text style={styles.sectionCount}>{pendingLeaves.length}</Text>
           </View>
-          
+
           <FlatList
-            data={leaveRequests}
+            data={pendingLeaves}
             renderItem={renderLeaveRequest}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => String(item.id)}
             scrollEnabled={false}
           />
         </View>
@@ -370,6 +479,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+  },
+  retryButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  retryButtonText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.background,
+    fontWeight: FONT_WEIGHTS.semiBold,
   },
   header: {
     backgroundColor: COLORS.background,
@@ -599,6 +728,9 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.md,
     gap: SPACING.xs,
+  },
+  leaveActionDisabled: {
+    opacity: 0.7,
   },
   rejectText: {
     fontSize: FONT_SIZES.sm,

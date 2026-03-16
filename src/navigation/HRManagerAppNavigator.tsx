@@ -3,7 +3,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { useTranslation } from 'react-i18next';
 import { COLORS } from '../constants';
 
 // Screens
@@ -18,8 +17,14 @@ import TechnicianProfileScreen from '../screens/technician/TechnicianProfileScre
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
+const TAB_LABELS = {
+  dashboard: 'Dashboard',
+  employees: 'Employees',
+  leaves: 'Leaves',
+  profile: 'Profile',
+};
+
 const TabNavigator = () => {
-  const { t } = useTranslation();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -36,7 +41,7 @@ const TabNavigator = () => {
         name="DashboardTab"
         component={HRManagerDashboardScreen}
         options={{
-          tabBarLabel: t('admin.hrManagerDashboard.tabDashboard'),
+          tabBarLabel: TAB_LABELS.dashboard,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -46,7 +51,7 @@ const TabNavigator = () => {
         name="EmployeesTab"
         component={EmployeeListScreen}
         options={{
-          tabBarLabel: t('admin.hrManagerDashboard.tabEmployees'),
+          tabBarLabel: TAB_LABELS.employees,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
           ),
@@ -56,7 +61,7 @@ const TabNavigator = () => {
         name="LeavesTab"
         component={ManageLeavesScreen}
         options={{
-          tabBarLabel: t('admin.hrManagerDashboard.tabLeaves'),
+          tabBarLabel: TAB_LABELS.leaves,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
@@ -66,7 +71,7 @@ const TabNavigator = () => {
         name="ProfileTab"
         component={TechnicianProfileScreen}
         options={{
-          tabBarLabel: t('admin.hrManagerDashboard.tabProfile'),
+          tabBarLabel: TAB_LABELS.profile,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),

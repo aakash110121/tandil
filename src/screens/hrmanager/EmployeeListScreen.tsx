@@ -10,6 +10,8 @@ import {
   TextInput,
   Modal,
   Alert,
+  Image,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,79 +19,142 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { hrService, Employee } from '../../services/hrService';
 
+export type RoleFilter = 'all' | 'supervisor' | 'technician';
+
+function matchesRoleFilter(employee: Employee, filter: RoleFilter): boolean {
+  if (filter === 'all') return true;
+  const role = (employee.user?.role ?? '').toLowerCase();
+  const designation = (employee.designation ?? '').toLowerCase();
+  if (filter === 'supervisor') {
+    return role === 'supervisor' || designation.includes('supervisor') || designation.includes('team leader');
+  }
+  if (filter === 'technician') {
+    return (
+      role === 'technician' ||
+      designation.includes('technician') ||
+      designation.includes('field worker') ||
+      designation.includes('field technician') ||
+      designation.includes('garden') ||
+      designation.includes('maintenance') ||
+      designation.includes('senior technician')
+    );
+  }
+  return true;
+}
+
 // Map designation to display role
-const getRoleDisplayName = (designation: string): string => {
+const getRoleDisplayName = (designation: string | null | undefined): string => {
+  const d = designation ?? '';
   const roleMap: { [key: string]: string } = {
     'Technician': 'Field Worker',
+    'Field Technician': 'Field Technician',
+    'Senior Technician': 'Senior Technician',
+    'Garden Technician': 'Garden Technician',
+    'Maintenance Technician': 'Maintenance Technician',
     'Supervisor': 'Team Leader',
     'Area Manager': 'Area Manager',
     'HR': 'HR Staff',
   };
-  return roleMap[designation] || designation;
+  return roleMap[d] || d || '—';
 };
 
 // Format date for display
-const formatDate = (dateString: string): string => {
+const formatDate = (dateString: string | null | undefined): string => {
+  if (dateString == null || String(dateString).trim() === '') return '—';
   try {
     const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return '—';
     return date.toISOString().split('T')[0];
   } catch {
-    return dateString;
+    return '—';
   }
 };
+
+const PER_PAGE = 20;
 
 const EmployeeListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMenu, setShowMenu] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [page, setPage] = useState(1);
+  const [lastPage, setLastPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
 
-  // Fetch employees from API
-  const fetchEmployees = useCallback(async (showLoading = true) => {
+  type FetchMode = 'initial' | 'refresh' | 'loadMore';
+
+  const fetchEmployees = useCallback(async (mode: FetchMode = 'initial') => {
+    const isLoadMore = mode === 'loadMore';
+    const isRefresh = mode === 'refresh';
+    const nextPage = isLoadMore ? page + 1 : 1;
+    if (isLoadMore && (loadingMore || nextPage > lastPage)) return;
     try {
       setError(null);
-      if (showLoading) {
-        setLoading(true);
-      }
-      const response = await hrService.getEmployees();
-      if (response && response.data) {
-        setEmployees(Array.isArray(response.data) ? response.data : []);
+      if (mode === 'initial' || isRefresh) {
+        if (isRefresh) setRefreshing(true);
+        else setLoading(true);
       } else {
-        setEmployees([]);
-        setError('Invalid response format from server');
+        setLoadingMore(true);
+      }
+      const response = await hrService.getEmployees({ page: nextPage, per_page: PER_PAGE });
+      const list = response?.data;
+      if (response && Array.isArray(list)) {
+        if (isLoadMore) {
+          setEmployees(prev => [...prev, ...list]);
+          setPage(nextPage);
+        } else {
+          setEmployees(list);
+          setPage(1);
+        }
+        setTotal(response.total ?? list.length);
+        const meta = response.meta;
+        if (meta) setLastPage(meta.last_page);
+        else setLastPage(1);
+      } else {
+        if (!isLoadMore) {
+          setEmployees([]);
+          setError(String('Invalid response format from server'));
+        }
       }
     } catch (err: any) {
       console.error('Error fetching employees:', err);
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to load employees';
-      setError(errorMessage);
-      setEmployees([]);
+      const errorMessage = err.response?.data?.message ?? err.message ?? 'Failed to load employees';
+      setError(String(errorMessage));
+      if (!isLoadMore) setEmployees([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
-  }, []);
+  }, [page, lastPage, loadingMore]);
 
   useEffect(() => {
-    fetchEmployees();
-  }, [fetchEmployees]);
+    fetchEmployees('initial');
+  }, []);
 
-  // Refresh when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      if (!loading) {
-        fetchEmployees(false);
+      if (!loading && employees.length === 0 && !error) {
+        fetchEmployees('refresh');
       }
-    }, [loading, fetchEmployees])
+    }, [loading, employees.length, error, fetchEmployees])
   );
 
   const onRefresh = () => {
-    setRefreshing(true);
-    fetchEmployees(false);
+    fetchEmployees('refresh');
   };
+
+  const onEndReached = useCallback(() => {
+    if (!loadingMore && page < lastPage && !loading && !error) {
+      fetchEmployees('loadMore');
+    }
+  }, [loadingMore, page, lastPage, loading, error, fetchEmployees]);
 
   const handleMenuPress = (employee: Employee) => {
     setSelectedEmployee(employee);
@@ -123,7 +188,7 @@ const EmployeeListScreen: React.FC = () => {
             try {
               await hrService.deleteEmployee(selectedEmployee.id);
               Alert.alert('Success', 'Employee deleted successfully');
-              fetchEmployees(false);
+              fetchEmployees('refresh');
             } catch (err: any) {
               console.error('Error deleting employee:', err);
               const errorMessage = 
@@ -138,31 +203,41 @@ const EmployeeListScreen: React.FC = () => {
     );
   };
 
-  // Filter employees based on search query
+  // Filter by role then by search query
   const filteredEmployees = employees.filter(employee => {
-    const matchesSearch = 
-      employee.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      getRoleDisplayName(employee.designation).toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
+    if (!matchesRoleFilter(employee, roleFilter)) return false;
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const name = (employee.name ?? '').toString().toLowerCase();
+    const email = (employee.email ?? '').toString().toLowerCase();
+    const empId = (employee.employee_id ?? '').toString().toLowerCase();
+    const role = getRoleDisplayName(employee.designation ?? '').toLowerCase();
+    return name.includes(q) || email.includes(q) || empId.includes(q) || role.includes(q);
   });
 
   const renderEmployee = ({ item }: { item: Employee }) => {
-    const avatarInitial = item.name.charAt(0).toUpperCase();
+    const name = item.name ?? '';
+    const avatarInitial = (item.initial ?? name.charAt(0) ?? '?').toString().toUpperCase().slice(0, 1);
     const roleDisplayName = getRoleDisplayName(item.designation);
-    const joiningDate = formatDate(item.joining_date);
-    const status = item.status || 'active'; // Assuming status field exists, default to active
+    const joiningDate = formatDate(item.joining_date ?? '');
+    const status = (item.status ?? 'active').toString();
+    const leaveDisplay = item.leave_remaining_days != null ? item.leave_remaining_days : (item.leave_balance ?? 0);
 
     return (
       <TouchableOpacity style={styles.employeeCard}>
         <View style={styles.employeeAvatar}>
-          <Text style={styles.avatarText}>{avatarInitial}</Text>
+          {item.profile_picture_url ? (
+            <Image source={{ uri: item.profile_picture_url }} style={styles.employeeAvatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>{avatarInitial}</Text>
+          )}
         </View>
-        
+
         <View style={styles.employeeInfo}>
           <View style={styles.nameRow}>
-            <Text style={styles.employeeName}>{item.name}</Text>
+            <Text style={styles.employeeName} numberOfLines={2}>
+              {name || '—'}
+            </Text>
             <View style={[
               styles.statusBadge,
               { backgroundColor: status === 'active' ? COLORS.success + '20' : COLORS.warning + '20' }
@@ -176,13 +251,13 @@ const EmployeeListScreen: React.FC = () => {
             </View>
           </View>
           <View style={styles.employeeMeta}>
-            <Text style={styles.employeeId}>{item.employee_id}</Text>
+            <Text style={styles.employeeId}>{item.employee_id ?? '—'}</Text>
             <Text style={styles.separator}>•</Text>
             <Text style={styles.employeeRole}>{roleDisplayName}</Text>
           </View>
           <View style={styles.bottomRow}>
             <Text style={styles.joiningDate}>Joined: {joiningDate}</Text>
-            <Text style={styles.leaveBalance}>Leave: {item.leave_balance || 0} days</Text>
+            <Text style={styles.leaveBalance}>Leave: {leaveDisplay} days</Text>
           </View>
         </View>
 
@@ -206,7 +281,11 @@ const EmployeeListScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Employee Directory</Text>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            Employee Directory
+          </Text>
+        </View>
         <View style={styles.headerRight} />
       </View>
 
@@ -227,6 +306,51 @@ const EmployeeListScreen: React.FC = () => {
         )}
       </View>
 
+      {/* Role filter: All | Supervisors | Technicians — fixed widths so labels never truncate */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.roleFilterRow}
+        style={styles.roleFilterScroll}
+      >
+        <TouchableOpacity
+          style={[
+            styles.roleChip,
+            styles.roleChipAll,
+            roleFilter === 'all' && styles.roleChipSelected,
+          ]}
+          onPress={() => setRoleFilter('all')}
+        >
+          <Text style={[styles.roleChipText, roleFilter === 'all' && styles.roleChipTextSelected]}>
+            All
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.roleChip,
+            styles.roleChipSupervisors,
+            roleFilter === 'supervisor' && styles.roleChipSelected,
+          ]}
+          onPress={() => setRoleFilter('supervisor')}
+        >
+          <Text style={[styles.roleChipText, roleFilter === 'supervisor' && styles.roleChipTextSelected]}>
+            Supervisors
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.roleChip,
+            styles.roleChipTechnicians,
+            roleFilter === 'technician' && styles.roleChipSelected,
+          ]}
+          onPress={() => setRoleFilter('technician')}
+        >
+          <Text style={[styles.roleChipText, roleFilter === 'technician' && styles.roleChipTextSelected]}>
+            Technicians
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+
       {/* Employees List */}
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -236,8 +360,8 @@ const EmployeeListScreen: React.FC = () => {
       ) : error ? (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => fetchEmployees()}>
+          <Text style={styles.errorText}>{String(error)}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => fetchEmployees('initial')}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
@@ -245,8 +369,11 @@ const EmployeeListScreen: React.FC = () => {
         <FlatList
           data={filteredEmployees}
           renderItem={renderEmployee}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContent}
+          keyExtractor={(item, index) => `emp-${item?.id ?? index}-${index}`}
+          contentContainerStyle={[
+            styles.listContent,
+            filteredEmployees.length === 0 && { flex: 1 },
+          ]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -254,6 +381,8 @@ const EmployeeListScreen: React.FC = () => {
               colors={[COLORS.primary]}
             />
           }
+          onEndReached={onEndReached}
+          onEndReachedThreshold={0.3}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="people-outline" size={64} color={COLORS.textSecondary} />
@@ -261,6 +390,21 @@ const EmployeeListScreen: React.FC = () => {
                 {searchQuery ? 'No employees found' : 'No employees yet'}
               </Text>
             </View>
+          }
+          ListFooterComponent={
+            <>
+              {loadingMore ? (
+                <View style={styles.footerLoader}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text style={styles.footerLoaderText}>Loading more...</Text>
+                </View>
+              ) : null}
+              {!loading && !loadingMore && total > 0 && (
+                <Text style={styles.footerCount}>
+                  {employees.length} of {total} employees
+                </Text>
+              )}
+            </>
           }
         />
       )}
@@ -315,6 +459,14 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: SPACING.xs,
+    flexShrink: 0,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: SPACING.sm,
+    minWidth: 0,
   },
   headerTitle: {
     fontSize: FONT_SIZES.xl,
@@ -323,6 +475,7 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 40,
+    flexShrink: 0,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -336,9 +489,52 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    minWidth: 0,
     paddingVertical: SPACING.md,
     fontSize: FONT_SIZES.md,
     color: COLORS.text,
+  },
+  roleFilterScroll: {
+    flexGrow: 0,
+  },
+  roleFilterRow: {
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.sm,
+    gap: SPACING.sm,
+    alignItems: 'center',
+    flexGrow: 0,
+  },
+  roleChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.round,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  roleChipAll: {
+    width: 64,
+  },
+  roleChipSupervisors: {
+    width: 120,
+  },
+  roleChipTechnicians: {
+    width: 120,
+  },
+  roleChipSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  roleChipText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.textSecondary,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  roleChipTextSelected: {
+    color: COLORS.background,
   },
   listContent: {
     padding: SPACING.lg,
@@ -359,6 +555,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
+    overflow: 'hidden',
+  },
+  employeeAvatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   avatarText: {
     fontSize: FONT_SIZES.xl,
@@ -367,6 +569,7 @@ const styles = StyleSheet.create({
   },
   employeeInfo: {
     flex: 1,
+    minWidth: 0,
   },
   nameRow: {
     flexDirection: 'row',
@@ -379,6 +582,7 @@ const styles = StyleSheet.create({
     fontWeight: FONT_WEIGHTS.semiBold,
     color: COLORS.text,
     flex: 1,
+    minWidth: 0,
   },
   employeeMeta: {
     flexDirection: 'row',
@@ -509,6 +713,24 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     color: COLORS.textSecondary,
     marginTop: SPACING.md,
+  },
+  footerLoader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  footerLoaderText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+  },
+  footerCount: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    paddingVertical: SPACING.md,
+    paddingBottom: SPACING.xl,
   },
 });
 

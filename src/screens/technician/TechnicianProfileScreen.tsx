@@ -131,6 +131,7 @@ const TechnicianProfileScreen: React.FC = () => {
 
   const menuItems = [
     { icon: 'person-outline', title: t('technician.profileInfo'), onPress: () => navigation.navigate('TechnicianProfileEdit') },
+    { icon: 'calendar-outline', title: t('technician.leaveStatus.title'), onPress: () => navigation.navigate('LeaveStatus') },
     { icon: 'notifications-outline', title: t('technician.notifications'), onPress: () => navigation.navigate('Notifications') },
     { icon: 'help-circle-outline', title: t('technician.helpSupport'), onPress: () => navigation.navigate('HelpCenter') },
     { icon: 'log-out-outline', title: t('technician.logout'), onPress: handleLogout, color: COLORS.error },

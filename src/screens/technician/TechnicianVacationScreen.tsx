@@ -47,6 +47,7 @@ const TechnicianVacationScreen: React.FC = () => {
   const [leaveType, setLeaveType] = useState<string>('');
   const [reason, setReason] = useState('');
   const [pickerOpen, setPickerOpen] = useState<'start' | 'end' | null>(null);
+  const [pickerValue, setPickerValue] = useState<Date>(new Date());
   const [leaveTypeModalVisible, setLeaveTypeModalVisible] = useState(false);
 
   const addVacation = () => {
@@ -77,9 +78,37 @@ const TechnicianVacationScreen: React.FC = () => {
     navigation.navigate('Main', { screen: 'ScheduleTab', params: { vacations } });
   };
 
-  const getPickerValue = (): Date => {
-    if (pickerOpen === 'start') return startDate ? new Date(startDate + 'T12:00:00') : new Date();
-    return endDate ? new Date(endDate + 'T12:00:00') : new Date();
+  const openStartPicker = () => {
+    setPickerValue(startDate ? new Date(startDate + 'T12:00:00') : new Date());
+    setPickerOpen('start');
+  };
+
+  const openEndPicker = () => {
+    setPickerValue(endDate ? new Date(endDate + 'T12:00:00') : new Date());
+    setPickerOpen('end');
+  };
+
+  const handlePickerChange = (event: any, selectedDate: Date | undefined) => {
+    if (event.type === 'dismissed') {
+      setPickerOpen(null);
+      return;
+    }
+    if (selectedDate) {
+      setPickerValue(selectedDate);
+      if (Platform.OS === 'android') {
+        const formatted = formatDateToYYYYMMDD(selectedDate);
+        if (pickerOpen === 'start') setStartDate(formatted);
+        else setEndDate(formatted);
+        setPickerOpen(null);
+      }
+    }
+  };
+
+  const handlePickerDone = () => {
+    const formatted = formatDateToYYYYMMDD(pickerValue);
+    if (pickerOpen === 'start') setStartDate(formatted);
+    else setEndDate(formatted);
+    setPickerOpen(null);
   };
 
   return (
@@ -88,7 +117,7 @@ const TechnicianVacationScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('technician.setVacation')}</Text>
+        <Text style={styles.headerTitle}>{t('technician.setLeave')}</Text>
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <Text style={styles.saveButtonText}>{t('technician.done')}</Text>
         </TouchableOpacity>
@@ -96,13 +125,13 @@ const TechnicianVacationScreen: React.FC = () => {
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('technician.vacation.addVacation')}</Text>
-          <TouchableOpacity style={styles.dateRow} onPress={() => setPickerOpen('start')}>
+          <Text style={styles.sectionTitle}>{t('technician.vacation.addLeave')}</Text>
+          <TouchableOpacity style={styles.dateRow} onPress={openStartPicker}>
             <Text style={styles.dateRowLabel}>{t('technician.vacation.startDate')}</Text>
             <Text style={styles.dateRowValue}>{startDate || t('technician.selectDate')}</Text>
             <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.dateRow} onPress={() => setPickerOpen('end')}>
+          <TouchableOpacity style={styles.dateRow} onPress={openEndPicker}>
             <Text style={styles.dateRowLabel}>{t('technician.vacation.endDate')}</Text>
             <Text style={styles.dateRowValue}>{endDate || t('technician.selectDate')}</Text>
             <Ionicons name="calendar-outline" size={22} color={COLORS.primary} />
@@ -147,36 +176,43 @@ const TechnicianVacationScreen: React.FC = () => {
           />
           <TouchableOpacity style={styles.addButton} onPress={addVacation}>
             <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>{t('technician.vacation.addVacation')}</Text>
+            <Text style={styles.addButtonText}>{t('technician.vacation.addLeave')}</Text>
           </TouchableOpacity>
         </View>
 
         {pickerOpen !== null && (
-          <DateTimePicker
-            value={getPickerValue()}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={(event, selectedDate) => {
-              if (Platform.OS === 'android') setPickerOpen(null);
-              if (event.type === 'dismissed') return;
-              if (selectedDate) {
-                const formatted = formatDateToYYYYMMDD(selectedDate);
-                if (pickerOpen === 'start') setStartDate(formatted);
-                else setEndDate(formatted);
-              }
-            }}
-          />
-        )}
-        {Platform.OS === 'ios' && pickerOpen !== null && (
-          <TouchableOpacity style={styles.donePicker} onPress={() => setPickerOpen(null)}>
-            <Text style={styles.donePickerText}>{t('technician.done')}</Text>
-          </TouchableOpacity>
+          <Modal visible transparent animationType="slide">
+            <TouchableOpacity
+              style={styles.dateModalOverlay}
+              activeOpacity={1}
+              onPress={() => setPickerOpen(null)}
+            >
+              <View style={styles.dateModalContent} onStartShouldSetResponder={() => true}>
+                <Text style={styles.dateModalTitle}>
+                  {pickerOpen === 'start'
+                    ? t('technician.vacation.startDate')
+                    : t('technician.vacation.endDate')}
+                </Text>
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={pickerValue}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={handlePickerChange}
+                  />
+                </View>
+                <TouchableOpacity style={styles.dateModalDone} onPress={handlePickerDone}>
+                  <Text style={styles.dateModalDoneText}>{t('technician.done')}</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('technician.vacation.yourVacations', { count: vacations.length })}</Text>
+          <Text style={styles.sectionTitle}>{t('technician.vacation.yourLeaves', { count: vacations.length })}</Text>
           {vacations.length === 0 ? (
-            <Text style={styles.emptyText}>{t('technician.vacation.noVacationsAdded')}</Text>
+            <Text style={styles.emptyText}>{t('technician.vacation.noLeavesAdded')}</Text>
           ) : (
             vacations.map((v, index) => (
               <View key={index} style={styles.vacationCard}>
@@ -270,6 +306,41 @@ const styles = StyleSheet.create({
   modalOptionText: { fontSize: FONT_SIZES.md, color: COLORS.text },
   modalCancel: { marginTop: SPACING.md, paddingVertical: SPACING.sm, alignItems: 'center' },
   modalCancelText: { fontSize: FONT_SIZES.md, color: COLORS.primary },
+  dateModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  dateModalContent: {
+    backgroundColor: COLORS.background,
+    borderTopLeftRadius: BORDER_RADIUS.lg,
+    borderTopRightRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    paddingBottom: SPACING.xxl,
+  },
+  dateModalTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  datePickerContainer: {
+    minHeight: 200,
+    alignItems: 'center',
+    marginVertical: SPACING.sm,
+  },
+  dateModalDone: {
+    marginTop: SPACING.md,
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.md,
+  },
+  dateModalDoneText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.background,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
 });
 
 export default TechnicianVacationScreen;

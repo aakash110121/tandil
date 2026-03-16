@@ -458,6 +458,46 @@ export async function getTechnicianProfile(): Promise<TechnicianProfileData | nu
   return null;
 }
 
+/** Leave request item from GET /api/technician/leave-requests */
+export interface TechnicianLeaveRequest {
+  id: number;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  duration_days: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  reviewed_at?: string | null;
+  created_at: string;
+}
+
+export interface TechnicianLeaveRequestsResponse {
+  success: boolean;
+  data: TechnicianLeaveRequest[];
+  meta?: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
+/**
+ * GET /api/technician/leave-requests?status=pending|approved|rejected&per_page=20&page=1
+ * Returns list of leave requests for the technician. status is optional.
+ */
+export async function getTechnicianLeaveRequests(params?: {
+  status?: 'pending' | 'approved' | 'rejected';
+  page?: number;
+  per_page?: number;
+}): Promise<TechnicianLeaveRequestsResponse> {
+  const response = await apiClient.get<TechnicianLeaveRequestsResponse>('/technician/leave-requests', {
+    params: { per_page: 20, ...params },
+    timeout: 15000,
+  });
+  return response.data;
+}
+
 /**
  * GET /api/technician/specializations
  * Returns { success, data: { specializations: string[] } }. Requires Bearer token.
