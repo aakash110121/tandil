@@ -34,7 +34,7 @@ const Header: React.FC<HeaderProps> = ({
   showCart = false,
   showNotifications = false,
   notificationCount = 0,
-  showLanguage = true,
+  showLanguage = false,
   onBackPress,
   onCartPress,
   onNotificationPress,

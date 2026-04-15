@@ -4,6 +4,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
+import { useTranslation } from 'react-i18next';
 
 // Screens
 import HRManagerLoginScreen from '../screens/hrmanager/HRManagerLoginScreen';
@@ -22,14 +23,8 @@ import SupportTicketChatScreen from '../screens/user/SupportTicketChatScreen';
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const TAB_LABELS = {
-  dashboard: 'Dashboard',
-  employees: 'Employees',
-  leaves: 'Leaves',
-  profile: 'Profile',
-};
-
 const TabNavigator = () => {
+  const { t } = useTranslation();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -46,7 +41,7 @@ const TabNavigator = () => {
         name="DashboardTab"
         component={HRManagerDashboardScreen}
         options={{
-          tabBarLabel: TAB_LABELS.dashboard,
+          tabBarLabel: t('admin.hrManagerDashboard.tabDashboard', { defaultValue: 'Dashboard' }),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home-outline" size={size} color={color} />
           ),
@@ -56,7 +51,7 @@ const TabNavigator = () => {
         name="EmployeesTab"
         component={EmployeeListScreen}
         options={{
-          tabBarLabel: TAB_LABELS.employees,
+          tabBarLabel: t('admin.hrManagerDashboard.tabEmployees', { defaultValue: 'Employees' }),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people-outline" size={size} color={color} />
           ),
@@ -66,7 +61,7 @@ const TabNavigator = () => {
         name="LeavesTab"
         component={ManageLeavesScreen}
         options={{
-          tabBarLabel: TAB_LABELS.leaves,
+          tabBarLabel: t('admin.hrManagerDashboard.tabLeaves', { defaultValue: 'Leaves' }),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar-outline" size={size} color={color} />
           ),
@@ -76,7 +71,7 @@ const TabNavigator = () => {
         name="ProfileTab"
         component={HRManagerProfileScreen}
         options={{
-          tabBarLabel: TAB_LABELS.profile,
+          tabBarLabel: t('admin.hrManagerDashboard.tabProfile', { defaultValue: 'Profile' }),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person-outline" size={size} color={color} />
           ),

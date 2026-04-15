@@ -277,6 +277,7 @@ export type UserStackParamList = {
 
 export type TechnicianStackParamList = {
   Login: undefined;
+  TechnicianSignup: undefined;
   Main: undefined;
   Dashboard: undefined;
   JobDetail: { orderId: string };

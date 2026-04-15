@@ -429,6 +429,7 @@ const HomeScreen: React.FC = () => {
       <Header 
         title={t('home.title')}
         showBack={false}
+        showLanguage={true}
         showNotifications={true}
         notificationCount={supportTicketsCount}
         onNotificationPress={() => navigation.navigate('MyTickets')}

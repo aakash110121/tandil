@@ -59,12 +59,54 @@ export interface GetOrderSummaryResponse {
   data?: OrderSummaryData;
 }
 
+export interface BuyNowSummaryItem {
+  id: number;
+  product_id: number;
+  name: string;
+  image_url: string | null;
+  category: string | null;
+  brand: string | null;
+  current_price: number;
+  original_price: number | null;
+  quantity: number;
+  line_total: number;
+  currency: string;
+}
+
+export interface BuyNowSummaryData {
+  item: BuyNowSummaryItem;
+  order_summary: OrderSummaryData;
+}
+
+interface GetBuyNowSummaryResponse {
+  success?: boolean;
+  message?: string;
+  data?: BuyNowSummaryData;
+}
+
 /**
  * Get order summary for current cart. Requires customer token.
  * GET /shop/order-summary. Returns subtotal, discount, shipping, tax, total, currency.
  */
 export async function getOrderSummary(): Promise<OrderSummaryData | null> {
   const response = await apiClient.get<GetOrderSummaryResponse>('/shop/order-summary', { timeout: 15000 });
+  if (response.data?.success && response.data?.data) return response.data.data;
+  return null;
+}
+
+/**
+ * Get order summary for direct Buy Now from product details.
+ * POST /shop/buy-now/summary with JSON body: { product_id, quantity }.
+ */
+export async function getBuyNowSummary(
+  productId: number,
+  quantity: number
+): Promise<BuyNowSummaryData | null> {
+  const response = await apiClient.post<GetBuyNowSummaryResponse>(
+    '/shop/buy-now/summary',
+    { product_id: productId, quantity },
+    { timeout: 15000 }
+  );
   if (response.data?.success && response.data?.data) return response.data.data;
   return null;
 }

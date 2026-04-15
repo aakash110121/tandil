@@ -150,8 +150,8 @@ const TechnicianLoginScreen: React.FC = () => {
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>{t('auth.dontHaveAccount')}</Text>
-          <TouchableOpacity>
-            <Text style={styles.signUpText}>{t('technicianLogin.contactAdmin', { defaultValue: 'Contact Admin' })}</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('TechnicianSignup')}>
+            <Text style={styles.signUpText}>{t('auth.signup', { defaultValue: 'Sign Up' })}</Text>
           </TouchableOpacity>
         </View>
 

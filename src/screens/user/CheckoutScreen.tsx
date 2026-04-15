@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   StatusBar,
-  Image,
   Alert,
   TextInput,
 } from 'react-native';
@@ -17,6 +16,7 @@ import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
 import { getShopSettings, ShopSettings } from '../../services/shopSettingsService';
 import { getOrderSummary, OrderSummaryData } from '../../services/cartService';
+import * as Location from 'expo-location';
 
 interface CartItem {
   id: string;
@@ -42,7 +42,7 @@ interface ShippingAddress {
 
 interface PaymentMethod {
   id: string;
-  type: 'card' | 'paypal' | 'cash';
+  type: 'apple_pay' | 'card' | 'cash';
   name: string;
   icon: string;
   last4?: string;
@@ -52,31 +52,44 @@ const CheckoutScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
   const route = useRoute<any>();
-  const { cartItems = [], total: routeTotal = 0 } = route.params || { cartItems: [], total: 0 };
+  const {
+    cartItems = [],
+    buyNowSummary = null,
+    isBuyNow = false,
+  } = route.params || { cartItems: [], buyNowSummary: null, isBuyNow: false };
   
-  const [currentStep, setCurrentStep] = useState<'address' | 'payment' | 'review'>('address');
+  const [currentStep, setCurrentStep] = useState<'location' | 'phone' | 'payment'>('location');
   const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
-  const [orderSummaryApi, setOrderSummaryApi] = useState<OrderSummaryData | null>(null);
+  const [orderSummaryApi, setOrderSummaryApi] = useState<OrderSummaryData | null>(buyNowSummary);
   
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
-    fullName: 'Ahmed Hassan',
-    phone: '+971501234567',
-    street: 'Sheikh Zayed Road',
-    city: 'Dubai',
-    state: 'Dubai',
-    zipCode: '12345',
-    country: 'UAE',
+    fullName: '',
+    phone: '',
+    street: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: '',
   });
 
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('paypal');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('apple_pay');
+  const STEP_ORDER: Array<'location' | 'phone' | 'payment'> = ['location', 'phone', 'payment'];
+  const activeStepIndex = STEP_ORDER.indexOf(currentStep);
 
   const paymentMethods: PaymentMethod[] = [
     {
-      id: 'paypal',
-      type: 'paypal',
-      name: t('checkout.paypal'),
-      icon: 'logo-paypal',
+      id: 'apple_pay',
+      type: 'apple_pay',
+      name: 'Apple Pay',
+      icon: 'logo-apple',
+    },
+    {
+      id: 'card',
+      type: 'card',
+      name: t('checkout.card', 'Card'),
+      icon: 'card-outline',
     },
     {
       id: 'cash',
@@ -104,15 +117,23 @@ const CheckoutScreen: React.FC = () => {
   useEffect(() => {
     let cancelled = false;
     getShopSettings().then((s) => { if (!cancelled) setShopSettings(s); });
-    getOrderSummary().then((s) => { if (!cancelled) setOrderSummaryApi(s ?? null); });
+    if (isBuyNow && buyNowSummary) {
+      if (!cancelled) setOrderSummaryApi(buyNowSummary);
+    } else {
+      getOrderSummary().then((s) => { if (!cancelled) setOrderSummaryApi(s ?? null); });
+    }
     return () => { cancelled = true; };
-  }, []);
+  }, [buyNowSummary, isBuyNow]);
 
   useFocusEffect(
     useCallback(() => {
       getShopSettings().then(setShopSettings);
-      getOrderSummary().then(setOrderSummaryApi);
-    }, [])
+      if (isBuyNow && buyNowSummary) {
+        setOrderSummaryApi(buyNowSummary);
+      } else {
+        getOrderSummary().then(setOrderSummaryApi);
+      }
+    }, [buyNowSummary, isBuyNow])
   );
 
   const useApiSummary = orderSummaryApi != null;
@@ -120,9 +141,14 @@ const CheckoutScreen: React.FC = () => {
   const discount = useApiSummary ? orderSummaryApi.discount : calculateDiscount();
   const shippingAmount = useApiSummary ? orderSummaryApi.shipping : (shopSettings?.shipping_amount ?? 0);
   const taxPercent = useApiSummary ? (orderSummaryApi.tax_percent ?? 0) : (shopSettings?.tax_percent ?? 0);
-  // Tax = (subtotal - discount) × tax_percent% so e.g. 100 + 5% = 105
-  const taxAmount = Math.round((subtotal - discount) * (taxPercent / 100) * 100) / 100;
-  const total = Math.round((subtotal - discount + shippingAmount + taxAmount) * 100) / 100;
+  // For API summaries, prefer backend tax/total values to avoid mismatches.
+  const derivedTaxAmount = Math.round((subtotal - discount) * (taxPercent / 100) * 100) / 100;
+  const taxAmount = useApiSummary
+    ? (orderSummaryApi.tax ?? Math.max(0, (orderSummaryApi.total ?? 0) - (subtotal - discount + shippingAmount)))
+    : derivedTaxAmount;
+  const total = useApiSummary
+    ? orderSummaryApi.total
+    : Math.round((subtotal - discount + shippingAmount + taxAmount) * 100) / 100;
   const currency = useApiSummary ? orderSummaryApi.currency : (shopSettings?.currency ?? 'AED');
 
   const handlePlaceOrder = () => {
@@ -142,28 +168,84 @@ const CheckoutScreen: React.FC = () => {
     }, 2000);
   };
 
-  const renderAddressForm = () => (
+  const handleUseMyLocation = async () => {
+    setLocating(true);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          t('common.error', 'Error'),
+          t(
+            'checkout.locationPermissionRequired',
+            'Location permission is required to auto-fill your address.'
+          )
+        );
+        return;
+      }
+
+      const coords = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const places = await Location.reverseGeocodeAsync({
+        latitude: coords.coords.latitude,
+        longitude: coords.coords.longitude,
+      });
+      const place = places?.[0];
+
+      if (!place) {
+        Alert.alert(
+          t('common.error', 'Error'),
+          t('checkout.locationNotFound', 'Could not fetch address from your location.')
+        );
+        return;
+      }
+
+      const streetParts = [place.name, place.street].filter(Boolean);
+      const street = streetParts.join(', ');
+      setShippingAddress((prev) => ({
+        ...prev,
+        street: street || prev.street,
+        city: place.city || place.subregion || prev.city,
+        state: place.region || place.subregion || prev.state,
+        zipCode: place.postalCode || prev.zipCode,
+        country: place.country || prev.country,
+      }));
+    } catch {
+      Alert.alert(
+        t('common.error', 'Error'),
+        t('checkout.locationFetchFailed', 'Unable to get your current location. Please try again.')
+      );
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const renderLocationStep = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t('checkout.shippingAddress')}</Text>
-      
+      <Text style={styles.sectionTitle}>{t('checkout.locationStep', 'Location')}</Text>
+      <Text style={styles.helperText}>
+        {t(
+          'checkout.locationStepHelp',
+          'Use GPS to auto-fill your shipping address instead of typing all address fields manually.'
+        )}
+      </Text>
+
+      <TouchableOpacity
+        style={[styles.locationButton, locating && styles.locationButtonDisabled]}
+        onPress={handleUseMyLocation}
+        disabled={locating}
+      >
+        <Ionicons name="locate-outline" size={18} color={COLORS.primary} />
+        <Text style={styles.locationButtonText}>
+          {locating ? t('common.loading', 'Loading...') : t('checkout.useMyLocation', 'Use my location')}
+        </Text>
+      </TouchableOpacity>
+
       <View style={styles.formGroup}>
-        <Text style={styles.label}>{t('checkout.fullName')}</Text>
+        <Text style={styles.label}>{t('checkout.fullName', 'Full Name')}</Text>
         <TextInput
           style={styles.input}
           value={shippingAddress.fullName}
           onChangeText={(text) => setShippingAddress(prev => ({ ...prev, fullName: text }))}
-          placeholder={t('checkout.fullName')}
-        />
-      </View>
-
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>{t('checkout.phoneNumber')}</Text>
-        <TextInput
-          style={styles.input}
-          value={shippingAddress.phone}
-          onChangeText={(text) => setShippingAddress(prev => ({ ...prev, phone: text }))}
-          placeholder={t('checkout.phoneNumber')}
-          keyboardType="phone-pad"
+          placeholder={t('checkout.fullName', 'Full Name')}
         />
       </View>
 
@@ -222,6 +304,25 @@ const CheckoutScreen: React.FC = () => {
     </View>
   );
 
+  const renderPhoneStep = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{t('checkout.phoneNumberStep', 'Phone Number')}</Text>
+      <Text style={styles.helperText}>
+        {t('checkout.phoneStepHelp', 'Please enter your phone number so we can contact you about delivery.')}
+      </Text>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>{t('checkout.phoneNumber')}</Text>
+        <TextInput
+          style={styles.input}
+          value={shippingAddress.phone}
+          onChangeText={(text) => setShippingAddress(prev => ({ ...prev, phone: text }))}
+          placeholder={t('checkout.phoneNumber')}
+          keyboardType="phone-pad"
+        />
+      </View>
+    </View>
+  );
+
   const renderPaymentMethods = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{t('checkout.paymentMethod')}</Text>
@@ -259,64 +360,23 @@ const CheckoutScreen: React.FC = () => {
     </View>
   );
 
-  const renderOrderReview = () => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t('checkout.orderReview')}</Text>
-      
-      {/* Order Items */}
-      <View style={styles.orderItems}>
-        {cartItems.map((item: any) => (
-          <View key={item.id} style={styles.orderItem}>
-            <Image source={{ uri: item.image }} style={styles.orderItemImage} />
-            <View style={styles.orderItemContent}>
-              <Text style={styles.orderItemName}>{item.name}</Text>
-              <Text style={styles.orderItemSpecs}>
-                {t('checkout.qty')} {item.quantity}
-              </Text>
-              <Text style={styles.orderItemPrice}>{t('orders.currency', { defaultValue: 'AED' })} {(item.price * item.quantity).toFixed(2)}</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-
-      {/* Shipping Address */}
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewSectionTitle}>{t('checkout.reviewShippingAddress')}</Text>
-        <Text style={styles.reviewText}>
-          {shippingAddress.fullName}{'\n'}
-          {shippingAddress.street}{'\n'}
-          {shippingAddress.city}, {shippingAddress.state} {shippingAddress.zipCode}{'\n'}
-          {shippingAddress.country}{'\n'}
-          {shippingAddress.phone}
-        </Text>
-      </View>
-
-      {/* Payment Method */}
-      <View style={styles.reviewSection}>
-        <Text style={styles.reviewSectionTitle}>{t('checkout.reviewPaymentMethod')}</Text>
-        <Text style={styles.reviewText}>
-          {paymentMethods.find(m => m.id === selectedPaymentMethod)?.name}
-        </Text>
-      </View>
-    </View>
-  );
-
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
       <View style={styles.stepContainer}>
         <View style={[
           styles.stepCircle,
-          currentStep === 'address' && styles.activeStepCircle,
+          activeStepIndex >= 0 && styles.activeStepCircle,
         ]}>
-          <Text style={[
-            styles.stepNumber,
-            currentStep === 'address' && styles.activeStepNumber,
-          ]}>1</Text>
+          {activeStepIndex > 0 ? (
+            <Ionicons name="checkmark" size={16} color={COLORS.background} />
+          ) : (
+            <Text style={[styles.stepNumber, styles.activeStepNumber]}>1</Text>
+          )}
         </View>
         <Text style={[
           styles.stepLabel,
-          currentStep === 'address' && styles.activeStepLabel,
-        ]}>{t('checkout.addressStep')}</Text>
+          activeStepIndex >= 0 && styles.activeStepLabel,
+        ]}>{t('checkout.locationStep', 'Location')}</Text>
       </View>
       
       <View style={styles.stepLine} />
@@ -324,17 +384,18 @@ const CheckoutScreen: React.FC = () => {
       <View style={styles.stepContainer}>
         <View style={[
           styles.stepCircle,
-          currentStep === 'payment' && styles.activeStepCircle,
+          activeStepIndex >= 1 && styles.activeStepCircle,
         ]}>
-          <Text style={[
-            styles.stepNumber,
-            currentStep === 'payment' && styles.activeStepNumber,
-          ]}>2</Text>
+          {activeStepIndex > 1 ? (
+            <Ionicons name="checkmark" size={16} color={COLORS.background} />
+          ) : (
+            <Text style={[styles.stepNumber, activeStepIndex >= 1 && styles.activeStepNumber]}>2</Text>
+          )}
         </View>
         <Text style={[
           styles.stepLabel,
-          currentStep === 'payment' && styles.activeStepLabel,
-        ]}>{t('checkout.paymentStep')}</Text>
+          activeStepIndex >= 1 && styles.activeStepLabel,
+        ]}>{t('checkout.phoneNumberStep', 'Phone')}</Text>
       </View>
       
       <View style={styles.stepLine} />
@@ -342,46 +403,72 @@ const CheckoutScreen: React.FC = () => {
       <View style={styles.stepContainer}>
         <View style={[
           styles.stepCircle,
-          currentStep === 'review' && styles.activeStepCircle,
+          activeStepIndex >= 2 && styles.activeStepCircle,
         ]}>
           <Text style={[
             styles.stepNumber,
-            currentStep === 'review' && styles.activeStepNumber,
+            activeStepIndex >= 2 && styles.activeStepNumber,
           ]}>3</Text>
         </View>
         <Text style={[
           styles.stepLabel,
-          currentStep === 'review' && styles.activeStepLabel,
-        ]}>{t('checkout.reviewStep')}</Text>
+          activeStepIndex >= 2 && styles.activeStepLabel,
+        ]}>{t('checkout.paymentStep', 'Payment')}</Text>
       </View>
     </View>
   );
 
   const getNextStep = () => {
     switch (currentStep) {
-      case 'address':
+      case 'location':
+        return 'phone';
+      case 'phone':
         return 'payment';
       case 'payment':
-        return 'review';
+        return null;
       default:
         return null;
     }
   };
 
   const handleNext = () => {
+    if (currentStep === 'location') {
+      if (!shippingAddress.street || !shippingAddress.city || !shippingAddress.country) {
+        Alert.alert(
+          t('common.error', 'Error'),
+          t(
+            'checkout.completeLocationFirst',
+            'Please use your location or complete your address before continuing.'
+          )
+        );
+        return;
+      }
+    }
+    if (currentStep === 'phone') {
+      if (!shippingAddress.phone.trim()) {
+        Alert.alert(
+          t('common.error', 'Error'),
+          t('checkout.enterPhoneFirst', 'Please enter your phone number before continuing.')
+        );
+        return;
+      }
+    }
+
     const nextStep = getNextStep();
     if (nextStep) {
       setCurrentStep(nextStep as any);
+    } else if (currentStep === 'payment') {
+      handlePlaceOrder();
     }
   };
 
   const handleBack = () => {
     switch (currentStep) {
-      case 'payment':
-        setCurrentStep('address');
+      case 'phone':
+        setCurrentStep('location');
         break;
-      case 'review':
-        setCurrentStep('payment');
+      case 'payment':
+        setCurrentStep('phone');
         break;
     }
   };
@@ -398,10 +485,16 @@ const CheckoutScreen: React.FC = () => {
       {/* Step Indicator */}
       {renderStepIndicator()}
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {currentStep === 'address' && renderAddressForm()}
-        {currentStep === 'payment' && renderPaymentMethods()}
-        {currentStep === 'review' && renderOrderReview()}
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.stepCard}>
+          {currentStep === 'location' && renderLocationStep()}
+          {currentStep === 'phone' && renderPhoneStep()}
+          {currentStep === 'payment' && renderPaymentMethods()}
+        </View>
 
         {/* Order Summary */}
         <View style={styles.orderSummary}>
@@ -448,7 +541,7 @@ const CheckoutScreen: React.FC = () => {
 
       {/* Bottom Actions */}
       <View style={styles.bottomActions}>
-        {currentStep !== 'address' && (
+        {currentStep !== 'location' && (
           <TouchableOpacity
             style={styles.backButton}
             onPress={handleBack}
@@ -460,16 +553,16 @@ const CheckoutScreen: React.FC = () => {
         <TouchableOpacity
           style={[
             styles.nextButton,
-            currentStep === 'review' && styles.placeOrderButton,
+            currentStep === 'payment' && styles.placeOrderButton,
           ]}
-          onPress={currentStep === 'review' ? handlePlaceOrder : handleNext}
+          onPress={handleNext}
           disabled={loading}
         >
             <Text style={styles.nextButtonText}>
               {loading ? t('checkout.processing') : 
-               currentStep === 'review' ? t('checkout.placeOrder') : t('checkout.next')}
+               currentStep === 'payment' ? t('checkout.placeOrder') : t('checkout.next')}
             </Text>
-          {currentStep !== 'review' && (
+          {currentStep !== 'payment' && (
             <Ionicons name="arrow-forward" size={20} color={COLORS.background} />
           )}
         </TouchableOpacity>
@@ -493,9 +586,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
-  backButton: {
-    padding: SPACING.sm,
-  },
   headerTitle: {
     fontSize: FONT_SIZES.lg,
     fontWeight: FONT_WEIGHTS.semiBold,
@@ -508,24 +598,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.lg,
+    paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   stepContainer: {
     alignItems: 'center',
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.border,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.xs,
   },
   activeStepCircle: {
     backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   stepNumber: {
     fontSize: FONT_SIZES.sm,
@@ -545,16 +640,54 @@ const styles = StyleSheet.create({
   },
   stepLine: {
     flex: 1,
-    height: 1,
+    height: 2,
     backgroundColor: COLORS.border,
-    marginHorizontal: SPACING.md,
+    marginHorizontal: SPACING.sm,
   },
   content: {
     flex: 1,
     paddingHorizontal: SPACING.lg,
   },
+  contentContainer: {
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.xl,
+  },
+  stepCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
   section: {
-    marginBottom: SPACING.xl,
+    marginBottom: 0,
+  },
+  helperText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.md,
+    lineHeight: 20,
+  },
+  locationButton: {
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.primary + '12',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  locationButtonDisabled: {
+    opacity: 0.6,
+  },
+  locationButtonText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHTS.medium,
   },
   sectionTitle: {
     fontSize: FONT_SIZES.lg,
@@ -572,13 +705,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   input: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: '#D5DCE5',
     borderRadius: BORDER_RADIUS.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     fontSize: FONT_SIZES.md,
     color: COLORS.text,
+    backgroundColor: COLORS.background,
   },
   row: {
     flexDirection: 'row',
@@ -760,7 +894,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     padding: SPACING.lg,
     borderRadius: BORDER_RADIUS.lg,
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   summaryTitle: {
     fontSize: FONT_SIZES.lg,
@@ -809,10 +945,19 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
     gap: SPACING.md,
   },
+  backButton: {
+    minWidth: 96,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.lg,
+  },
   backButtonText: {
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.medium,
-    color: COLORS.textSecondary,
+    color: COLORS.text,
   },
   nextButton: {
     flex: 1,

@@ -9,6 +9,7 @@ import { TechnicianStackParamList } from '../types';
 
 // Screens
 import TechnicianLoginScreen from '../screens/technician/TechnicianLoginScreen';
+import TechnicianSignupScreen from '../screens/technician/TechnicianSignupScreen';
 import TechnicianDashboardScreen from '../screens/technician/TechnicianDashboardScreen';
 import JobDetailScreen from '../screens/technician/JobDetailScreen';
 import TechnicianOrderHistoryScreen from '../screens/technician/TechnicianOrderHistoryScreen';
@@ -120,6 +121,7 @@ const TechnicianAppNavigator = () => {
         }}
       >
         <Stack.Screen name="Login" component={TechnicianLoginScreen} />
+        <Stack.Screen name="TechnicianSignup" component={TechnicianSignupScreen} />
         <Stack.Screen name="Main" component={TabNavigator} />
         <Stack.Screen name="JobDetail" component={JobDetailScreen} />
         <Stack.Screen name="TodayTasks" component={TechnicianTodayTasksScreen} />

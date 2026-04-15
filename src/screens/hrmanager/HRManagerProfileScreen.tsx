@@ -112,7 +112,7 @@ const HRManagerProfileScreen: React.FC = () => {
   };
 
   const menuItems = [
-    { icon: 'person-outline' as const, title: t('technician.profileEdit.personalInfo', 'Profile information'), onPress: () => navigation.navigate('HRManagerProfileEdit') },
+    { icon: 'person-outline' as const, title: t('technician.profileInfo', 'Profile information'), onPress: () => navigation.navigate('HRManagerProfileEdit') },
     { icon: 'notifications-outline' as const, title: t('technician.notifications', 'Notifications'), onPress: () => {} },
     { icon: 'help-circle-outline' as const, title: t('technician.helpSupport', 'Help & Support'), onPress: () => navigation.navigate('HelpCenter') },
     { icon: 'log-out-outline' as const, title: t('technician.logout', 'Log out'), onPress: handleLogout, color: COLORS.error },
@@ -125,12 +125,12 @@ const HRManagerProfileScreen: React.FC = () => {
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={COLORS.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={styles.headerTitle}>{t('tabs.profile', 'Profile')}</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.centeredContent}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>{t('common.loading', 'Loading...')}</Text>
         </View>
       </View>
     );
@@ -142,7 +142,7 @@ const HRManagerProfileScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={styles.headerTitle}>{t('tabs.profile', 'Profile')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -169,7 +169,7 @@ const HRManagerProfileScreen: React.FC = () => {
             ) : null}
             <View style={styles.onlineStatus}>
               <View style={[styles.statusDot, { backgroundColor: COLORS.success }]} />
-              <Text style={styles.statusText}>Online</Text>
+              <Text style={styles.statusText}>{t('technician.availability.onlineStatus', 'Online')}</Text>
             </View>
           </View>
 
@@ -182,7 +182,9 @@ const HRManagerProfileScreen: React.FC = () => {
             <Text style={styles.ratingText}>
               {Number(display.rating) ? Number(display.rating).toFixed(1) : '0'}/5
             </Text>
-            <Text style={styles.ratingLabel}>({display.jobsCompleted} jobs)</Text>
+            <Text style={styles.ratingLabel}>
+              ({t('technician.jobsCount', { count: display.jobsCompleted, defaultValue: `${display.jobsCompleted} jobs` })})
+            </Text>
           </View>
         </View>
 

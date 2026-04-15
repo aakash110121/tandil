@@ -24,16 +24,33 @@ function getGreetingKey(): 'greetingMorning' | 'greetingAfternoon' | 'greetingEv
   return 'greetingEvening';
 }
 
-function formatLeaveTypeLabel(leaveType: string): string {
+function formatLeaveTypeLabel(leaveType: string, t: any): string {
   const map: Record<string, string> = {
-    annual: 'Annual Leave',
-    sick: 'Sick Leave',
-    unpaid: 'Unpaid Leave',
-    paternity: 'Paternity Leave',
-    other: 'Other',
+    annual: t('admin.hrLeave.leaveTypes.annual', 'Annual Leave'),
+    sick: t('admin.hrLeave.leaveTypes.sick', 'Sick Leave'),
+    unpaid: t('admin.hrLeave.leaveTypes.unpaid', 'Unpaid Leave'),
+    paternity: t('admin.hrLeave.leaveTypes.paternity', 'Paternity Leave'),
+    other: t('admin.hrLeave.leaveTypes.other', 'Other'),
   };
   const key = (leaveType || '').toLowerCase().replace(/\s+/g, '_');
   return map[key] || leaveType;
+}
+
+function formatRoleLabel(role: string, t: any): string {
+  const key = (role || '').toLowerCase().trim();
+  if (key.includes('team leader') || key.includes('supervisor')) {
+    return t('admin.hrEmployees.teamLeader', 'Team Leader');
+  }
+  if (key.includes('field worker') || key.includes('technician')) {
+    return t('admin.hrEmployees.fieldWorker', 'Field Worker');
+  }
+  if (key.includes('area manager')) {
+    return t('admin.hrEmployees.areaManager', 'Area Manager');
+  }
+  if (key.includes('hr')) {
+    return t('admin.hrEmployees.hrStaff', 'HR Staff');
+  }
+  return role;
 }
 
 const HRManagerDashboardScreen: React.FC = () => {
@@ -61,13 +78,13 @@ const HRManagerDashboardScreen: React.FC = () => {
         setSummary(summaryRes.data);
       } else {
         setSummary(null);
-        setError('Failed to load dashboard');
+        setError(t('admin.hrDashboard.failedToLoad', 'Failed to load dashboard'));
       }
       if (visitRes && visitRes.success && visitRes.data) {
         setVisitAssignments(visitRes.data);
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to load dashboard');
+      setError(err.response?.data?.message || err.message || t('admin.hrDashboard.failedToLoad', 'Failed to load dashboard'));
       setSummary(null);
     } finally {
       setLoading(false);
@@ -102,7 +119,7 @@ const HRManagerDashboardScreen: React.FC = () => {
       Alert.alert(t('admin.hrManagerDashboard.successTitle'), t('admin.hrManagerDashboard.leaveApproved', { name: item.applicant_name }));
       fetchSummary(false);
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Failed to approve leave';
+      const msg = err.response?.data?.message || err.message || t('admin.hrLeave.failedToApprove', 'Failed to approve leave');
       Alert.alert(t('common.error') || 'Error', msg);
     } finally {
       setActionLeaveId(null);
@@ -117,7 +134,7 @@ const HRManagerDashboardScreen: React.FC = () => {
       Alert.alert(t('admin.hrManagerDashboard.leaveRejectedTitle'), t('admin.hrManagerDashboard.leaveRejectedMessage', { name: item.applicant_name }));
       fetchSummary(false);
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Failed to reject leave';
+      const msg = err.response?.data?.message || err.message || t('admin.hrLeave.failedToReject', 'Failed to reject leave');
       Alert.alert(t('common.error') || 'Error', msg);
     } finally {
       setActionLeaveId(null);
@@ -180,7 +197,7 @@ const HRManagerDashboardScreen: React.FC = () => {
         <View style={styles.employeeInfo}>
           <Text style={styles.employeeName}>{item.name}</Text>
           <Text style={styles.employeeId}>{item.employeeId}</Text>
-          <Text style={styles.employeePosition}>{item.position}</Text>
+          <Text style={styles.employeePosition}>{formatRoleLabel(item.position, t)}</Text>
         </View>
         <View style={[
           styles.statusBadge,
@@ -202,8 +219,11 @@ const HRManagerDashboardScreen: React.FC = () => {
   );
 
   const renderLeaveRequest = ({ item }: { item: HRPendingLeaveRequest }) => {
-    const leaveTypeLabel = formatLeaveTypeLabel(item.leave_type);
-    const duration = `${item.duration_days} ${item.duration_days === 1 ? 'day' : 'days'}`;
+    const leaveTypeLabel = formatLeaveTypeLabel(item.leave_type, t);
+    const duration = t('admin.hrLeave.daysCount', {
+      count: item.duration_days,
+      defaultValue: `${item.duration_days} ${item.duration_days === 1 ? 'day' : 'days'}`,
+    });
     return (
       <View style={styles.leaveCard}>
         <View style={styles.leaveHeader}>
@@ -216,7 +236,7 @@ const HRManagerDashboardScreen: React.FC = () => {
           </View>
         </View>
         <Text style={styles.leaveType}>{leaveTypeLabel} • {duration}</Text>
-        <Text style={styles.leaveDate}>From: {item.start_date}</Text>
+        <Text style={styles.leaveDate}>{t('admin.hrManagerDashboard.fromDate', { date: item.start_date, defaultValue: `From: ${item.start_date}` })}</Text>
         <View style={styles.leaveActions}>
           <TouchableOpacity
             style={[styles.approveButton, actionLeaveId === item.id && styles.leaveActionDisabled]}
@@ -279,7 +299,11 @@ const HRManagerDashboardScreen: React.FC = () => {
   const renderSchedule = ({ item }: { item: any }) => (
     <View style={styles.scheduleCard}>
       <Text style={styles.scheduleDate}>
-        {item.date === 'Today' ? t('admin.hrManagerDashboard.today') : item.date === 'Tomorrow' ? t('admin.hrManagerDashboard.tomorrow') : item.date}
+        {item.id === 'today'
+          ? t('admin.hrManagerDashboard.today')
+          : item.id === 'tomorrow'
+          ? t('admin.hrManagerDashboard.tomorrow')
+          : item.date}
       </Text>
       <View style={styles.scheduleStats}>
         <View style={styles.scheduleStatItem}>
@@ -313,7 +337,7 @@ const HRManagerDashboardScreen: React.FC = () => {
       <View style={[styles.container, styles.centered]}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={() => fetchSummary()}>
-          <Text style={styles.retryButtonText}>{t('common.retry') || 'Retry'}</Text>
+          <Text style={styles.retryButtonText}>{t('common.retry', 'Retry')}</Text>
         </TouchableOpacity>
       </View>
     );

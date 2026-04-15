@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { hrService, Employee } from '../../services/hrService';
+import { useTranslation } from 'react-i18next';
 
 export type RoleFilter = 'all' | 'supervisor' | 'technician';
 
@@ -42,22 +43,6 @@ function matchesRoleFilter(employee: Employee, filter: RoleFilter): boolean {
   return true;
 }
 
-// Map designation to display role
-const getRoleDisplayName = (designation: string | null | undefined): string => {
-  const d = designation ?? '';
-  const roleMap: { [key: string]: string } = {
-    'Technician': 'Field Worker',
-    'Field Technician': 'Field Technician',
-    'Senior Technician': 'Senior Technician',
-    'Garden Technician': 'Garden Technician',
-    'Maintenance Technician': 'Maintenance Technician',
-    'Supervisor': 'Team Leader',
-    'Area Manager': 'Area Manager',
-    'HR': 'HR Staff',
-  };
-  return roleMap[d] || d || '—';
-};
-
 // Format date for display
 const formatDate = (dateString: string | null | undefined): string => {
   if (dateString == null || String(dateString).trim() === '') return '—';
@@ -74,6 +59,7 @@ const PER_PAGE = 20;
 
 const EmployeeListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,6 +72,21 @@ const EmployeeListScreen: React.FC = () => {
   const [lastPage, setLastPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+
+  const getRoleDisplayName = useCallback((designation: string | null | undefined): string => {
+    const d = designation ?? '';
+    const roleMap: { [key: string]: string } = {
+      Technician: t('admin.hrEmployees.fieldWorker', 'Field Worker'),
+      'Field Technician': t('admin.hrEmployees.fieldTechnician', 'Field Technician'),
+      'Senior Technician': t('admin.hrEmployees.seniorTechnician', 'Senior Technician'),
+      'Garden Technician': t('admin.hrEmployees.gardenTechnician', 'Garden Technician'),
+      'Maintenance Technician': t('admin.hrEmployees.maintenanceTechnician', 'Maintenance Technician'),
+      Supervisor: t('admin.hrEmployees.teamLeader', 'Team Leader'),
+      'Area Manager': t('admin.hrEmployees.areaManager', 'Area Manager'),
+      HR: t('admin.hrEmployees.hrStaff', 'HR Staff'),
+    };
+    return roleMap[d] || d || '—';
+  }, [t]);
 
   type FetchMode = 'initial' | 'refresh' | 'loadMore';
 
@@ -119,12 +120,13 @@ const EmployeeListScreen: React.FC = () => {
       } else {
         if (!isLoadMore) {
           setEmployees([]);
-          setError(String('Invalid response format from server'));
+          setError(String(t('admin.hrEmployees.invalidResponse', 'Invalid response format from server')));
         }
       }
     } catch (err: any) {
       console.error('Error fetching employees:', err);
-      const errorMessage = err.response?.data?.message ?? err.message ?? 'Failed to load employees';
+      const errorMessage =
+        err.response?.data?.message ?? err.message ?? t('admin.hrEmployees.failedToLoad', 'Failed to load employees');
       setError(String(errorMessage));
       if (!isLoadMore) setEmployees([]);
     } finally {
@@ -172,30 +174,36 @@ const EmployeeListScreen: React.FC = () => {
     if (!selectedEmployee) return;
     
     Alert.alert(
-      'Delete Employee',
-      `Are you sure you want to delete ${selectedEmployee.name}? This action cannot be undone.`,
+      t('admin.hrEmployees.deleteTitle', 'Delete Employee'),
+      t('admin.hrEmployees.deleteConfirm', {
+        name: selectedEmployee.name,
+        defaultValue: `Are you sure you want to delete ${selectedEmployee.name}? This action cannot be undone.`,
+      }),
       [
         {
-          text: 'Cancel',
+          text: t('common.cancel', 'Cancel'),
           style: 'cancel',
           onPress: () => setShowMenu(false),
         },
         {
-          text: 'Delete',
+          text: t('common.delete', 'Delete'),
           style: 'destructive',
           onPress: async () => {
             setShowMenu(false);
             try {
               await hrService.deleteEmployee(selectedEmployee.id);
-              Alert.alert('Success', 'Employee deleted successfully');
+              Alert.alert(
+                t('admin.hrManagerDashboard.successTitle', 'Success'),
+                t('admin.hrEmployees.deletedSuccess', 'Employee deleted successfully')
+              );
               fetchEmployees('refresh');
             } catch (err: any) {
               console.error('Error deleting employee:', err);
               const errorMessage = 
                 err.response?.data?.message || 
                 err.message || 
-                'Failed to delete employee. Please try again.';
-              Alert.alert('Error', errorMessage);
+                t('admin.hrEmployees.deleteFailed', 'Failed to delete employee. Please try again.');
+              Alert.alert(t('common.error', 'Error'), errorMessage);
             }
           },
         },
@@ -246,7 +254,9 @@ const EmployeeListScreen: React.FC = () => {
                 styles.statusText,
                 { color: status === 'active' ? COLORS.success : COLORS.warning }
               ]}>
-                {status === 'active' ? 'Active' : 'On Leave'}
+                {status === 'active'
+                  ? t('admin.hrManagerDashboard.active', 'Active')
+                  : t('admin.hrManagerDashboard.onLeave', 'On Leave')}
               </Text>
             </View>
           </View>
@@ -256,8 +266,15 @@ const EmployeeListScreen: React.FC = () => {
             <Text style={styles.employeeRole}>{roleDisplayName}</Text>
           </View>
           <View style={styles.bottomRow}>
-            <Text style={styles.joiningDate}>Joined: {joiningDate}</Text>
-            <Text style={styles.leaveBalance}>Leave: {leaveDisplay} days</Text>
+            <Text style={styles.joiningDate}>
+              {t('admin.hrManagerDashboard.joined', { date: joiningDate, defaultValue: `Joined: ${joiningDate}` })}
+            </Text>
+            <Text style={styles.leaveBalance}>
+              {t('admin.hrManagerDashboard.leaveDays', {
+                count: leaveDisplay,
+                defaultValue: `Leave: ${leaveDisplay} days`,
+              })}
+            </Text>
           </View>
         </View>
 
@@ -283,7 +300,7 @@ const EmployeeListScreen: React.FC = () => {
         </TouchableOpacity>
         <View style={styles.headerTitleWrap}>
           <Text style={styles.headerTitle} numberOfLines={1}>
-            Employee Directory
+            {t('admin.hrManagerDashboard.employeeDirectory', 'Employee Directory')}
           </Text>
         </View>
         <View style={styles.headerRight} />
@@ -294,7 +311,7 @@ const EmployeeListScreen: React.FC = () => {
         <Ionicons name="search" size={20} color={COLORS.textSecondary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search employees..."
+          placeholder={t('admin.hrEmployees.searchPlaceholder', 'Search employees...')}
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor={COLORS.textSecondary}
@@ -316,37 +333,34 @@ const EmployeeListScreen: React.FC = () => {
         <TouchableOpacity
           style={[
             styles.roleChip,
-            styles.roleChipAll,
             roleFilter === 'all' && styles.roleChipSelected,
           ]}
           onPress={() => setRoleFilter('all')}
         >
           <Text style={[styles.roleChipText, roleFilter === 'all' && styles.roleChipTextSelected]}>
-            All
+            {t('common.all', 'All')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.roleChip,
-            styles.roleChipSupervisors,
             roleFilter === 'supervisor' && styles.roleChipSelected,
           ]}
           onPress={() => setRoleFilter('supervisor')}
         >
           <Text style={[styles.roleChipText, roleFilter === 'supervisor' && styles.roleChipTextSelected]}>
-            Supervisors
+            {t('admin.hrEmployees.supervisors', 'Supervisors')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[
             styles.roleChip,
-            styles.roleChipTechnicians,
             roleFilter === 'technician' && styles.roleChipSelected,
           ]}
           onPress={() => setRoleFilter('technician')}
         >
           <Text style={[styles.roleChipText, roleFilter === 'technician' && styles.roleChipTextSelected]}>
-            Technicians
+            {t('admin.hrEmployees.technicians', 'Technicians')}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -355,14 +369,14 @@ const EmployeeListScreen: React.FC = () => {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Loading employees...</Text>
+          <Text style={styles.loadingText}>{t('admin.hrEmployees.loading', 'Loading employees...')}</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={COLORS.error} />
           <Text style={styles.errorText}>{String(error)}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => fetchEmployees('initial')}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t('common.retry', 'Retry')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -387,7 +401,9 @@ const EmployeeListScreen: React.FC = () => {
             <View style={styles.emptyState}>
               <Ionicons name="people-outline" size={64} color={COLORS.textSecondary} />
               <Text style={styles.emptyText}>
-                {searchQuery ? 'No employees found' : 'No employees yet'}
+                {searchQuery
+                  ? t('admin.hrEmployees.emptySearch', 'No employees found')
+                  : t('admin.hrEmployees.emptyList', 'No employees yet')}
               </Text>
             </View>
           }
@@ -396,7 +412,7 @@ const EmployeeListScreen: React.FC = () => {
               {loadingMore ? (
                 <View style={styles.footerLoader}>
                   <ActivityIndicator size="small" color={COLORS.primary} />
-                  <Text style={styles.footerLoaderText}>Loading more...</Text>
+                  <Text style={styles.footerLoaderText}>{t('common.loadingMore', 'Loading more...')}</Text>
                 </View>
               ) : null}
               {!loading && !loadingMore && total > 0 && (
@@ -427,14 +443,16 @@ const EmployeeListScreen: React.FC = () => {
               onPress={handleEdit}
             >
               <Ionicons name="create-outline" size={20} color={COLORS.primary} />
-              <Text style={styles.menuItemText}>Edit</Text>
+              <Text style={styles.menuItemText}>{t('common.edit', 'Edit')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.menuItem, styles.menuItemDanger]}
               onPress={handleDelete}
             >
               <Ionicons name="trash-outline" size={20} color={COLORS.error} />
-              <Text style={[styles.menuItemText, styles.menuItemTextDanger]}>Delete</Text>
+              <Text style={[styles.menuItemText, styles.menuItemTextDanger]}>
+                {t('common.delete', 'Delete')}
+              </Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -496,6 +514,7 @@ const styles = StyleSheet.create({
   },
   roleFilterScroll: {
     flexGrow: 0,
+    minHeight: 64,
   },
   roleFilterRow: {
     flexDirection: 'row',
@@ -506,23 +525,17 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   roleChip: {
-    paddingHorizontal: SPACING.md,
+    minWidth: 96,
+    paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.sm,
+    minHeight: 48,
     borderRadius: BORDER_RADIUS.round,
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  roleChipAll: {
-    width: 64,
-  },
-  roleChipSupervisors: {
-    width: 120,
-  },
-  roleChipTechnicians: {
-    width: 120,
+    flexShrink: 0,
   },
   roleChipSelected: {
     backgroundColor: COLORS.primary,
@@ -532,6 +545,9 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     color: COLORS.textSecondary,
     fontWeight: FONT_WEIGHTS.medium,
+    textAlign: 'center',
+    paddingTop: 2,
+    paddingBottom: 1,
   },
   roleChipTextSelected: {
     color: COLORS.background,

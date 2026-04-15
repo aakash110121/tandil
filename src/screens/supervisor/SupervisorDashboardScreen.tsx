@@ -351,6 +351,18 @@ const SupervisorDashboardScreen: React.FC = () => {
               </View>
               <Text style={styles.quickActionText}>{t('supervisorDashboard.profile')}</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickAction}
+              onPress={() => navigation.navigate('SupervisorSignupRequests' as never)}
+            >
+              <View style={styles.quickActionIcon}>
+                <Ionicons name="person-add-outline" size={24} color={COLORS.primary} />
+              </View>
+              <Text style={styles.quickActionText}>
+                {t('supervisorDashboard.signupRequests')}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>

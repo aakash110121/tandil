@@ -17,7 +17,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
 import { shopService, ShopProduct } from '../../services/shopService';
-import { addCartItem } from '../../services/cartService';
+import { addCartItem, getBuyNowSummary } from '../../services/cartService';
 import { useIsAuthenticated } from '../../store';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -74,6 +74,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
   const [apiProduct, setApiProduct] = useState<ShopProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [buyingNow, setBuyingNow] = useState(false);
   const isAuthenticated = useIsAuthenticated();
 
   useEffect(() => {
@@ -150,19 +151,89 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
     }
   };
 
-  const handleBuyNow = () => {
+  const handleBuyNow = async () => {
     if (!product.inStock) {
       Alert.alert(t('category.outOfStock'), t('category.outOfStock'));
       return;
     }
-    
-    // Navigate to checkout with product details
-    navigation.navigate('Checkout', { 
-      items: [{
-        ...product,
-        quantity: quantity
-      }]
-    });
+
+    if (!isAuthenticated) {
+      Alert.alert(
+        t('product.loginRequired', { defaultValue: 'Login required' }),
+        t('product.loginToBuyNow', { defaultValue: 'Please log in to continue with Buy Now.' }),
+        [
+          { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+          { text: t('auth.login', 'Log in'), onPress: () => navigation.navigate('Main', { screen: 'Profile' }) },
+        ]
+      );
+      return;
+    }
+
+    const productId = Number(product.id);
+    if (!Number.isFinite(productId)) {
+      Alert.alert(t('common.error', 'Error'), t('product.invalidProduct', { defaultValue: 'Invalid product.' }));
+      return;
+    }
+
+    setBuyingNow(true);
+    try {
+      const res = await getBuyNowSummary(productId, quantity);
+      if (res?.item && res?.order_summary) {
+        navigation.navigate('Checkout', {
+          cartItems: [
+            {
+              id: String(res.item.id || res.item.product_id),
+              productId: String(res.item.product_id),
+              name: res.item.name,
+              price: res.item.current_price,
+              originalPrice: res.item.original_price ?? undefined,
+              image: res.item.image_url || product.image,
+              color: '',
+              size: '',
+              quantity: res.item.quantity,
+            },
+          ],
+          total: res.order_summary.total,
+          buyNowSummary: res.order_summary,
+          isBuyNow: true,
+        });
+        return;
+      }
+
+      navigation.navigate('Checkout', {
+        cartItems: [
+          {
+            id: product.id,
+            productId: product.id,
+            name: product.name,
+            price: product.price,
+            originalPrice: product.originalPrice > product.price ? product.originalPrice : undefined,
+            image: product.image,
+            color: '',
+            size: '',
+            quantity,
+          },
+        ],
+        isBuyNow: true,
+      });
+    } catch (err: any) {
+      const status = err.response?.status;
+      const message =
+        err.response?.data?.message ||
+        err.message ||
+        t('checkout.orderSummaryError', { defaultValue: 'Failed to load order summary.' });
+      if (status === 401) {
+        Alert.alert(
+          t('product.loginRequired', { defaultValue: 'Login required' }),
+          t('product.loginToBuyNow', { defaultValue: 'Please log in to continue with Buy Now.' }),
+          [{ text: t('common.ok', 'OK') }]
+        );
+      } else {
+        Alert.alert(t('common.error', 'Error'), message);
+      }
+    } finally {
+      setBuyingNow(false);
+    }
   };
 
   const increaseQuantity = () => {
@@ -327,11 +398,15 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.buyNowButton, !product.inStock && styles.disabledButton]}
+          style={[styles.buyNowButton, (!product.inStock || buyingNow) && styles.disabledButton]}
           onPress={handleBuyNow}
-          disabled={!product.inStock}
+          disabled={!product.inStock || buyingNow}
         >
-          <Text style={styles.buyNowText}>{t('product.buyNow')}</Text>
+          {buyingNow ? (
+            <ActivityIndicator size="small" color={COLORS.background} />
+          ) : (
+            <Text style={styles.buyNowText}>{t('product.buyNow')}</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

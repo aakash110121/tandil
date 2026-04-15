@@ -8,19 +8,22 @@ import {
   Dimensions,
   Image,
   ScrollView,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../constants';
 import { useTranslation } from 'react-i18next';
+import { setAppLanguage } from '../i18n';
 
 const { width, height } = Dimensions.get('window');
 
 const RoleSelectionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
 
   console.log('RoleSelectionScreen: Rendering...');
 
@@ -76,6 +79,15 @@ const RoleSelectionScreen: React.FC = () => {
       >
         {/* Header */}
         <View style={styles.header}>
+          <View style={styles.headerTopRow}>
+            <TouchableOpacity
+              style={styles.languageButton}
+              onPress={() => setLanguageModalVisible(true)}
+            >
+              <Ionicons name="globe-outline" size={22} color={COLORS.text} />
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.logoContainer}>
           <Image source={require('../../assets/logo.png')} style={styles.logoImage} />
           </View>
@@ -178,6 +190,50 @@ const RoleSelectionScreen: React.FC = () => {
           <Text style={styles.footerText}>{t('roleSelection.footer')}</Text>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>{t('common.language', 'Language')}</Text>
+            <View style={styles.languageOptions}>
+              {[
+                { code: 'en', label: 'English' },
+                { code: 'ar', label: 'العربية' },
+                { code: 'ur', label: 'اردو' },
+              ].map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.languageOption,
+                    i18n.language === lang.code && styles.languageOptionActive,
+                  ]}
+                  onPress={async () => {
+                    await setAppLanguage(lang.code as 'en' | 'ar' | 'ur');
+                    setLanguageModalVisible(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.languageOptionText,
+                      i18n.language === lang.code && styles.languageOptionTextActive,
+                    ]}
+                  >
+                    {lang.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.modalClose} onPress={() => setLanguageModalVisible(false)}>
+              <Text style={styles.modalCloseText}>{t('common.cancel', 'Cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -195,6 +251,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.lg,
+  },
+  headerTopRow: {
+    width: '100%',
+    alignItems: 'flex-end',
+    marginBottom: SPACING.sm,
+  },
+  languageButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoContainer: {
     width: 150,
@@ -271,6 +342,60 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    width: '85%',
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.lg,
+  },
+  modalTitle: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: FONT_WEIGHTS.bold,
+    color: COLORS.text,
+    marginBottom: SPACING.md,
+  },
+  languageOptions: {
+    gap: SPACING.sm,
+  },
+  languageOption: {
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+  },
+  languageOptionActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '10',
+  },
+  languageOptionText: {
+    fontSize: FONT_SIZES.md,
+    color: COLORS.text,
+  },
+  languageOptionTextActive: {
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  modalClose: {
+    alignSelf: 'flex-end',
+    marginTop: SPACING.md,
+  },
+  modalCloseText: {
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHTS.medium,
   },
 });
 

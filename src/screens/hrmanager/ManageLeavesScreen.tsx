@@ -14,14 +14,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { hrService, HRLeaveRequest } from '../../services/hrService';
+import { useTranslation } from 'react-i18next';
 
-function formatLeaveTypeLabel(leaveType: string): string {
+function formatLeaveTypeLabel(leaveType: string, t: any): string {
   const map: Record<string, string> = {
-    annual: 'Annual Leave',
-    sick: 'Sick Leave',
-    unpaid: 'Unpaid Leave',
-    paternity: 'Paternity Leave',
-    other: 'Other',
+    annual: t('admin.hrLeave.leaveTypes.annual', 'Annual Leave'),
+    sick: t('admin.hrLeave.leaveTypes.sick', 'Sick Leave'),
+    unpaid: t('admin.hrLeave.leaveTypes.unpaid', 'Unpaid Leave'),
+    paternity: t('admin.hrLeave.leaveTypes.paternity', 'Paternity Leave'),
+    other: t('admin.hrLeave.leaveTypes.other', 'Other'),
   };
   const key = (leaveType || '').toLowerCase().replace(/\s+/g, '_');
   return map[key] || leaveType;
@@ -29,6 +30,7 @@ function formatLeaveTypeLabel(leaveType: string): string {
 
 const ManageLeavesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const [selectedFilter, setSelectedFilter] = useState<'pending' | 'approved' | 'rejected'>('pending');
   const [list, setList] = useState<HRLeaveRequest[]>([]);
   const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0 });
@@ -55,7 +57,10 @@ const ManageLeavesScreen: React.FC = () => {
       }
     } catch (err: any) {
       setList([]);
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to load leave requests');
+      Alert.alert(
+        t('common.error', 'Error'),
+        err.response?.data?.message || err.message || t('admin.hrLeave.failedToLoad', 'Failed to load leave requests')
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -80,20 +85,34 @@ const ManageLeavesScreen: React.FC = () => {
 
   const handleApprove = (item: HRLeaveRequest) => {
     Alert.alert(
-      'Approve Leave',
-      `Approve ${formatLeaveTypeLabel(item.leave_type)} for ${item.applicant_name}?`,
+      t('admin.hrManagerDashboard.approveLeaveTitle', 'Approve Leave'),
+      t('admin.hrManagerDashboard.approveLeaveConfirm', {
+        type: formatLeaveTypeLabel(item.leave_type, t),
+        name: item.applicant_name,
+        id: item.applicant_id,
+          defaultValue: `Approve ${formatLeaveTypeLabel(item.leave_type, t)} for ${item.applicant_name}?`,
+      }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         {
-          text: 'Approve',
+          text: t('admin.hrManagerDashboard.approve', 'Approve'),
           onPress: async () => {
             setActionId(item.id);
             try {
               await hrService.approveLeaveRequest(item.id);
-              Alert.alert('Success', `Leave approved for ${item.applicant_name}`);
+              Alert.alert(
+                t('admin.hrManagerDashboard.successTitle', 'Success'),
+                t('admin.hrManagerDashboard.leaveApproved', {
+                  name: item.applicant_name,
+                  defaultValue: `Leave approved for ${item.applicant_name}`,
+                })
+              );
               fetchLeaves(selectedFilter, true);
             } catch (err: any) {
-              Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to approve');
+              Alert.alert(
+                t('common.error', 'Error'),
+                err.response?.data?.message || err.message || t('admin.hrLeave.failedToApprove', 'Failed to approve')
+              );
             } finally {
               setActionId(null);
             }
@@ -105,21 +124,35 @@ const ManageLeavesScreen: React.FC = () => {
 
   const handleReject = (item: HRLeaveRequest) => {
     Alert.alert(
-      'Reject Leave',
-      `Reject ${formatLeaveTypeLabel(item.leave_type)} for ${item.applicant_name}?`,
+      t('admin.hrManagerDashboard.rejectLeaveTitle', 'Reject Leave'),
+      t('admin.hrManagerDashboard.rejectLeaveConfirm', {
+        type: formatLeaveTypeLabel(item.leave_type, t),
+        name: item.applicant_name,
+        id: item.applicant_id,
+          defaultValue: `Reject ${formatLeaveTypeLabel(item.leave_type, t)} for ${item.applicant_name}?`,
+      }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         {
-          text: 'Reject',
+          text: t('admin.hrManagerDashboard.reject', 'Reject'),
           style: 'destructive',
           onPress: async () => {
             setActionId(item.id);
             try {
               await hrService.rejectLeaveRequest(item.id);
-              Alert.alert('Leave Rejected', `Leave request rejected for ${item.applicant_name}`);
+              Alert.alert(
+                t('admin.hrManagerDashboard.leaveRejectedTitle', 'Leave Rejected'),
+                t('admin.hrManagerDashboard.leaveRejectedMessage', {
+                  name: item.applicant_name,
+                  defaultValue: `Leave request rejected for ${item.applicant_name}`,
+                })
+              );
               fetchLeaves(selectedFilter, true);
             } catch (err: any) {
-              Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to reject');
+              Alert.alert(
+                t('common.error', 'Error'),
+                err.response?.data?.message || err.message || t('admin.hrLeave.failedToReject', 'Failed to reject')
+              );
             } finally {
               setActionId(null);
             }
@@ -130,14 +163,17 @@ const ManageLeavesScreen: React.FC = () => {
   };
 
   const filters: { id: 'pending' | 'approved' | 'rejected'; label: string; count: number }[] = [
-    { id: 'pending', label: 'Pending', count: counts.pending },
-    { id: 'approved', label: 'Approved', count: counts.approved },
-    { id: 'rejected', label: 'Rejected', count: counts.rejected },
+    { id: 'pending', label: t('admin.hrLeave.pending', 'Pending'), count: counts.pending },
+    { id: 'approved', label: t('admin.hrLeave.approved', 'Approved'), count: counts.approved },
+    { id: 'rejected', label: t('admin.hrLeave.rejected', 'Rejected'), count: counts.rejected },
   ];
 
   const renderLeaveRequest = ({ item }: { item: HRLeaveRequest }) => {
-    const leaveTypeLabel = formatLeaveTypeLabel(item.leave_type);
-    const durationText = `${item.duration_days} ${item.duration_days === 1 ? 'day' : 'days'}`;
+    const leaveTypeLabel = formatLeaveTypeLabel(item.leave_type, t);
+    const durationText = t('admin.hrLeave.daysCount', {
+      count: item.duration_days,
+      defaultValue: `${item.duration_days} ${item.duration_days === 1 ? 'day' : 'days'}`,
+    });
     const isActioning = actionId === item.id;
     return (
       <View style={styles.leaveCard}>
@@ -173,7 +209,11 @@ const ManageLeavesScreen: React.FC = () => {
                   COLORS.warning,
               },
             ]}>
-              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+              {item.status === 'approved'
+                ? t('admin.hrLeave.approved', 'Approved')
+                : item.status === 'rejected'
+                ? t('admin.hrLeave.rejected', 'Rejected')
+                : t('admin.hrLeave.pending', 'Pending')}
             </Text>
           </View>
         </View>
@@ -189,12 +229,18 @@ const ManageLeavesScreen: React.FC = () => {
           </View>
           <View style={styles.detailRow}>
             <Ionicons name="arrow-forward-outline" size={16} color={COLORS.textSecondary} />
-            <Text style={styles.detailText}>{item.start_date} to {item.end_date}</Text>
+            <Text style={styles.detailText}>
+              {t('admin.hrLeave.dateRange', {
+                start: item.start_date,
+                end: item.end_date,
+                defaultValue: `${item.start_date} to ${item.end_date}`,
+              })}
+            </Text>
           </View>
         </View>
 
         <View style={styles.reasonBox}>
-          <Text style={styles.reasonLabel}>Reason:</Text>
+          <Text style={styles.reasonLabel}>{t('admin.hrLeave.reason', 'Reason')}:</Text>
           <Text style={styles.reasonText}>{item.reason || '—'}</Text>
         </View>
 
@@ -210,7 +256,7 @@ const ManageLeavesScreen: React.FC = () => {
               ) : (
                 <Ionicons name="checkmark" size={18} color={COLORS.background} />
               )}
-              <Text style={styles.approveText}>Approve</Text>
+              <Text style={styles.approveText}>{t('admin.hrManagerDashboard.approve', 'Approve')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.rejectButton, isActioning && styles.actionDisabled]}
@@ -222,7 +268,7 @@ const ManageLeavesScreen: React.FC = () => {
               ) : (
                 <Ionicons name="close" size={18} color={COLORS.background} />
               )}
-              <Text style={styles.rejectText}>Reject</Text>
+              <Text style={styles.rejectText}>{t('admin.hrManagerDashboard.reject', 'Reject')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -240,7 +286,7 @@ const ManageLeavesScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Manage Leaves</Text>
+        <Text style={styles.headerTitle}>{t('admin.hrManagerDashboard.manageLeaves', 'Manage Leaves')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -293,7 +339,12 @@ const ManageLeavesScreen: React.FC = () => {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={64} color={COLORS.textSecondary} />
-              <Text style={styles.emptyText}>No {selectedFilter} leave requests</Text>
+              <Text style={styles.emptyText}>
+                {t('admin.hrLeave.emptyState', {
+                  status: filters.find((f) => f.id === selectedFilter)?.label?.toLowerCase() ?? selectedFilter,
+                  defaultValue: `No ${selectedFilter} leave requests`,
+                })}
+              </Text>
             </View>
           }
         />

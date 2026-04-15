@@ -13,9 +13,11 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { hrService } from '../../services/hrService';
+import { useTranslation } from 'react-i18next';
 
 const AddEmployeeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,10 +30,10 @@ const AddEmployeeScreen: React.FC = () => {
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const positions = [
-    { value: 'Field Worker', label: 'Field Worker', designation: 'Technician' },
-    { value: 'Team Leader', label: 'Team Leader', designation: 'Supervisor' },
-    { value: 'Area Manager', label: 'Area Manager', designation: 'Area Manager' },
-    { value: 'HR Staff', label: 'HR Staff', designation: 'HR' },
+    { value: 'Field Worker', label: t('admin.hrEmployees.fieldWorker', 'Field Worker'), designation: 'Technician' },
+    { value: 'Team Leader', label: t('admin.hrEmployees.teamLeader', 'Team Leader'), designation: 'Supervisor' },
+    { value: 'Area Manager', label: t('admin.hrEmployees.areaManager', 'Area Manager'), designation: 'Area Manager' },
+    { value: 'HR Staff', label: t('admin.hrEmployees.hrStaff', 'HR Staff'), designation: 'HR' },
   ];
 
   // Generate employee ID based on position (if not provided)
@@ -54,35 +56,35 @@ const AddEmployeeScreen: React.FC = () => {
     const newErrors: { [key: string]: string } = {};
 
     if (!name.trim()) {
-      newErrors.name = 'Name is required';
+      newErrors.name = t('admin.hrEmployees.validation.nameRequired', 'Name is required');
     }
 
     if (!email.trim()) {
-      newErrors.email = 'Email Address is required';
+      newErrors.email = t('admin.hrEmployees.validation.emailRequired', 'Email Address is required');
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = t('admin.hrEmployees.validation.emailInvalid', 'Please enter a valid email address');
     }
 
     if (!phone.trim()) {
-      newErrors.phone = 'Phone Number is required';
+      newErrors.phone = t('admin.hrEmployees.validation.phoneRequired', 'Phone Number is required');
     }
 
     if (!position) {
-      newErrors.position = 'Position is required';
+      newErrors.position = t('admin.hrEmployees.validation.positionRequired', 'Position is required');
     }
 
     if (!employeeId.trim()) {
-      newErrors.employeeId = 'Employee ID is required';
+      newErrors.employeeId = t('admin.hrEmployees.validation.employeeIdRequired', 'Employee ID is required');
     }
 
     if (!region.trim()) {
-      newErrors.region = 'Region is required';
+      newErrors.region = t('admin.hrEmployees.validation.regionRequired', 'Region is required');
     }
 
     if (!joiningDate.trim()) {
-      newErrors.joiningDate = 'Joining Date is required';
+      newErrors.joiningDate = t('admin.hrEmployees.validation.joiningDateRequired', 'Joining Date is required');
     } else if (!/^\d{4}-\d{2}-\d{2}$/.test(joiningDate.trim())) {
-      newErrors.joiningDate = 'Please enter date in YYYY-MM-DD format';
+      newErrors.joiningDate = t('admin.hrEmployees.validation.joiningDateFormat', 'Please enter date in YYYY-MM-DD format');
     }
 
     setErrors(newErrors);
@@ -98,7 +100,7 @@ const AddEmployeeScreen: React.FC = () => {
     try {
       const selectedPosition = positions.find(p => p.value === position);
       if (!selectedPosition) {
-        Alert.alert('Error', 'Invalid position selected');
+        Alert.alert(t('common.error', 'Error'), t('admin.hrEmployees.validation.invalidPosition', 'Invalid position selected'));
         setLoading(false);
         return;
       }
@@ -117,11 +119,11 @@ const AddEmployeeScreen: React.FC = () => {
       });
 
       Alert.alert(
-        'Success',
-        'Employee added successfully!',
+        t('admin.hrManagerDashboard.successTitle', 'Success'),
+        t('admin.hrEmployees.addSuccess', 'Employee added successfully!'),
         [
           { 
-            text: 'OK', 
+            text: t('common.ok', 'OK'), 
             onPress: () => {
               // Reset form
               setName('');
@@ -143,7 +145,7 @@ const AddEmployeeScreen: React.FC = () => {
         err.response?.data?.message || 
         err.response?.data?.error ||
         err.message || 
-        'Failed to add employee. Please try again.';
+        t('admin.hrEmployees.addFailed', 'Failed to add employee. Please try again.');
       
       // Handle validation errors from API
       if (err.response?.data?.errors) {
@@ -153,7 +155,7 @@ const AddEmployeeScreen: React.FC = () => {
         });
         setErrors(apiErrors);
       } else {
-        Alert.alert('Error', errorMessage);
+        Alert.alert(t('common.error', 'Error'), errorMessage);
       }
     } finally {
       setLoading(false);
@@ -170,7 +172,7 @@ const AddEmployeeScreen: React.FC = () => {
         >
           <Ionicons name="arrow-back" size={24} color={COLORS.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add New Employee</Text>
+        <Text style={styles.headerTitle}>{t('admin.hrEmployees.addNewEmployee', 'Add New Employee')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -179,8 +181,8 @@ const AddEmployeeScreen: React.FC = () => {
           {/* Name */}
           <View style={styles.formGroup}>
             <Input
-              label="Name *"
-              placeholder="Enter full name"
+              label={t('admin.hrEmployees.nameLabel', 'Name *')}
+              placeholder={t('admin.hrEmployees.namePlaceholder', 'Enter full name')}
               value={name}
               onChangeText={(text) => {
                 setName(text);
@@ -194,8 +196,8 @@ const AddEmployeeScreen: React.FC = () => {
           {/* Email */}
           <View style={styles.formGroup}>
             <Input
-              label="Email Address *"
-              placeholder="email@example.com"
+              label={t('admin.hrEmployees.emailLabel', 'Email Address *')}
+              placeholder={t('admin.hrEmployees.emailPlaceholder', 'email@example.com')}
               value={email}
               onChangeText={(text) => {
                 setEmail(text);
@@ -211,8 +213,8 @@ const AddEmployeeScreen: React.FC = () => {
           {/* Phone */}
           <View style={styles.formGroup}>
             <Input
-              label="Phone Number *"
-              placeholder="+971 50 XXX XXXX"
+              label={t('admin.hrEmployees.phoneLabel', 'Phone Number *')}
+              placeholder={t('admin.hrEmployees.phonePlaceholder', '+971 50 XXX XXXX')}
               value={phone}
               onChangeText={(text) => {
                 setPhone(text);
@@ -227,8 +229,8 @@ const AddEmployeeScreen: React.FC = () => {
           {/* Employee ID */}
           <View style={styles.formGroup}>
             <Input
-              label="Employee ID *"
-              placeholder="e.g., EMP-1001"
+              label={t('admin.hrEmployees.employeeIdLabel', 'Employee ID *')}
+              placeholder={t('admin.hrEmployees.employeeIdPlaceholder', 'e.g., EMP-1001')}
               value={employeeId}
               onChangeText={(text) => {
                 setEmployeeId(text);
@@ -242,8 +244,8 @@ const AddEmployeeScreen: React.FC = () => {
           {/* Region */}
           <View style={styles.formGroup}>
             <Input
-              label="Region *"
-              placeholder="e.g., Dubai"
+              label={t('admin.hrEmployees.regionLabel', 'Region *')}
+              placeholder={t('admin.hrEmployees.regionPlaceholder', 'e.g., Dubai')}
               value={region}
               onChangeText={(text) => {
                 setRegion(text);
@@ -256,7 +258,7 @@ const AddEmployeeScreen: React.FC = () => {
 
           {/* Position */}
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Position *</Text>
+            <Text style={styles.label}>{t('admin.hrEmployees.positionLabel', 'Position *')}</Text>
             <View style={styles.positionGrid}>
               {positions.map((pos) => (
                 <TouchableOpacity
@@ -290,8 +292,8 @@ const AddEmployeeScreen: React.FC = () => {
           {/* Joining Date */}
           <View style={styles.formGroup}>
             <Input
-              label="Joining Date"
-              placeholder="YYYY-MM-DD"
+              label={t('admin.hrEmployees.joiningDateLabel', 'Joining Date')}
+              placeholder={t('admin.hrEmployees.joiningDatePlaceholder', 'YYYY-MM-DD')}
               value={joiningDate}
               onChangeText={(text) => {
                 setJoiningDate(text);
@@ -306,13 +308,16 @@ const AddEmployeeScreen: React.FC = () => {
           <View style={styles.infoBox}>
             <Ionicons name="information-circle" size={20} color={COLORS.info} />
             <Text style={styles.infoText}>
-              The new employee will receive login credentials via email
+              {t(
+                'admin.hrEmployees.infoText',
+                'The new employee will receive login credentials via email'
+              )}
             </Text>
           </View>
 
           {/* Submit Button */}
           <Button
-            title="Add Employee"
+            title={t('admin.hrManagerDashboard.addEmployee', 'Add Employee')}
             onPress={handleSubmit}
             loading={loading}
             style={styles.submitButton}

@@ -45,7 +45,7 @@ const StoreScreen: React.FC = () => {
       getCart()
         .then((res) => {
           const items = res.data?.items ?? [];
-          setCartItemCount(items.reduce((sum, i) => sum + i.quantity, 0));
+          setCartItemCount(items.length);
         })
         .catch(() => setCartItemCount(0));
     }, [isAuthenticated])
@@ -156,7 +156,9 @@ const StoreScreen: React.FC = () => {
     try {
       await addCartItem(productId, 1);
       setAddedToCart(String(productId));
-      setCartItemCount((prev) => prev + 1);
+      // Refresh from API so badge shows actual cart line-items count.
+      const cartRes = await getCart();
+      setCartItemCount((cartRes.data?.items ?? []).length);
       setTimeout(() => setAddedToCart(null), 1000);
     } catch (err: any) {
       const status = err.response?.status;
