@@ -66,6 +66,7 @@ const AdminDashboardScreen: React.FC = () => {
   const [pendingReportsCount, setPendingReportsCount] = useState(0);
   const [newOrdersCount, setNewOrdersCount] = useState(0);
   const [supportTicketsCount, setSupportTicketsCount] = useState(0);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [profile, setProfile] = useState<AdminDashboardProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
 
@@ -174,6 +175,16 @@ const AdminDashboardScreen: React.FC = () => {
     }
   }, []);
 
+  const fetchUnreadNotificationsCount = useCallback(async () => {
+    try {
+      const res = await adminService.getNotifications({ page: 1, per_page: 200 });
+      const unread = (res.list ?? []).filter((n) => !n.read_at).length;
+      setUnreadNotificationsCount(unread);
+    } catch (_) {
+      setUnreadNotificationsCount(0);
+    }
+  }, []);
+
   const fetchDashboardProfile = useCallback(async () => {
     try {
       setProfileLoading(true);
@@ -194,8 +205,9 @@ const AdminDashboardScreen: React.FC = () => {
       fetchPendingReportsCount();
       fetchNewOrdersCount();
       fetchSupportTicketsCount();
+      fetchUnreadNotificationsCount();
       fetchDashboardProfile();
-    }, [fetchStatistics, fetchRecentActivities, fetchPendingReportsCount, fetchNewOrdersCount, fetchSupportTicketsCount, fetchDashboardProfile])
+    }, [fetchStatistics, fetchRecentActivities, fetchPendingReportsCount, fetchNewOrdersCount, fetchSupportTicketsCount, fetchUnreadNotificationsCount, fetchDashboardProfile])
   );
 
   const greetingText = profile?.greeting?.trim() || t(getGreetingKey());
@@ -280,14 +292,14 @@ const AdminDashboardScreen: React.FC = () => {
           <View style={styles.headerRightRow}>
             <TouchableOpacity
               style={styles.notificationIconButton}
-              onPress={() => navigation.navigate('AdminSupportTickets' as never)}
+              onPress={() => navigation.navigate('AdminNotifications' as never)}
               activeOpacity={0.7}
             >
               <Ionicons name="notifications-outline" size={24} color={COLORS.text} />
-              {supportTicketsCount > 0 ? (
+              {unreadNotificationsCount > 0 ? (
                 <View style={styles.notificationBadge}>
                   <Text style={styles.notificationBadgeText} numberOfLines={1}>
-                    {supportTicketsCount > 99 ? '99+' : supportTicketsCount}
+                    {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
                   </Text>
                 </View>
               ) : null}

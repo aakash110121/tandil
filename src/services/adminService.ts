@@ -352,6 +352,54 @@ export const adminService = {
     };
   },
 
+  /** POST /notifications/:id/mark-read */
+  markNotificationAsRead: async (
+    notificationId: string | number
+  ): Promise<{ success: boolean; message?: string }> => {
+    const response = await apiClient.post(`/notifications/${notificationId}/mark-read`, null, {
+      timeout: 15000,
+    });
+    return {
+      success: response?.data?.success === true,
+      message: response?.data?.message,
+    };
+  },
+
+  /** POST /notifications/mark-all-read */
+  markAllNotificationsAsRead: async (): Promise<{ success: boolean; message?: string }> => {
+    const response = await apiClient.post('/notifications/mark-all-read', null, {
+      timeout: 15000,
+    });
+    return {
+      success: response?.data?.success === true,
+      message: response?.data?.message,
+    };
+  },
+
+  /** DELETE /notifications/:id */
+  deleteNotification: async (
+    notificationId: string | number
+  ): Promise<{ success: boolean; message?: string }> => {
+    const response = await apiClient.delete(`/notifications/${notificationId}`, {
+      timeout: 15000,
+    });
+    return {
+      success: response?.data?.success === true,
+      message: response?.data?.message,
+    };
+  },
+
+  /** POST /notifications/clear-all */
+  clearAllNotifications: async (): Promise<{ success: boolean; message?: string }> => {
+    const response = await apiClient.post('/notifications/clear-all', null, {
+      timeout: 15000,
+    });
+    return {
+      success: response?.data?.success === true,
+      message: response?.data?.message,
+    };
+  },
+
   /** GET /admin/dashboard/profile – admin profile for dashboard header */
   getDashboardProfile: async (): Promise<{ success: boolean; data: AdminDashboardProfile }> => {
     const response = await apiClient.get<{ success: boolean; data: AdminDashboardProfile }>(

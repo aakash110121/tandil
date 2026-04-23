@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from './authService';
+import { publicApiClient } from './api';
 
 const STORAGE_KEY = 'technician_signup_requests_v1';
 
@@ -38,23 +39,30 @@ export const technicianSignupRequestService = {
     password: string;
     password_confirmation: string;
   }): Promise<TechnicianSignupRequest> {
-    const current = await readAll();
-    const exists = current.some((r) => r.email.toLowerCase() === params.email.trim().toLowerCase());
-    if (exists) {
-      throw new Error('A signup request with this email already exists.');
-    }
-    const next: TechnicianSignupRequest = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    const response = await publicApiClient.post('/auth/register-technician', {
       name: params.name.trim(),
       email: params.email.trim(),
       phone: params.phone.trim(),
-      service_area: params.service_area?.trim() || undefined,
+      service_area: params.service_area?.trim() || '',
+      password: params.password,
+      password_confirmation: params.password_confirmation,
+    });
+    const body = response?.data ?? {};
+    if (body?.success !== true) {
+      throw new Error(body?.message || 'Technician signup request failed.');
+    }
+    const resolvedServiceArea =
+      body?.data?.service_area ?? (params.service_area?.trim() || undefined);
+    return {
+      id: String(body?.data?.request_id ?? `${Date.now()}`),
+      name: params.name.trim(),
+      email: params.email.trim(),
+      phone: params.phone.trim(),
+      service_area: resolvedServiceArea,
       password: params.password,
       password_confirmation: params.password_confirmation,
       created_at: new Date().toISOString(),
     };
-    await writeAll([next, ...current]);
-    return next;
   },
 
   async getRequests(): Promise<TechnicianSignupRequest[]> {

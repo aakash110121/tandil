@@ -530,6 +530,65 @@ export interface SupervisorTeamStatsResponse {
   data?: SupervisorTeamStatsData;
 }
 
+export interface SupervisorTechnicianSignupRequest {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  service_area?: string | null;
+  area?: { id: number; name: string } | null;
+  created_at: string;
+}
+
+/**
+ * GET /api/supervisor/technician-signup-requests
+ * Returns pending technician signup requests for supervisor.
+ */
+export async function getSupervisorTechnicianSignupRequests(): Promise<SupervisorTechnicianSignupRequest[]> {
+  const response = await apiClient.get<{
+    success?: boolean;
+    data?: SupervisorTechnicianSignupRequest[];
+  }>('/supervisor/technician-signup-requests', { timeout: 15000 });
+  if (response.data?.success && Array.isArray(response.data?.data)) {
+    return response.data.data;
+  }
+  return [];
+}
+
+/**
+ * POST /api/supervisor/technician-signup-requests/:id/confirm
+ */
+export async function approveSupervisorTechnicianSignupRequest(
+  requestId: number
+): Promise<{ success: boolean; message?: string }> {
+  const response = await apiClient.post<{ success?: boolean; message?: string }>(
+    `/supervisor/technician-signup-requests/${requestId}/confirm`,
+    null,
+    { timeout: 15000 }
+  );
+  return {
+    success: response.data?.success === true,
+    message: response.data?.message,
+  };
+}
+
+/**
+ * POST /api/supervisor/technician-signup-requests/:id/cancel
+ */
+export async function rejectSupervisorTechnicianSignupRequest(
+  requestId: number
+): Promise<{ success: boolean; message?: string }> {
+  const response = await apiClient.post<{ success?: boolean; message?: string }>(
+    `/supervisor/technician-signup-requests/${requestId}/cancel`,
+    null,
+    { timeout: 15000 }
+  );
+  return {
+    success: response.data?.success === true,
+    message: response.data?.message,
+  };
+}
+
 /**
  * GET /api/supervisor/team-stats
  * Returns team stats (visits today, avg duration, rating, open issues) and members list. Requires Bearer token.

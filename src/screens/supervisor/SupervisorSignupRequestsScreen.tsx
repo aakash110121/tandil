@@ -15,9 +15,11 @@ import { useTranslation } from 'react-i18next';
 import Header from '../../components/common/Header';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import {
-  technicianSignupRequestService,
-  TechnicianSignupRequest,
-} from '../../services/technicianSignupRequestService';
+  getSupervisorTechnicianSignupRequests,
+  approveSupervisorTechnicianSignupRequest,
+  rejectSupervisorTechnicianSignupRequest,
+  SupervisorTechnicianSignupRequest,
+} from '../../services/supervisorService';
 
 function formatDate(iso: string): string {
   try {
@@ -31,17 +33,19 @@ function formatDate(iso: string): string {
 const SupervisorSignupRequestsScreen: React.FC = () => {
   const { t } = useTranslation();
   const navigation = useNavigation<any>();
-  const [requests, setRequests] = useState<TechnicianSignupRequest[]>([]);
+  const [requests, setRequests] = useState<SupervisorTechnicianSignupRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [actioningId, setActioningId] = useState<number | null>(null);
 
   const loadRequests = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const list = await technicianSignupRequestService.getRequests();
+      const list = await getSupervisorTechnicianSignupRequests();
       setRequests(list);
+    } catch (_) {
+      setRequests([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -54,7 +58,7 @@ const SupervisorSignupRequestsScreen: React.FC = () => {
     }, [loadRequests])
   );
 
-  const onApprove = (item: TechnicianSignupRequest) => {
+  const onApprove = (item: SupervisorTechnicianSignupRequest) => {
     Alert.alert(
       t('supervisorSignupRequests.approveTitle'),
       t('supervisorSignupRequests.approveMessage', {
@@ -67,7 +71,10 @@ const SupervisorSignupRequestsScreen: React.FC = () => {
           onPress: async () => {
             setActioningId(item.id);
             try {
-              await technicianSignupRequestService.approveRequest(item.id);
+              const res = await approveSupervisorTechnicianSignupRequest(item.id);
+              if (!res.success) {
+                throw new Error(res.message || t('supervisorSignupRequests.approveFailed'));
+              }
               await loadRequests(true);
               Alert.alert(
                 t('common.success', { defaultValue: 'Success' }),
@@ -90,7 +97,7 @@ const SupervisorSignupRequestsScreen: React.FC = () => {
     );
   };
 
-  const onReject = (item: TechnicianSignupRequest) => {
+  const onReject = (item: SupervisorTechnicianSignupRequest) => {
     Alert.alert(
       t('supervisorSignupRequests.rejectTitle'),
       t('supervisorSignupRequests.rejectMessage', {
@@ -104,12 +111,17 @@ const SupervisorSignupRequestsScreen: React.FC = () => {
           onPress: async () => {
             setActioningId(item.id);
             try {
-              await technicianSignupRequestService.rejectRequest(item.id);
+              const res = await rejectSupervisorTechnicianSignupRequest(item.id);
+              if (!res.success) {
+                throw new Error(res.message || t('supervisorSignupRequests.rejectFailed'));
+              }
               await loadRequests(true);
-            } catch {
+            } catch (err: any) {
               Alert.alert(
                 t('common.error', { defaultValue: 'Error' }),
-                t('supervisorSignupRequests.rejectFailed')
+                err?.response?.data?.message ||
+                  err?.message ||
+                  t('supervisorSignupRequests.rejectFailed')
               );
             } finally {
               setActioningId(null);
@@ -120,13 +132,15 @@ const SupervisorSignupRequestsScreen: React.FC = () => {
     );
   };
 
-  const renderItem = ({ item }: { item: TechnicianSignupRequest }) => {
+  const renderItem = ({ item }: { item: SupervisorTechnicianSignupRequest }) => {
     const isActioning = actioningId === item.id;
+    const areaText = item.area?.name?.trim() || item.service_area?.trim();
     return (
       <View style={styles.card}>
         <Text style={styles.name}>{item.name}</Text>
         <Text style={styles.meta}>{item.email}</Text>
         <Text style={styles.meta}>{item.phone}</Text>
+        {areaText ? <Text style={styles.meta}>{areaText}</Text> : null}
         <Text style={styles.date}>
           {t('supervisorSignupRequests.requestedAt')} {formatDate(item.created_at)}
         </Text>
@@ -178,7 +192,7 @@ const SupervisorSignupRequestsScreen: React.FC = () => {
       ) : (
         <FlatList
           data={requests}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadRequests(true)} />}

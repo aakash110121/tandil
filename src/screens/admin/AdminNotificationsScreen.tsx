@@ -7,6 +7,8 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -20,6 +22,12 @@ const AdminNotificationsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [openingNotificationId, setOpeningNotificationId] = useState<string | number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Array<string | number>>([]);
+  const [markingSelected, setMarkingSelected] = useState(false);
+  const [markingAll, setMarkingAll] = useState(false);
+  const [deletingSelected, setDeletingSelected] = useState(false);
+  const [clearingAll, setClearingAll] = useState(false);
 
   const fetchNotifications = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -52,19 +60,159 @@ const AdminNotificationsScreen: React.FC = () => {
     return 'notifications-outline';
   };
 
+  const handleNotificationPress = useCallback(async (item: AdminNotificationItem) => {
+    const meta = (item.meta ?? {}) as Record<string, unknown>;
+    const action = String(item.action || '').toLowerCase();
+    const metaEntity = String(meta.entity ?? '').toLowerCase();
+    const rawTicketId = meta.ticket_id;
+    const ticketId =
+      typeof rawTicketId === 'number'
+        ? rawTicketId
+        : typeof rawTicketId === 'string' && rawTicketId.trim()
+          ? Number(rawTicketId)
+          : NaN;
+
+    const isTicketNotification =
+      action.includes('ticket') ||
+      metaEntity === 'support_ticket' ||
+      Number.isFinite(ticketId);
+
+    if (!isTicketNotification) return;
+
+    if (!Number.isFinite(ticketId)) {
+      navigation.navigate('AdminSupportTickets');
+      return;
+    }
+
+    setOpeningNotificationId(item.id);
+    try {
+      const res = await adminService.getSupportTicketById(ticketId);
+      if (res.success && res.data) {
+        navigation.navigate('SupportTicketChat', { ticket: res.data });
+      } else {
+        navigation.navigate('AdminSupportTickets');
+      }
+    } catch {
+      navigation.navigate('AdminSupportTickets');
+    } finally {
+      setOpeningNotificationId(null);
+    }
+  }, [navigation]);
+
+  const toggleSelected = useCallback((id: string | number) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
+    const allIds = list.map((item) => item.id);
+    if (allIds.length === 0) return;
+    const areAllSelected = allIds.every((id) => selectedIds.includes(id));
+    setSelectedIds(areAllSelected ? [] : allIds);
+  }, [list, selectedIds]);
+
+  const handleMarkSelectedAsRead = useCallback(async () => {
+    if (selectedIds.length === 0 || markingSelected) return;
+    setMarkingSelected(true);
+    try {
+      await Promise.all(selectedIds.map((id) => adminService.markNotificationAsRead(id)));
+      const now = new Date().toISOString();
+      setList((prev) =>
+        prev.map((item) => (selectedIds.includes(item.id) ? { ...item, read_at: item.read_at ?? now } : item))
+      );
+      setSelectedIds([]);
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.message ?? e?.message ?? 'Failed to mark selected notifications as read.');
+    } finally {
+      setMarkingSelected(false);
+    }
+  }, [selectedIds, markingSelected]);
+
+  const handleMarkAllAsRead = useCallback(async () => {
+    if (markingAll) return;
+    setMarkingAll(true);
+    try {
+      const res = await adminService.markAllNotificationsAsRead();
+      if (!res.success) throw new Error(res.message || 'Failed to mark all notifications as read.');
+      const now = new Date().toISOString();
+      setList((prev) => prev.map((item) => ({ ...item, read_at: item.read_at ?? now })));
+      setSelectedIds([]);
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.message ?? e?.message ?? 'Failed to mark all notifications as read.');
+    } finally {
+      setMarkingAll(false);
+    }
+  }, [markingAll]);
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (selectedIds.length === 0 || deletingSelected) return;
+    setDeletingSelected(true);
+    try {
+      await Promise.all(selectedIds.map((id) => adminService.deleteNotification(id)));
+      setList((prev) => prev.filter((item) => !selectedIds.includes(item.id)));
+      setSelectedIds([]);
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.message ?? e?.message ?? 'Failed to delete selected notifications.');
+    } finally {
+      setDeletingSelected(false);
+    }
+  }, [selectedIds, deletingSelected]);
+
+  const handleClearAll = useCallback(async () => {
+    if (clearingAll || list.length === 0) return;
+    setClearingAll(true);
+    try {
+      const res = await adminService.clearAllNotifications();
+      if (!res.success) throw new Error(res.message || 'Failed to clear all notifications.');
+      setList([]);
+      setSelectedIds([]);
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.message ?? e?.message ?? 'Failed to clear all notifications.');
+    } finally {
+      setClearingAll(false);
+    }
+  }, [clearingAll, list.length]);
+
   const renderItem = ({ item }: { item: AdminNotificationItem }) => (
-    <View style={styles.card}>
-      <View style={styles.iconWrap}>
-        <Ionicons name={iconFor(item) as any} size={22} color={COLORS.primary} />
+    <TouchableOpacity
+      style={[styles.card, !item.read_at && styles.cardUnread]}
+      activeOpacity={0.82}
+      onPress={() => handleNotificationPress(item)}
+      disabled={openingNotificationId === item.id}
+    >
+      <View style={styles.leadingColumn}>
+        <TouchableOpacity
+          style={styles.checkboxTouchable}
+          onPress={() => toggleSelected(item.id)}
+          activeOpacity={0.85}
+        >
+          <View
+            style={[
+              styles.checkbox,
+              selectedIds.includes(item.id) && styles.checkboxSelected,
+            ]}
+          >
+            {selectedIds.includes(item.id) ? (
+              <Ionicons name="checkmark" size={16} color={COLORS.background} />
+            ) : null}
+          </View>
+        </TouchableOpacity>
+        <View style={styles.iconWrap}>
+          <Ionicons name={iconFor(item) as any} size={22} color={COLORS.primary} />
+        </View>
       </View>
       <View style={styles.content}>
-        <Text style={styles.title}>{item.title || 'Notification'}</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{item.title || 'Notification'}</Text>
+          {openingNotificationId === item.id ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : null}
+        </View>
         <Text style={styles.message}>{item.message || '—'}</Text>
         <Text style={styles.time}>
           {item.created_at ? dayjs(item.created_at).format('DD MMM YYYY, hh:mm A') : '—'}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -75,6 +223,63 @@ const AdminNotificationsScreen: React.FC = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
         <View style={styles.headerSpacer} />
+      </View>
+      <View style={styles.actionsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.actionsRow}
+        >
+        <TouchableOpacity style={styles.actionBtn} onPress={handleSelectAll}>
+          <Text style={styles.actionBtnText}>
+            {list.length > 0 && list.every((item) => selectedIds.includes(item.id)) ? 'Unselect All' : 'Select All'}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnPrimary, (selectedIds.length === 0 || markingSelected) && styles.actionBtnDisabled]}
+          onPress={handleMarkSelectedAsRead}
+          disabled={selectedIds.length === 0 || markingSelected}
+        >
+          {markingSelected ? (
+            <ActivityIndicator size="small" color={COLORS.background} />
+          ) : (
+            <Text style={styles.actionBtnPrimaryText}>Mark as Read</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnOutline, markingAll && styles.actionBtnDisabled]}
+          onPress={handleMarkAllAsRead}
+          disabled={markingAll}
+        >
+          {markingAll ? (
+            <ActivityIndicator size="small" color={COLORS.primary} />
+          ) : (
+            <Text style={styles.actionBtnOutlineText}>Mark All Read</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnDanger, (selectedIds.length === 0 || deletingSelected) && styles.actionBtnDisabled]}
+          onPress={handleDeleteSelected}
+          disabled={selectedIds.length === 0 || deletingSelected}
+        >
+          {deletingSelected ? (
+            <ActivityIndicator size="small" color={COLORS.background} />
+          ) : (
+            <Text style={styles.actionBtnDangerText}>Delete</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnDangerOutline, (clearingAll || list.length === 0) && styles.actionBtnDisabled]}
+          onPress={handleClearAll}
+          disabled={clearingAll || list.length === 0}
+        >
+          {clearingAll ? (
+            <ActivityIndicator size="small" color={COLORS.error} />
+          ) : (
+            <Text style={styles.actionBtnDangerOutlineText}>Clear All</Text>
+          )}
+        </TouchableOpacity>
+        </ScrollView>
       </View>
 
       {loading ? (
@@ -130,14 +335,107 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.xl,
   },
+  actionsContainer: {
+    paddingTop: SPACING.xs,
+    paddingBottom: SPACING.sm,
+    backgroundColor: COLORS.background,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: 0,
+  },
+  actionBtn: {
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  actionBtnPrimary: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  actionBtnOutline: {
+    backgroundColor: COLORS.background,
+    borderColor: COLORS.primary,
+  },
+  actionBtnDanger: {
+    backgroundColor: COLORS.error,
+    borderColor: COLORS.error,
+  },
+  actionBtnDangerOutline: {
+    backgroundColor: COLORS.background,
+    borderColor: COLORS.error,
+  },
+  actionBtnDisabled: {
+    opacity: 0.6,
+  },
+  actionBtnText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.text,
+    fontWeight: FONT_WEIGHTS.medium,
+  },
+  actionBtnPrimaryText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.background,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  actionBtnOutlineText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.primary,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  actionBtnDangerText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.background,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
+  actionBtnDangerOutlineText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.error,
+    fontWeight: FONT_WEIGHTS.semiBold,
+  },
   card: {
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.lg,
     padding: SPACING.md,
     marginBottom: SPACING.md,
     flexDirection: 'row',
+    alignItems: 'flex-start',
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  cardUnread: {
+    borderColor: COLORS.primary + '55',
+  },
+  leadingColumn: {
+    width: 48,
+    alignItems: 'center',
+    marginRight: SPACING.sm,
+    paddingTop: 2,
+  },
+  checkboxTouchable: {
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: COLORS.textSecondary + '88',
+    backgroundColor: COLORS.background,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary,
   },
   iconWrap: {
     width: 42,
@@ -146,9 +444,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.primary + '14',
-    marginRight: SPACING.md,
+    marginTop: 0,
   },
   content: { flex: 1 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+  },
   title: {
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.semiBold,
