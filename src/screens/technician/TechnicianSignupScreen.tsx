@@ -16,8 +16,14 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { useTranslation } from 'react-i18next';
-import { technicianSignupRequestService } from '../../services/technicianSignupRequestService';
-import { getAddressFromCurrentLocation } from '../../utils/addressFromLocation';
+import {
+  technicianSignupRequestService,
+  TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA,
+} from '../../services/technicianSignupRequestService';
+import {
+  buildTechnicianServiceAreaFromAddress,
+  getAddressFromCurrentLocation,
+} from '../../utils/addressFromLocation';
 
 const TechnicianSignupScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -36,7 +42,15 @@ const TechnicianSignupScreen: React.FC = () => {
   const [locatingServiceArea, setLocatingServiceArea] = useState(false);
 
   const validate = (): boolean => {
-    if (!name.trim() || !email.trim() || !phone.trim() || !serviceArea.trim() || !password.trim() || !confirmPassword.trim()) {
+    const serviceAreaRequired = !TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA;
+    if (
+      !name.trim() ||
+      !email.trim() ||
+      !phone.trim() ||
+      (serviceAreaRequired && !serviceArea.trim()) ||
+      !password.trim() ||
+      !confirmPassword.trim()
+    ) {
       Alert.alert(
         t('booking.missingTitle', { defaultValue: 'Missing Information' }),
         t('booking.missingBody', { defaultValue: 'Please fill in all fields' })
@@ -113,12 +127,24 @@ const TechnicianSignupScreen: React.FC = () => {
         return;
       }
       const a = result.address;
-      const area =
-        [a.city, a.state, a.country].filter(Boolean).join(', ').trim() ||
-        a.street_address ||
-        t('serviceArea.selectedLocation', { defaultValue: 'Selected location' });
+      let area = buildTechnicianServiceAreaFromAddress(a).trim();
+      if (!area && TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA) {
+        area =
+          [a.city, a.state].filter(Boolean).join(', ').trim() ||
+          a.street_address ||
+          t('useCurrentLocation', { defaultValue: 'Current location' });
+      }
       setServiceArea(area);
       setError(null);
+      if (!area && !TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA) {
+        Alert.alert(
+          t('technicianSignup.serviceArea', { defaultValue: 'Service Area' }),
+          t('technicianSignup.serviceAreaLocationNotMapped', {
+            defaultValue:
+              'Current location is outside the UAE or could not be matched to an emirate. Enter your service area manually using the exact name your company uses (for example Dubai or Abu Dhabi).',
+          })
+        );
+      }
     } finally {
       setLocatingServiceArea(false);
     }
