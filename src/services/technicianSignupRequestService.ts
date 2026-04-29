@@ -1,34 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AxiosError } from 'axios';
 import { authService } from './authService';
 import { publicApiClient } from './api';
 
-function messageFromRegisterTechnicianResponse(data: unknown): string | null {
-  if (!data || typeof data !== 'object') return null;
-  const d = data as Record<string, unknown>;
-  const errs = d.errors;
-  if (errs && typeof errs === 'object' && errs !== null) {
-    for (const key of Object.keys(errs as Record<string, unknown>)) {
-      const v = (errs as Record<string, unknown[]>)[key];
-      if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'string') {
-        return v[0];
-      }
-    }
-  }
-  if (typeof d.message === 'string') return d.message;
-  if (typeof d.error === 'string') return d.error;
-  return null;
-}
-
 const STORAGE_KEY = 'technician_signup_requests_v1';
-
-/**
- * TEMPORARY — set to `false` before production / after client video.
- * When true, `register-technician` always sends `TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA_VALUE`
- * so the API accepts signup regardless of GPS; the UI can still show the real geocoded label.
- */
-export const TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA = true;
-export const TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA_VALUE = 'Dubai';
 
 export interface TechnicianSignupRequest {
   id: string;
@@ -65,35 +39,20 @@ export const technicianSignupRequestService = {
     password: string;
     password_confirmation: string;
   }): Promise<TechnicianSignupRequest> {
-    const serviceAreaForApi =
-      TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA && TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA_VALUE.trim()
-        ? TECHNICIAN_SIGNUP_DEMO_SERVICE_AREA_VALUE.trim()
-        : params.service_area?.trim() || '';
-
-    let response;
-    try {
-      response = await publicApiClient.post('/auth/register-technician', {
-        name: params.name.trim(),
-        email: params.email.trim(),
-        phone: params.phone.trim(),
-        service_area: serviceAreaForApi,
-        password: params.password,
-        password_confirmation: params.password_confirmation,
-      });
-    } catch (e) {
-      const ax = e as AxiosError<{ message?: string; errors?: Record<string, string[]> }>;
-      const fromBody = messageFromRegisterTechnicianResponse(ax.response?.data);
-      throw new Error(fromBody || ax.message || 'Technician signup request failed.');
-    }
+    const response = await publicApiClient.post('/auth/register-technician', {
+      name: params.name.trim(),
+      email: params.email.trim(),
+      phone: params.phone.trim(),
+      service_area: params.service_area?.trim() || '',
+      password: params.password,
+      password_confirmation: params.password_confirmation,
+    });
     const body = response?.data ?? {};
     if (body?.success !== true) {
-      throw new Error(
-        messageFromRegisterTechnicianResponse(body) || body?.message || 'Technician signup request failed.'
-      );
+      throw new Error(body?.message || 'Technician signup request failed.');
     }
     const resolvedServiceArea =
-      body?.data?.service_area ??
-      (params.service_area?.trim() || serviceAreaForApi || undefined);
+      body?.data?.service_area ?? (params.service_area?.trim() || undefined);
     return {
       id: String(body?.data?.request_id ?? `${Date.now()}`),
       name: params.name.trim(),
