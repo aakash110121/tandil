@@ -16,7 +16,15 @@ import { useTranslation } from 'react-i18next';
 import { TFunction } from 'i18next';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { setAppLanguage } from '../../i18n';
-import { getSupervisorDashboardSummary, SupervisorDashboardSummaryData, getSupervisorReports, SupervisorReportItem, getSupervisorTeam, SupervisorTeamMember } from '../../services/supervisorService';
+import {
+  getSupervisorDashboardSummary,
+  SupervisorDashboardSummaryData,
+  getSupervisorReports,
+  SupervisorReportItem,
+  getSupervisorTeam,
+  SupervisorTeamMember,
+  getSupervisorNotifications,
+} from '../../services/supervisorService';
 
 const DASHBOARD_REPORTS_LIMIT = 3;
 
@@ -54,6 +62,7 @@ const SupervisorDashboardScreen: React.FC = () => {
   const [profileImageError, setProfileImageError] = useState(false);
   const [reports, setReports] = useState<SupervisorReportItem[]>([]);
   const [teamMembers, setTeamMembers] = useState<SupervisorTeamMember[]>([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -64,12 +73,18 @@ const SupervisorDashboardScreen: React.FC = () => {
         getSupervisorDashboardSummary(),
         getSupervisorReports(1, 20),
         getSupervisorTeam(),
+        getSupervisorNotifications({ per_page: 20, page: 1 }).catch(() => null),
       ])
-        .then(([summaryData, reportsResult, teamList]) => {
+        .then(([summaryData, reportsResult, teamList, notifPayload]) => {
           if (!cancelled) {
             setSummary(summaryData ?? null);
             setReports(reportsResult.list);
             setTeamMembers(teamList ?? []);
+            setUnreadNotificationsCount(
+              notifPayload && typeof notifPayload === 'object' && 'unreadCount' in notifPayload
+                ? notifPayload.unreadCount
+                : 0
+            );
           }
         })
         .catch(() => {
@@ -77,6 +92,7 @@ const SupervisorDashboardScreen: React.FC = () => {
             setSummary(null);
             setReports([]);
             setTeamMembers([]);
+            setUnreadNotificationsCount(0);
           }
         })
         .finally(() => {
@@ -188,6 +204,20 @@ const SupervisorDashboardScreen: React.FC = () => {
             )}
           </View>
           <View style={styles.headerRightRow}>
+            <TouchableOpacity
+              style={styles.notificationButton}
+              onPress={() => navigation.navigate('Notifications' as never)}
+              accessibilityLabel={t('notifications.title')}
+            >
+              <Ionicons name="notifications-outline" size={22} color={COLORS.text} />
+              {unreadNotificationsCount > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadNotificationsCount > 99 ? '99+' : unreadNotificationsCount}
+                  </Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.languageButton}
               onPress={() => setLanguageModalVisible(true)}
@@ -405,6 +435,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.xs,
+  },
+  notificationButton: {
+    padding: SPACING.sm,
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 0,
+    minWidth: 24,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: COLORS.error,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: COLORS.background,
+    fontSize: 9,
+    fontWeight: FONT_WEIGHTS.bold,
   },
   languageButton: {
     padding: SPACING.sm,

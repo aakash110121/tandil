@@ -659,3 +659,66 @@ export async function submitSupervisorSupportTicket(params: {
     message: (response.data as any)?.message ?? 'Failed to submit ticket.',
   };
 }
+
+/** Item from GET /api/supervisor/notifications */
+export interface SupervisorNotificationItem {
+  id: string;
+  type: string;
+  notifiable_type?: string;
+  notifiable_id?: number;
+  data?: {
+    title?: string;
+    message?: string;
+    type?: string;
+    meta?: Record<string, unknown> | unknown[] | null;
+  };
+  read_at?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface SupervisorNotificationsListResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    notifications?: {
+      current_page?: number;
+      data?: SupervisorNotificationItem[];
+      last_page?: number;
+      total?: number;
+      per_page?: number;
+    };
+    unread_count?: number;
+  };
+}
+
+/**
+ * GET /api/supervisor/notifications?per_page=&page=
+ * Returns paginated notifications and unread_count. Requires Bearer token.
+ */
+export async function getSupervisorNotifications(params?: {
+  per_page?: number;
+  page?: number;
+}): Promise<{
+  list: SupervisorNotificationItem[];
+  unreadCount: number;
+  currentPage: number;
+  lastPage: number;
+  total: number;
+  perPage: number;
+}> {
+  const response = await apiClient.get<SupervisorNotificationsListResponse>('/supervisor/notifications', {
+    params: { per_page: params?.per_page ?? 20, page: params?.page ?? 1 },
+    timeout: 15000,
+  });
+  const payload = response.data?.data;
+  const notifications = payload?.notifications;
+  return {
+    list: Array.isArray(notifications?.data) ? notifications!.data : [],
+    unreadCount: payload?.unread_count ?? 0,
+    currentPage: notifications?.current_page ?? 1,
+    lastPage: notifications?.last_page ?? 1,
+    total: notifications?.total ?? 0,
+    perPage: notifications?.per_page ?? 20,
+  };
+}
