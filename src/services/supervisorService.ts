@@ -722,3 +722,59 @@ export async function getSupervisorNotifications(params?: {
     perPage: notifications?.per_page ?? 20,
   };
 }
+
+export interface SupervisorNotificationActionResponse {
+  success?: boolean;
+  message?: string;
+}
+
+/**
+ * POST /api/supervisor/notifications/:notification_id/mark-read
+ */
+export async function markSupervisorNotificationAsRead(
+  notificationId: string
+): Promise<SupervisorNotificationActionResponse> {
+  const response = await apiClient.post<SupervisorNotificationActionResponse>(
+    `/supervisor/notifications/${notificationId}/mark-read`,
+    null,
+    { timeout: 15000 }
+  );
+  return response.data ?? {};
+}
+
+/**
+ * POST /api/supervisor/notifications/mark-all-read
+ */
+export async function markAllSupervisorNotificationsAsRead(): Promise<SupervisorNotificationActionResponse> {
+  const response = await apiClient.post<SupervisorNotificationActionResponse>(
+    '/supervisor/notifications/mark-all-read',
+    null,
+    { timeout: 15000 }
+  );
+  return response.data ?? {};
+}
+
+/**
+ * DELETE /api/supervisor/notifications/:notification_id
+ */
+export async function deleteSupervisorNotification(
+  notificationId: string
+): Promise<SupervisorNotificationActionResponse> {
+  const response = await apiClient.delete<SupervisorNotificationActionResponse>(
+    `/supervisor/notifications/${notificationId}`,
+    { timeout: 15000 }
+  );
+  return response.data ?? {};
+}
+
+/**
+ * POST /api/supervisor/notifications/clear-all
+ */
+export async function clearAllSupervisorNotifications(): Promise<SupervisorNotificationActionResponse> {
+  const response = await apiClient.post<SupervisorNotificationActionResponse>(
+    '/supervisor/notifications/clear-all',
+    null,
+    { timeout: 15000 }
+  );
+  return response.data ?? {};
+}

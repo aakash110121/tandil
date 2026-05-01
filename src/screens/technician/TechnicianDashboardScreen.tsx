@@ -86,7 +86,7 @@ const TechnicianDashboardScreen: React.FC = () => {
   useFocusEffect(
     useCallback(() => {
       getTechnicianNotifications({ per_page: 1, page: 1 })
-        .then((res) => setNotificationCount(res.total ?? 0))
+        .then((res) => setNotificationCount(res.unreadCount ?? 0))
         .catch(() => setNotificationCount(0));
     }, [])
   );

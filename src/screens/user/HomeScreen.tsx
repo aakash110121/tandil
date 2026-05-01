@@ -33,7 +33,7 @@ import { getExclusiveOffers, PublicExclusiveOffer } from '../../services/exclusi
 import { buildFullImageUrl } from '../../config/api';
 import * as Location from 'expo-location';
 import { fetchWeather, WeatherData } from '../../services/weatherService';
-import { getSupportTickets } from '../../services/supportService';
+import { getClientNotifications } from '../../services/userService';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -56,16 +56,13 @@ const HomeScreen: React.FC = () => {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
-  const [supportTicketsCount, setSupportTicketsCount] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
-      getSupportTickets({ per_page: 1, page: 1 })
-        .then((res) => {
-          const total = res?.data?.pagination?.total ?? 0;
-          setSupportTicketsCount(typeof total === 'number' ? total : 0);
-        })
-        .catch(() => setSupportTicketsCount(0));
+      getClientNotifications({ per_page: 1, page: 1 })
+        .then((res) => setUnreadNotificationCount(res.unreadCount ?? 0))
+        .catch(() => setUnreadNotificationCount(0));
     }, [])
   );
 
@@ -431,8 +428,8 @@ const HomeScreen: React.FC = () => {
         showBack={false}
         showLanguage={true}
         showNotifications={true}
-        notificationCount={supportTicketsCount}
-        onNotificationPress={() => navigation.navigate('MyTickets')}
+        notificationCount={unreadNotificationCount}
+        onNotificationPress={() => navigation.navigate('Notifications')}
         showCart={true}
       />
       <ScrollView showsVerticalScrollIndicator={false}>

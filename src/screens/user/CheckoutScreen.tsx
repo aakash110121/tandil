@@ -42,7 +42,7 @@ interface ShippingAddress {
 
 interface PaymentMethod {
   id: string;
-  type: 'apple_pay' | 'card' | 'cash';
+  type: 'stripe' | 'paypal';
   name: string;
   icon: string;
   last4?: string;
@@ -74,28 +74,22 @@ const CheckoutScreen: React.FC = () => {
     country: '',
   });
 
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('apple_pay');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('stripe');
   const STEP_ORDER: Array<'location' | 'phone' | 'payment'> = ['location', 'phone', 'payment'];
   const activeStepIndex = STEP_ORDER.indexOf(currentStep);
 
   const paymentMethods: PaymentMethod[] = [
     {
-      id: 'apple_pay',
-      type: 'apple_pay',
-      name: 'Apple Pay',
-      icon: 'logo-apple',
-    },
-    {
-      id: 'card',
-      type: 'card',
-      name: t('checkout.card', 'Card'),
+      id: 'stripe',
+      type: 'stripe',
+      name: 'Stripe',
       icon: 'card-outline',
     },
     {
-      id: 'cash',
-      type: 'cash',
-      name: t('checkout.cashOnDelivery'),
-      icon: 'cash-outline',
+      id: 'paypal',
+      type: 'paypal',
+      name: 'PayPal',
+      icon: 'logo-paypal',
     },
   ];
 

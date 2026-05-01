@@ -1609,7 +1609,15 @@ export const en = {
     errorMarkAllRead: 'Failed to mark all as read.',
     errorDeleteSelected: 'Failed to delete selected notifications.',
     buyRecommendedProducts: 'Buy Recommended Products',
-    filters: { all: 'All', unread: 'Unread', order: 'Orders', promotion: 'Promotions' },
+    filters: {
+      all: 'All',
+      unread: 'Unread',
+      order: 'Orders',
+      promotion: 'Promotions',
+      tips: 'Tips',
+      updates: 'Updates',
+      leave: 'Leave',
+    },
     sample: {
       orderConfirmed: 'Order Confirmed',
       orderConfirmedMsg: 'Your order #12345 has been confirmed and is being processed.',
@@ -3878,7 +3886,15 @@ export const ar = {
     errorMarkAllRead: 'فشل تعليم الكل كمقروء.',
     errorDeleteSelected: 'فشل حذف الإشعارات المختارة.',
     buyRecommendedProducts: 'شراء المنتجات الموصى بها',
-    filters: { all: 'الكل', unread: 'غير مقروء', order: 'الطلبات', promotion: 'العروض' },
+    filters: {
+      all: 'الكل',
+      unread: 'غير مقروء',
+      order: 'الطلبات',
+      promotion: 'العروض',
+      tips: 'نصائح',
+      updates: 'تحديثات',
+      leave: 'الإجازة',
+    },
   },
   delivery: {
     orderStatus: {
@@ -6095,7 +6111,15 @@ export const ur = {
     errorMarkAllRead: 'سب کو پڑھا ہوا قرار دینے میں ناکامی۔',
     errorDeleteSelected: 'منتخب نوٹیفیکیشنز حذف کرنے میں ناکامی۔',
     buyRecommendedProducts: 'تجویز کردہ مصنوعات خریدیں',
-    filters: { all: 'سب', unread: 'ناپڑھا', order: 'آرڈرز', promotion: 'پروموشنز' },
+    filters: {
+      all: 'سب',
+      unread: 'ناپڑھا',
+      order: 'آرڈرز',
+      promotion: 'پروموشنز',
+      tips: 'مشورے',
+      updates: 'اپ ڈیٹس',
+      leave: 'چھٹی',
+    },
   },
   delivery: {
     orderStatus: {

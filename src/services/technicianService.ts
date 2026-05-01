@@ -754,17 +754,60 @@ export async function updateTechnicianAvailability(
   };
 }
 
-/** Notification from GET /api/technician/notifications */
+/** Item from GET /api/technician/notifications (Laravel database notifications) */
 export interface TechnicianNotification {
-  id: number;
+  id: string;
   type: string;
-  title: string;
-  message: string;
+  notifiable_type?: string;
+  notifiable_id?: number;
+  data?: {
+    title?: string;
+    message?: string;
+    type?: string;
+    meta?: Record<string, unknown> | unknown[] | null;
+  };
+  read_at?: string | null;
   created_at: string;
+  updated_at?: string;
+}
+
+export interface TechnicianNotificationsListResponse {
+  success?: boolean;
+  message?: string;
+  data?: {
+    /** Laravel paginator object, or in some builds a plain array of rows */
+    notifications?: {
+      current_page?: number;
+      data?: TechnicianNotification[] | Record<string, TechnicianNotification> | null;
+      last_page?: number;
+      total?: number;
+      per_page?: number;
+    } | TechnicianNotification[] | null;
+    unread_count?: number;
+  };
+}
+
+/** Normalize paginator `data` (array or keyed object) into a list of notification rows */
+function coerceTechnicianNotificationRows(raw: unknown): TechnicianNotification[] {
+  if (raw == null) return [];
+  if (Array.isArray(raw)) {
+    return raw.filter(
+      (row): row is TechnicianNotification =>
+        Boolean(row) && typeof row === 'object' && (row as TechnicianNotification).id != null
+    );
+  }
+  if (typeof raw === 'object') {
+    return Object.values(raw as Record<string, unknown>).filter(
+      (v): v is TechnicianNotification =>
+        Boolean(v) && typeof v === 'object' && (v as TechnicianNotification).id != null
+    );
+  }
+  return [];
 }
 
 export interface GetTechnicianNotificationsResult {
   list: TechnicianNotification[];
+  unreadCount: number;
   currentPage: number;
   lastPage: number;
   total: number;
@@ -772,97 +815,115 @@ export interface GetTechnicianNotificationsResult {
 }
 
 /**
- * GET /api/technician/notifications?per_page=20&page=1
- * Returns technician notifications. Requires Bearer token.
+ * GET /api/technician/notifications?per_page=&page=
+ * Returns paginated notifications and unread_count. Requires Bearer token.
  */
 export async function getTechnicianNotifications(params?: {
   per_page?: number;
   page?: number;
 }): Promise<GetTechnicianNotificationsResult> {
-  const response = await apiClient.get<{
-    success: boolean;
-    message?: string;
-    data: {
-      current_page: number;
-      data: TechnicianNotification[];
+  const response = await apiClient.get<TechnicianNotificationsListResponse>('/technician/notifications', {
+    params: { per_page: params?.per_page ?? 20, page: params?.page ?? 1 },
+    timeout: 15000,
+  });
+  const payload = response.data?.data;
+  const notifications = payload?.notifications;
+  if (notifications == null) {
+    return { list: [], unreadCount: 0, currentPage: 1, lastPage: 1, total: 0, perPage: 20 };
+  }
+
+  let list: TechnicianNotification[] = [];
+  let currentPage = 1;
+  let lastPage = 1;
+  let total = 0;
+  let perPage = 20;
+
+  if (Array.isArray(notifications)) {
+    list = coerceTechnicianNotificationRows(notifications);
+    total = list.length;
+  } else if (typeof notifications === 'object') {
+    const paginator = notifications as {
+      data?: unknown;
+      current_page?: number;
       last_page?: number;
       total?: number;
       per_page?: number;
     };
-  }>('/technician/notifications', {
-    params: { per_page: params?.per_page ?? 20, page: params?.page ?? 1 },
-    timeout: 15000,
-  });
-  const d = response.data?.data;
-  if (!response.data?.success || !d) {
-    return { list: [], currentPage: 1, lastPage: 1, total: 0, perPage: 20 };
+    list = coerceTechnicianNotificationRows(paginator.data);
+    currentPage = paginator.current_page ?? 1;
+    lastPage = paginator.last_page ?? 1;
+    total = paginator.total ?? list.length;
+    perPage = paginator.per_page ?? 20;
   }
+
   return {
-    list: Array.isArray(d.data) ? d.data : [],
-    currentPage: d.current_page ?? 1,
-    lastPage: d.last_page ?? 1,
-    total: d.total ?? 0,
-    perPage: d.per_page ?? 20,
+    list,
+    unreadCount: payload?.unread_count ?? 0,
+    currentPage,
+    lastPage,
+    total,
+    perPage,
   };
+}
+
+export interface TechnicianNotificationActionResponse {
+  success?: boolean;
+  message?: string;
 }
 
 /**
  * POST /api/technician/notifications/clear-all
  * Clear all notifications for the technician. Requires Bearer token.
  */
-export async function clearTechnicianNotifications(): Promise<{ success: boolean; message?: string }> {
-  const response = await apiClient.post<{ success?: boolean; message?: string }>(
+export async function clearTechnicianNotifications(): Promise<TechnicianNotificationActionResponse> {
+  const response = await apiClient.post<TechnicianNotificationActionResponse>(
     '/technician/notifications/clear-all',
-    {},
+    null,
     { timeout: 15000 }
   );
-  if (response.data?.success) {
-    return { success: true, message: response.data.message };
-  }
-  return {
-    success: false,
-    message: (response.data as any)?.message ?? 'Failed to clear notifications.',
-  };
+  return response.data ?? {};
 }
 
 /**
- * POST /api/technician/notifications/:notification_id/read
+ * POST /api/technician/notifications/:notification_id/mark-read
  * Mark a single notification as read. Requires Bearer token.
  */
 export async function markTechnicianNotificationRead(
-  notificationId: number | string
-): Promise<{ success: boolean; message?: string }> {
-  const response = await apiClient.post<{ success?: boolean; message?: string }>(
-    `/technician/notifications/${notificationId}/read`,
-    {},
+  notificationId: string | number
+): Promise<TechnicianNotificationActionResponse> {
+  const response = await apiClient.post<TechnicianNotificationActionResponse>(
+    `/technician/notifications/${notificationId}/mark-read`,
+    null,
     { timeout: 15000 }
   );
-  if (response.data?.success) {
-    return { success: true, message: response.data.message };
-  }
-  return {
-    success: false,
-    message: (response.data as any)?.message ?? 'Failed to mark as read.',
-  };
+  return response.data ?? {};
 }
 
 /**
- * POST /api/technician/notifications/read-all
+ * POST /api/technician/notifications/mark-all-read
  * Mark all notifications as read. Requires Bearer token.
  */
-export async function markTechnicianNotificationsReadAll(): Promise<{ success: boolean; message?: string }> {
-  const response = await apiClient.post<{ success?: boolean; message?: string }>(
-    '/technician/notifications/read-all',
-    {},
+export async function markTechnicianNotificationsReadAll(): Promise<TechnicianNotificationActionResponse> {
+  const response = await apiClient.post<TechnicianNotificationActionResponse>(
+    '/technician/notifications/mark-all-read',
+    null,
     { timeout: 15000 }
   );
-  if (response.data?.success) {
-    return { success: true, message: response.data.message };
-  }
-  return {
-    success: false,
-    message: (response.data as any)?.message ?? 'Failed to mark all as read.',
-  };
+  return response.data ?? {};
+}
+
+/**
+ * DELETE /api/technician/notifications/:notification_id
+ * Delete a single notification. Requires Bearer token.
+ */
+export async function deleteTechnicianNotification(
+  notificationId: string
+): Promise<TechnicianNotificationActionResponse> {
+  const response = await apiClient.delete<TechnicianNotificationActionResponse>(
+    `/technician/notifications/${notificationId}`,
+    { timeout: 15000 }
+  );
+  return response.data ?? {};
 }
 
 /**
