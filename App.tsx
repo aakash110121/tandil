@@ -9,10 +9,12 @@ import ErrorBoundary from './src/components/common/ErrorBoundary';
 import { captureException } from './src/utils/sentry';
 import './src/i18n';
 import { StripeProvider } from '@stripe/stripe-react-native';
-import { getStripePublishableKey } from './src/config/api';
+import { getStripeMerchantIdentifier, getStripePublishableKey } from './src/config/api';
 
 function AppContent() {
   const { setUser, setAuthenticated } = useAppStore();
+  const stripePublishableKey = getStripePublishableKey();
+  const stripeMerchantIdentifier = getStripeMerchantIdentifier();
 
   useEffect(() => {
     const initializeAuth = async () => {
@@ -38,7 +40,10 @@ function AppContent() {
   }, []);
 
   return (
-    <StripeProvider publishableKey={getStripePublishableKey()}>
+    <StripeProvider
+      publishableKey={stripePublishableKey}
+      merchantIdentifier={stripeMerchantIdentifier || undefined}
+    >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <StatusBar style="auto" />

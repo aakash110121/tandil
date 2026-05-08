@@ -109,6 +109,15 @@ const OrderTrackingScreen: React.FC = () => {
     [];
 
   const summary = track?.order_summary;
+  const firstItemProduct = track?.order?.items?.[0]?.product;
+  const estimatedArrival =
+    summary?.estimated_arrival ||
+    firstItemProduct?.estimated_arrival ||
+    null;
+  const jobDuration =
+    summary?.job_duration ||
+    firstItemProduct?.job_duration ||
+    null;
   const placedDate =
     summary?.placed_at != null
       ? (() => {
@@ -240,6 +249,30 @@ const OrderTrackingScreen: React.FC = () => {
                   </Text>
                 </View>
               </View>
+
+              {estimatedArrival ? (
+                <View style={styles.orderInfoItem}>
+                  <Ionicons name="navigate-outline" size={20} color={COLORS.textSecondary} />
+                  <View style={styles.orderInfoText}>
+                    <Text style={styles.orderInfoLabel}>
+                      {t('product.estimatedArrival', { defaultValue: 'Estimated arrival' })}
+                    </Text>
+                    <Text style={styles.orderInfoValue}>{estimatedArrival}</Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {jobDuration ? (
+                <View style={styles.orderInfoItem}>
+                  <Ionicons name="hourglass-outline" size={20} color={COLORS.textSecondary} />
+                  <View style={styles.orderInfoText}>
+                    <Text style={styles.orderInfoLabel}>
+                      {t('product.jobDuration', { defaultValue: 'Job duration' })}
+                    </Text>
+                    <Text style={styles.orderInfoValue}>{jobDuration}</Text>
+                  </View>
+                </View>
+              ) : null}
 
               {summary?.special_instructions ? (
                 <View style={styles.orderInfoItem}>

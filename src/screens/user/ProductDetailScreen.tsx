@@ -65,6 +65,8 @@ function shopProductToDisplay(p: ShopProduct | null): ProductDetailDisplay | nul
     inStock: (p.stock ?? 0) > 0,
     description: p.description ?? undefined,
     features: [],
+    estimatedArrival: p.estimated_arrival ?? undefined,
+    jobDuration: p.job_duration ?? undefined,
   };
 }
 

@@ -47,6 +47,7 @@ import AdminNotificationStatisticsScreen from '../screens/admin/AdminNotificatio
 import AdminNotificationDeliveryAnalyticsScreen from '../screens/admin/AdminNotificationDeliveryAnalyticsScreen';
 import AdminSendNotificationScreen from '../screens/admin/AdminSendNotificationScreen';
 import AdminBroadcastLogScreen from '../screens/admin/AdminBroadcastLogScreen';
+import AdminOperationalAreasScreen from '../screens/admin/AdminOperationalAreasScreen';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -164,6 +165,7 @@ const AdminAppNavigator = () => {
         <Stack.Screen name="AdminNotificationDeliveryAnalytics" component={AdminNotificationDeliveryAnalyticsScreen} />
         <Stack.Screen name="AdminSendNotification" component={AdminSendNotificationScreen} />
         <Stack.Screen name="AdminBroadcastLog" component={AdminBroadcastLogScreen} />
+        <Stack.Screen name="AdminOperationalAreas" component={AdminOperationalAreasScreen} />
       </Stack.Navigator>
     </SafeAreaView>
   );

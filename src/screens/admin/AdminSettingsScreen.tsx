@@ -129,13 +129,22 @@ const AdminSettingsScreen: React.FC = () => {
           type: 'navigation',
           onPress: () => navigation.navigate('AdminZones'),
         },
+        {
+          icon: 'map-outline',
+          titleKey: 'admin.settings.operationalAreas.title',
+          subtitleKey: 'admin.settings.operationalAreas.subtitle',
+          title: 'Operational Areas',
+          subtitle: 'Manage city/zone operations, map pins, and toggles',
+          type: 'navigation',
+          onPress: () => navigation.navigate('AdminOperationalAreas'),
+        },
       ],
     },
   ];
 
   const renderSettingItem = (item: any) => {
-    const title = t(item.titleKey);
-    const subtitle = t(item.subtitleKey);
+    const title = item.title ?? t(item.titleKey);
+    const subtitle = item.subtitle ?? t(item.subtitleKey);
     if (item.type === 'toggle') {
       return (
         <View key={item.titleKey} style={styles.settingItem}>

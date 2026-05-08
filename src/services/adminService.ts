@@ -145,6 +145,48 @@ export interface AdminSupervisorsResponse {
   search: string | null;
 }
 
+export interface AdminOperationalAreaSupervisor {
+  id: number;
+  name: string;
+}
+
+export interface AdminOperationalAreaItem {
+  id: number;
+  name: string;
+  location: string;
+  country: string;
+  is_active: boolean;
+  priority: number;
+  latitude: number | null;
+  longitude: number | null;
+  supervisors: AdminOperationalAreaSupervisor[];
+}
+
+export interface AdminOperationalAreasSummary {
+  total_zones: number;
+  operational_zones: number;
+  pinned_on_map: number;
+}
+
+export interface AdminOperationalAreasResponse {
+  success: boolean;
+  message?: string;
+  data: {
+    summary: AdminOperationalAreasSummary;
+    areas: AdminOperationalAreaItem[];
+  };
+  pagination?: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+  filters?: {
+    search?: string | null;
+    country?: string | null;
+  };
+}
+
 function parseNotificationsListPayload(
   body: any,
   perPageFallback?: number
@@ -859,6 +901,41 @@ export const adminService = {
   /** Delete area: DELETE /admin/areas/:area_id */
   deleteArea: async (areaId: number): Promise<{ success: boolean; message?: string }> => {
     const response = await apiClient.delete(`/admin/areas/${areaId}`, { timeout: 15000 });
+    return response.data;
+  },
+
+  /** GET /admin/operational-areas?country=UAE&per_page=10&page=1&search= */
+  getOperationalAreas: async (params?: {
+    country?: string;
+    per_page?: number;
+    page?: number;
+    search?: string;
+  }): Promise<AdminOperationalAreasResponse> => {
+    const response = await apiClient.get<AdminOperationalAreasResponse>('/admin/operational-areas', {
+      params: {
+        country: params?.country ?? 'UAE',
+        per_page: params?.per_page ?? 10,
+        page: params?.page ?? 1,
+        search: params?.search ?? '',
+      },
+      timeout: 20000,
+    });
+    return response.data;
+  },
+
+  /** POST /admin/operational-areas/:area_id/toggle-active */
+  toggleOperationalAreaActive: async (
+    areaId: number
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: { id?: number; is_active?: boolean | number | string } | null;
+  }> => {
+    const response = await apiClient.post(
+      `/admin/operational-areas/${areaId}/toggle-active`,
+      null,
+      { timeout: 15000 }
+    );
     return response.data;
   },
 

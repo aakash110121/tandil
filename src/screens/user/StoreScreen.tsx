@@ -67,6 +67,8 @@ const StoreScreen: React.FC = () => {
     inStock: (p.stock ?? 0) > 0,
     description: p.description,
     features: [],
+    estimatedArrival: p.estimated_arrival ?? undefined,
+    jobDuration: p.job_duration ?? undefined,
   }), [getProductImage]);
 
   useEffect(() => {
@@ -211,6 +213,26 @@ const StoreScreen: React.FC = () => {
         <View style={styles.productContent}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
           <Text style={styles.productDescription} numberOfLines={1}>{item.description ?? ''}</Text>
+          {(item.estimated_arrival || item.job_duration) ? (
+            <View style={styles.productMetaBox}>
+              {item.job_duration ? (
+                <View style={styles.productMetaRow}>
+                  <Ionicons name="hourglass-outline" size={14} color={COLORS.primary} />
+                  <Text style={styles.productMetaText} numberOfLines={1}>
+                    {t('product.jobDuration', { defaultValue: 'Duration' })}: {item.job_duration}
+                  </Text>
+                </View>
+              ) : null}
+              {item.estimated_arrival ? (
+                <View style={styles.productMetaRow}>
+                  <Ionicons name="navigate-outline" size={14} color={COLORS.primary} />
+                  <Text style={styles.productMetaText} numberOfLines={1}>
+                    {t('product.estimatedArrival', { defaultValue: 'Arrival' })}: {item.estimated_arrival}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.productFooter}>
             <View style={styles.priceContainer}>
               <Text style={styles.productPrice}>{t('orders.currency', { defaultValue: 'AED' })} {priceNum}</Text>
@@ -485,6 +507,20 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     color: COLORS.textSecondary,
     marginBottom: SPACING.sm,
+  },
+  productMetaBox: {
+    marginBottom: SPACING.sm,
+    gap: 2,
+  },
+  productMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  productMetaText: {
+    flex: 1,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
   },
   productFooter: {
     flexDirection: 'row',

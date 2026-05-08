@@ -93,7 +93,6 @@ const AdminNotificationDeliveryAnalyticsScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [segment, setSegment] = useState<'stats' | 'broadcast'>('stats');
 
   const fetchData = useCallback(
     async (isRefresh = false) => {
@@ -128,9 +127,8 @@ const AdminNotificationDeliveryAnalyticsScreen: React.FC = () => {
   );
 
   useEffect(() => {
-    if (segment !== 'stats') return;
     fetchData(false);
-  }, [fetchData, segment]);
+  }, [fetchData]);
 
   const applyFilters = () => {
     const s = sinceInput.trim() || undefined;
@@ -207,39 +205,7 @@ const AdminNotificationDeliveryAnalyticsScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={() => fetchData(true)} tintColor={COLORS.primary} />
         }
       >
-        <View style={styles.segmentRow}>
-          <TouchableOpacity
-            style={[styles.segmentPill, segment === 'stats' && styles.segmentPillActive]}
-            onPress={() => setSegment('stats')}
-          >
-            <Text style={[styles.segmentText, segment === 'stats' && styles.segmentTextActive]}>
-              {t('admin.deliveryAnalytics.segmentStats')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.segmentPill, segment === 'broadcast' && styles.segmentPillActive]}
-            onPress={() => {
-              setSegment('broadcast');
-            }}
-          >
-            <Text style={[styles.segmentText, segment === 'broadcast' && styles.segmentTextActive]}>
-              {t('admin.deliveryAnalytics.segmentBroadcast')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {segment === 'broadcast' ? (
-          <View style={styles.broadcastPlaceholder}>
-            <Ionicons name="radio-outline" size={40} color={COLORS.textSecondary} />
-            <Text style={styles.broadcastPlaceholderTitle}>{t('admin.deliveryAnalytics.broadcastSoonTitle')}</Text>
-            <Text style={styles.broadcastPlaceholderBody}>{t('admin.deliveryAnalytics.broadcastSoonBody')}</Text>
-            <TouchableOpacity style={styles.linkBtn} onPress={() => setSegment('stats')}>
-              <Text style={styles.linkBtnText}>{t('admin.deliveryAnalytics.backToStats')}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <View style={styles.filterCard}>
+        <View style={styles.filterCard}>
               <Text style={styles.filterLabel}>{t('admin.deliveryAnalytics.since')}</Text>
               <TextInput
                 style={styles.filterInput}
@@ -329,8 +295,7 @@ const AdminNotificationDeliveryAnalyticsScreen: React.FC = () => {
                 </View>
               </>
             ) : null}
-          </>
-        )}
+
         <View style={styles.bottomPad} />
       </ScrollView>
 
@@ -380,27 +345,6 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   scroll: { padding: SPACING.lg, paddingBottom: SPACING.xxl },
-  segmentRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
-  },
-  segmentPill: {
-    flex: 1,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-  },
-  segmentPillActive: {
-    backgroundColor: COLORS.background,
-    borderColor: COLORS.primary,
-    borderWidth: 2,
-  },
-  segmentText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontWeight: FONT_WEIGHTS.medium },
-  segmentTextActive: { color: COLORS.primary, fontWeight: FONT_WEIGHTS.semiBold },
   filterCard: {
     backgroundColor: COLORS.surface,
     borderRadius: BORDER_RADIUS.lg,
@@ -444,13 +388,13 @@ const styles = StyleSheet.create({
   },
   applyBtn: {
     flex: 1,
-    backgroundColor: COLORS.info,
+    backgroundColor: COLORS.primary,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
   },
-  applyBtnText: { color: COLORS.background, fontWeight: FONT_WEIGHTS.semiBold, fontSize: FONT_SIZES.md },
-  resetText: { fontSize: FONT_SIZES.md, color: COLORS.info, fontWeight: FONT_WEIGHTS.semiBold },
+  applyBtnText: { color: COLORS.surface, fontWeight: FONT_WEIGHTS.semiBold, fontSize: FONT_SIZES.md },
+  resetText: { fontSize: FONT_SIZES.md, color: COLORS.primary, fontWeight: FONT_WEIGHTS.semiBold },
   loadingBox: { paddingVertical: SPACING.xl, alignItems: 'center', gap: SPACING.md },
   loadingText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
   errorBox: { paddingVertical: SPACING.lg, gap: SPACING.md },
@@ -471,8 +415,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   statCardUntracked: {
-    backgroundColor: '#FFF9E8',
-    borderColor: '#E8DCC8',
+    backgroundColor: COLORS.surfaceLight,
+    borderColor: COLORS.border,
   },
   statCardLabel: {
     fontSize: 10,
@@ -484,7 +428,7 @@ const styles = StyleSheet.create({
   statCardValue: {
     fontSize: FONT_SIZES.xl,
     fontWeight: FONT_WEIGHTS.bold,
-    color: COLORS.info,
+    color: COLORS.primary,
   },
   tableSectionTitle: {
     fontSize: FONT_SIZES.md,
@@ -516,30 +460,9 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
   },
   tdType: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.semiBold, color: COLORS.text, marginBottom: SPACING.xs },
-  tdNum: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.bold, color: COLORS.info, marginBottom: SPACING.xs },
+  tdNum: { fontSize: FONT_SIZES.sm, fontWeight: FONT_WEIGHTS.bold, color: COLORS.primary, marginBottom: SPACING.xs },
   tdAudience: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, lineHeight: 18 },
   tableEmpty: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, paddingVertical: SPACING.md, textAlign: 'center' },
-  broadcastPlaceholder: {
-    alignItems: 'center',
-    paddingVertical: SPACING.xxl,
-    paddingHorizontal: SPACING.lg,
-  },
-  broadcastPlaceholderTitle: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    color: COLORS.text,
-    marginTop: SPACING.md,
-    textAlign: 'center',
-  },
-  broadcastPlaceholderBody: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginTop: SPACING.sm,
-    lineHeight: 20,
-  },
-  linkBtn: { marginTop: SPACING.lg },
-  linkBtnText: { fontSize: FONT_SIZES.md, color: COLORS.primary, fontWeight: FONT_WEIGHTS.semiBold },
   bottomPad: { height: SPACING.xl },
   modalOverlay: {
     flex: 1,

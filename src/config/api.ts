@@ -49,6 +49,31 @@ export function getStripePublishableKey(): string {
   return '';
 }
 
+/** Stripe Apple Pay merchant identifier (merchant.com.example.app). */
+export function getStripeMerchantIdentifier(): string {
+  try {
+    if (
+      Constants.expoConfig?.extra?.stripeMerchantIdentifier != null &&
+      Constants.expoConfig.extra.stripeMerchantIdentifier !== ''
+    ) {
+      return String(Constants.expoConfig.extra.stripeMerchantIdentifier).trim();
+    }
+    if (
+      Constants.manifest?.extra?.stripeMerchantIdentifier != null &&
+      Constants.manifest.extra.stripeMerchantIdentifier !== ''
+    ) {
+      return String(Constants.manifest.extra.stripeMerchantIdentifier).trim();
+    }
+    if (Constants.manifest2?.extra?.expoConfig?.extra?.stripeMerchantIdentifier != null) {
+      const v = Constants.manifest2.extra.expoConfig.extra.stripeMerchantIdentifier;
+      if (v !== '') return String(v).trim();
+    }
+  } catch {
+    // ignore
+  }
+  return '';
+}
+
 // For development, you can also use:
 // export const API_BASE_URL = __DEV__ 
 //   ? Constants.expoConfig?.extra?.apiBaseUrlDev || 'http://192.168.1.100:8000/api'

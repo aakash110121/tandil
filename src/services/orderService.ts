@@ -16,6 +16,8 @@ export interface ShopOrderLineItem {
     id: number;
     name: string;
     image_url?: string | null;
+    estimated_arrival?: string | null;
+    job_duration?: string | null;
   } | null;
 }
 
@@ -158,6 +160,8 @@ export interface OrderTrackSummary {
   total: number;
   currency: string;
   special_instructions?: string | null;
+  estimated_arrival?: string | null;
+  job_duration?: string | null;
 }
 
 export interface OrderTrackData {

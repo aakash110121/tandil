@@ -23,7 +23,7 @@ import {
   confirmCheckoutAfterStripe,
   type CreatePaymentIntentBody,
 } from '../../services/paymentService';
-import { getStripePublishableKey } from '../../config/api';
+import { getStripeMerchantIdentifier, getStripePublishableKey } from '../../config/api';
 import {
   useStripe,
   AddressCollectionMode,
@@ -33,6 +33,7 @@ import { countryToStripeAlpha2 } from '../../utils/stripeBillingCountry';
 import { getStripePaymentSheetReturnURL } from '../../config/stripeLinking';
 import { captureException } from '../../utils/sentry';
 import * as Location from 'expo-location';
+import { resolveVisitArea } from '../../services/visitService';
 
 interface CartItem {
   id: string;
@@ -78,6 +79,7 @@ const CheckoutScreen: React.FC = () => {
   const [currentStep, setCurrentStep] = useState<'location' | 'phone' | 'payment'>('location');
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  const [locationCoords, setLocationCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [shopSettings, setShopSettings] = useState<ShopSettings | null>(null);
   const [orderSummaryApi, setOrderSummaryApi] = useState<OrderSummaryData | null>(buyNowSummary);
   
@@ -197,6 +199,7 @@ const CheckoutScreen: React.FC = () => {
     }
 
     const stripePk = getStripePublishableKey();
+    const stripeMerchantIdentifier = getStripeMerchantIdentifier();
     if (!stripePk) {
       Alert.alert(
         t('common.error', 'Error'),
@@ -280,6 +283,8 @@ const CheckoutScreen: React.FC = () => {
         pi.customer && pi.ephemeral_key
           ? { customerId: pi.customer, customerEphemeralKeySecret: pi.ephemeral_key }
           : {};
+      const merchantCountryCode = (countryCode || 'AE').toUpperCase();
+      const currencyCode = String(currency || 'AED').toUpperCase();
 
       const sheetBase = {
         merchantDisplayName: 'Tandil',
@@ -287,6 +292,19 @@ const CheckoutScreen: React.FC = () => {
         returnURL: getStripePaymentSheetReturnURL(),
         allowsDelayedPaymentMethods: false,
         defaultBillingDetails,
+        ...(stripeMerchantIdentifier
+          ? {
+              applePay: {
+                merchantCountryCode,
+              },
+            }
+          : {}),
+        googlePay: {
+          merchantCountryCode,
+          currencyCode,
+          // Use test mode whenever app points to Stripe test keys.
+          testEnv: /pk_test_/i.test(stripePk),
+        },
         ...customerProps,
       };
 
@@ -395,6 +413,10 @@ const CheckoutScreen: React.FC = () => {
         zipCode: place.postalCode || prev.zipCode,
         country: place.country || prev.country,
       }));
+      setLocationCoords({
+        latitude: coords.coords.latitude,
+        longitude: coords.coords.longitude,
+      });
     } catch {
       Alert.alert(
         t('common.error', 'Error'),
@@ -618,7 +640,7 @@ const CheckoutScreen: React.FC = () => {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (currentStep === 'location') {
       if (!shippingAddress.street || !shippingAddress.city || !shippingAddress.country) {
         Alert.alert(
@@ -629,6 +651,33 @@ const CheckoutScreen: React.FC = () => {
           )
         );
         return;
+      }
+
+      setLoading(true);
+      try {
+        const resolveRes = await resolveVisitArea({
+          full_name: shippingAddress.fullName,
+          street_address: shippingAddress.street,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          zip_code: shippingAddress.zipCode,
+          country: shippingAddress.country,
+          latitude: locationCoords?.latitude,
+          longitude: locationCoords?.longitude,
+        });
+        if (!resolveRes.success) {
+          Alert.alert(
+            t('checkout.locationNotServiceableTitle', 'Location unavailable'),
+            resolveRes.message || t('checkout.resolveAreaFailed', 'Unable to validate service area. Please check address and try again.')
+          );
+          return;
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        Alert.alert(t('checkout.locationNotServiceableTitle', 'Location unavailable'), msg);
+        return;
+      } finally {
+        setLoading(false);
       }
     }
     if (currentStep === 'phone') {

@@ -3,6 +3,20 @@ const { expo } = appJson;
 
 // EAS Build sets EAS_BUILD_PROFILE (e.g. 'preview', 'production'). Use it for Sentry environment.
 const easBuildProfile = process.env.EAS_BUILD_PROFILE || 'development';
+const stripeMerchantIdentifier =
+  process.env.EXPO_PUBLIC_STRIPE_MERCHANT_IDENTIFIER || expo.extra?.stripeMerchantIdentifier || '';
+
+const basePlugins = Array.isArray(expo.plugins) ? expo.plugins : [];
+const pluginsWithoutStripe = basePlugins.filter((p) =>
+  Array.isArray(p) ? p[0] !== '@stripe/stripe-react-native' : p !== '@stripe/stripe-react-native'
+);
+const stripePlugin = [
+  '@stripe/stripe-react-native',
+  {
+    enableGooglePay: true,
+    ...(stripeMerchantIdentifier ? { merchantIdentifier: stripeMerchantIdentifier } : {}),
+  },
+];
 
 module.exports = {
   ...appJson,
@@ -25,6 +39,8 @@ module.exports = {
       easBuildProfile,
       stripePublishableKey:
         process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || expo.extra?.stripePublishableKey || '',
+      stripeMerchantIdentifier,
     },
+    plugins: [...pluginsWithoutStripe, stripePlugin],
   },
 };
