@@ -31,6 +31,9 @@ export interface ShopOrderApi {
   payment_status: string;
   order_status: string;
   payment_method: string;
+  refunded_at?: string | null;
+  refund_amount?: string | null;
+  refund_reason?: string | null;
   created_at: string;
   items: ShopOrderLineItem[];
 }
@@ -139,6 +142,34 @@ export async function getClientOrders(params?: {
   return { orders: [], pagination: null, message: body?.message };
 }
 
+/**
+ * GET /orders/cancelled — customer cancelled orders list.
+ */
+export async function getClientCancelledOrders(params?: {
+  page?: number;
+  per_page?: number;
+}): Promise<{
+  orders: ShopOrderApi[];
+  pagination: OrdersListPagination | null;
+  message?: string;
+}> {
+  const response = await apiClient.get<GetClientOrdersResponse>('/orders/cancelled', {
+    params: {
+      page: params?.page ?? 1,
+      per_page: params?.per_page ?? 15,
+    },
+    timeout: 20000,
+  });
+  const body = response.data;
+  if (body?.success && Array.isArray(body.data)) {
+    return { orders: body.data, pagination: body.pagination ?? null, message: body.message };
+  }
+  if (Array.isArray(body?.data)) {
+    return { orders: body.data, pagination: body.pagination ?? null, message: body?.message };
+  }
+  return { orders: [], pagination: null, message: body?.message };
+}
+
 export function mapShopOrdersToOrders(rows: ShopOrderApi[]): Order[] {
   return rows.map(shopOrderToOrder);
 }
@@ -159,6 +190,10 @@ export interface OrderTrackSummary {
   payment_method_code?: string;
   total: number;
   currency: string;
+  payment_status?: string;
+  refund_amount?: number | string | null;
+  refund_reason?: string | null;
+  refunded_at?: string | null;
   special_instructions?: string | null;
   estimated_arrival?: string | null;
   job_duration?: string | null;
@@ -200,6 +235,26 @@ export async function getOrderTrack(
 ): Promise<{ data: OrderTrackData | null; message?: string }> {
   const id = encodeURIComponent(String(orderId));
   const response = await apiClient.get<GetOrderTrackResponse>(`/orders/${id}/track`, {
+    timeout: 25000,
+  });
+  const body = response.data;
+  if (body?.success && body.data) {
+    return { data: body.data, message: body.message };
+  }
+  if (body?.data) {
+    return { data: body.data, message: body.message };
+  }
+  return { data: null, message: body?.message };
+}
+
+/**
+ * GET /orders/:id/cancel-track — cancelled order refund tracking.
+ */
+export async function getCancelledOrderTrack(
+  orderId: string | number
+): Promise<{ data: OrderTrackData | null; message?: string }> {
+  const id = encodeURIComponent(String(orderId));
+  const response = await apiClient.get<GetOrderTrackResponse>(`/orders/${id}/cancel-track`, {
     timeout: 25000,
   });
   const body = response.data;

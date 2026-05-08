@@ -120,6 +120,18 @@ const AdminSettingsScreen: React.FC = () => {
       ],
     },
     {
+      titleKey: 'admin.settings.orderManagementSection',
+      items: [
+        {
+          icon: 'receipt-outline',
+          titleKey: 'admin.settings.orderManagement.title',
+          subtitleKey: 'admin.settings.orderManagement.subtitle',
+          type: 'navigation',
+          onPress: () => navigation.navigate('AdminOrderStatistics'),
+        },
+      ],
+    },
+    {
       titleKey: 'admin.settings.zonesAndTeamsSection',
       items: [
         {
@@ -133,8 +145,6 @@ const AdminSettingsScreen: React.FC = () => {
           icon: 'map-outline',
           titleKey: 'admin.settings.operationalAreas.title',
           subtitleKey: 'admin.settings.operationalAreas.subtitle',
-          title: 'Operational Areas',
-          subtitle: 'Manage city/zone operations, map pins, and toggles',
           type: 'navigation',
           onPress: () => navigation.navigate('AdminOperationalAreas'),
         },
@@ -142,12 +152,13 @@ const AdminSettingsScreen: React.FC = () => {
     },
   ];
 
-  const renderSettingItem = (item: any) => {
+  const renderSettingItem = (item: any, index: number) => {
     const title = item.title ?? t(item.titleKey);
     const subtitle = item.subtitle ?? t(item.subtitleKey);
+    const itemKey = item.titleKey ?? item.title ?? `${item.icon}-${index}`;
     if (item.type === 'toggle') {
       return (
-        <View key={item.titleKey} style={styles.settingItem}>
+        <View key={itemKey} style={styles.settingItem}>
           <View style={styles.settingIcon}>
             <Ionicons name={item.icon as any} size={24} color={COLORS.primary} />
           </View>
@@ -167,7 +178,7 @@ const AdminSettingsScreen: React.FC = () => {
 
     return (
       <TouchableOpacity
-        key={item.titleKey}
+        key={itemKey}
         style={styles.settingItem}
         onPress={item.onPress}
       >
@@ -214,9 +225,9 @@ const AdminSettingsScreen: React.FC = () => {
         </View>
 
         {/* Settings Sections */}
-        {settingsSections.map((section) => (
-          <View key={section.titleKey} style={styles.section}>
-            <Text style={styles.sectionTitle}>{t(section.titleKey)}</Text>
+        {settingsSections.map((section, sectionIndex) => (
+          <View key={`${section.titleKey ?? section.title ?? 'section'}-${sectionIndex}`} style={styles.section}>
+            <Text style={styles.sectionTitle}>{section.title ?? t(section.titleKey)}</Text>
             <View style={styles.sectionContent}>
               {section.items.map(renderSettingItem)}
             </View>

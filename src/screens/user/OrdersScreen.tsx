@@ -17,7 +17,11 @@ import { useAppStore } from '../../store';
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
 import type { Order } from '../../types';
-import { getClientOrders, mapShopOrdersToOrders } from '../../services/orderService';
+import {
+  getClientOrders,
+  getClientCancelledOrders,
+  mapShopOrdersToOrders,
+} from '../../services/orderService';
 
 const OrdersScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -42,8 +46,14 @@ const OrdersScreen: React.FC = () => {
       else setLoading(true);
       setLoadError(null);
       try {
-        const { orders: rows } = await getClientOrders();
-        setOrders(mapShopOrdersToOrders(rows));
+        const [{ orders: rows }, { orders: cancelledRows }] = await Promise.all([
+          getClientOrders(),
+          getClientCancelledOrders(),
+        ]);
+        const mergedById = new Map<number, (typeof rows)[number]>();
+        rows.forEach((item) => mergedById.set(item.id, item));
+        cancelledRows.forEach((item) => mergedById.set(item.id, item));
+        setOrders(mapShopOrdersToOrders(Array.from(mergedById.values())));
       } catch (e: unknown) {
         const msg =
           (e as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -97,7 +107,12 @@ const OrdersScreen: React.FC = () => {
   const renderOrderItem = ({ item }: { item: Order }) => (
     <OrderCard
       order={item}
-      onPress={() => navigation.navigate('OrderTracking', { orderId: item.id })}
+      onPress={() =>
+        navigation.navigate('OrderTracking', {
+          orderId: item.id,
+          useCancelledTrack: item.status === 'cancelled',
+        })
+      }
       variant="default"
     />
   );

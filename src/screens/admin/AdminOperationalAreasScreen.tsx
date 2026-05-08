@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import MapView, { Marker, Region } from 'react-native-maps';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../constants';
 import { adminService, AdminOperationalAreaItem, AdminOperationalAreasSummary } from '../../services/adminService';
+import { useTranslation } from 'react-i18next';
 
 const UAE_REGION: Region = {
   latitude: 24.35,
@@ -67,6 +68,7 @@ function isAreaActive(value: unknown): boolean {
 
 const AdminOperationalAreasScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const [areas, setAreas] = useState<AdminOperationalAreaItem[]>([]);
   const [summary, setSummary] = useState<AdminOperationalAreasSummary>({
     total_zones: 0,
@@ -79,59 +81,82 @@ const AdminOperationalAreasScreen: React.FC = () => {
   const [lastPage, setLastPage] = useState(1);
   const [togglingAreaIds, setTogglingAreaIds] = useState<Record<number, boolean>>({});
 
-  const activePinnedAreas = areas
-    .filter((area) => isAreaActive((area as unknown as { is_active: unknown }).is_active))
-    .map((area) => ({ area, coordinate: getAreaCoordinate(area) }))
-    .filter(
-      (entry): entry is { area: AdminOperationalAreaItem; coordinate: { latitude: number; longitude: number } } =>
-        entry.coordinate != null
-    )
-    .map((entry, index, arr) => {
-      const duplicatesBefore = arr
-        .slice(0, index)
+  const activePinnedAreas = useMemo(
+    () =>
+      areas
+        .filter((area) => isAreaActive((area as unknown as { is_active: unknown }).is_active))
+        .map((area) => ({ area, coordinate: getAreaCoordinate(area) }))
         .filter(
-          (x) =>
-            x.coordinate.latitude === entry.coordinate.latitude &&
-            x.coordinate.longitude === entry.coordinate.longitude
-        ).length;
-      if (duplicatesBefore === 0) return { ...entry, displayCoordinate: entry.coordinate };
-      const step = 0.03;
-      const angle = duplicatesBefore * 45;
-      const radians = (angle * Math.PI) / 180;
-      return {
-        ...entry,
-        displayCoordinate: {
-          latitude: entry.coordinate.latitude + Math.sin(radians) * step,
-          longitude: entry.coordinate.longitude + Math.cos(radians) * step,
-        },
-      };
-    });
+          (entry): entry is { area: AdminOperationalAreaItem; coordinate: { latitude: number; longitude: number } } =>
+            entry.coordinate != null
+        )
+        .map((entry, index, arr) => {
+          const duplicatesBefore = arr
+            .slice(0, index)
+            .filter(
+              (x) =>
+                x.coordinate.latitude === entry.coordinate.latitude &&
+                x.coordinate.longitude === entry.coordinate.longitude
+            ).length;
+          if (duplicatesBefore === 0) return { ...entry, displayCoordinate: entry.coordinate };
+          const step = 0.03;
+          const angle = duplicatesBefore * 45;
+          const radians = (angle * Math.PI) / 180;
+          return {
+            ...entry,
+            displayCoordinate: {
+              latitude: entry.coordinate.latitude + Math.sin(radians) * step,
+              longitude: entry.coordinate.longitude + Math.cos(radians) * step,
+            },
+          };
+        }),
+    [areas]
+  );
+  const [stablePinnedAreas, setStablePinnedAreas] = useState<typeof activePinnedAreas>([]);
+  const hasToggleInFlight = useMemo(
+    () => Object.values(togglingAreaIds).some(Boolean),
+    [togglingAreaIds]
+  );
 
-  const fetchOperationalAreas = useCallback(async (page: number = 1, append = false) => {
-    if (append) setLoadingMore(true);
-    else setLoading(true);
+  useEffect(() => {
+    // Avoid mutating native map marker tree while a Switch interaction is in progress.
+    if (!hasToggleInFlight) setStablePinnedAreas(activePinnedAreas);
+  }, [activePinnedAreas, hasToggleInFlight]);
+
+  const fetchOperationalAreas = useCallback(
+    async (page: number = 1, append = false, silent = false) => {
+      if (append) setLoadingMore(true);
+      else if (!silent) setLoading(true);
     try {
       const res = await adminService.getOperationalAreas({
         country: 'UAE',
         per_page: OPERATIONAL_AREAS_PER_PAGE,
         page,
       });
-      const incoming = res?.data?.areas ?? [];
+      const incomingRaw = res?.data?.areas ?? [];
+      // Normalize server values to avoid runtime crashes in RN controls like Switch.
+      const incoming = incomingRaw.map((area) => ({
+        ...area,
+        is_active: isAreaActive((area as unknown as { is_active: unknown }).is_active),
+        supervisors: Array.isArray(area.supervisors) ? area.supervisors : [],
+      }));
       const incomingSummary = res?.data?.summary;
       setAreas((prev) => (append ? [...prev, ...incoming] : incoming));
       if (incomingSummary) setSummary(incomingSummary);
       setCurrentPage(res?.pagination?.current_page ?? page);
       setLastPage(res?.pagination?.last_page ?? 1);
     } catch {
-      if (!append) {
+      if (!append && !silent) {
         setAreas([]);
         setSummary({ total_zones: 0, operational_zones: 0, pinned_on_map: 0 });
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       setLoadingMore(false);
     }
-  }, []);
+    },
+    []
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -139,21 +164,32 @@ const AdminOperationalAreasScreen: React.FC = () => {
     }, [fetchOperationalAreas])
   );
 
-  const onToggleArea = async (id: number, value: boolean) => {
-    const previousAreas = areas;
-    setAreas((prev) => prev.map((item) => (item.id === id ? { ...item, is_active: value } : item)));
+  const onToggleArea = async (id: number) => {
+    if (togglingAreaIds[id]) return;
+    const currentItem = areas.find((x) => x.id === id);
+    const currentActive = isAreaActive((currentItem as unknown as { is_active?: unknown })?.is_active);
     setTogglingAreaIds((prev) => ({ ...prev, [id]: true }));
     try {
       const res = await adminService.toggleOperationalAreaActive(id);
       if (!res?.success) {
-        setAreas(previousAreas);
         Alert.alert('Update failed', res?.message || 'Could not update zone status. Please try again.');
-      } else if (res?.data && typeof res.data.is_active !== 'undefined') {
-        const nextActive = isAreaActive(res.data.is_active);
+      } else {
+        const nextActive =
+          res?.data && typeof res.data.is_active !== 'undefined'
+            ? isAreaActive(res.data.is_active)
+            : !currentActive;
         setAreas((prev) => prev.map((item) => (item.id === id ? { ...item, is_active: nextActive } : item)));
+        setSummary((prev) => {
+          const operational = prev.operational_zones + (nextActive ? 1 : -1);
+          const pinned = prev.pinned_on_map + (nextActive ? 1 : -1);
+          return {
+            ...prev,
+            operational_zones: Math.max(0, operational),
+            pinned_on_map: Math.max(0, pinned),
+          };
+        });
       }
     } catch (e: any) {
-      setAreas(previousAreas);
       Alert.alert('Update failed', e?.response?.data?.message || e?.message || 'Could not update zone status.');
     } finally {
       setTogglingAreaIds((prev) => ({ ...prev, [id]: false }));
@@ -171,84 +207,118 @@ const AdminOperationalAreasScreen: React.FC = () => {
 
         <View style={styles.topHeader}>
           <View>
-            <Text style={styles.screenTitle}>UAE Operational Areas</Text>
+            <Text style={styles.screenTitle}>
+              {t('admin.operationalAreas.screenTitle', { defaultValue: 'UAE Operational Areas' })}
+            </Text>
             <Text style={styles.screenSubtitle}>
-              Enable/disable cities and zones from one screen, with live map pins for active operations.
+              {t('admin.operationalAreas.screenSubtitle', {
+                defaultValue:
+                  'Enable/disable cities and zones from one screen, with live map pins for active operations.',
+              })}
             </Text>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity style={styles.headerButtonSecondary}>
-              <Text style={styles.headerButtonSecondaryText}>Zone Assignment</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButtonPrimary}>
-              <Text style={styles.headerButtonPrimaryText}>New Zone</Text>
+              <Text style={styles.headerButtonSecondaryText}>
+                {t('admin.operationalAreas.zoneAssignment', { defaultValue: 'Zone Assignment' })}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>TOTAL ZONES</Text>
+            <Text style={styles.statLabel}>
+              {t('admin.operationalAreas.totalZones', { defaultValue: 'TOTAL ZONES' })}
+            </Text>
             <Text style={styles.statValue}>{summary.total_zones}</Text>
           </View>
           <View style={[styles.statCard, styles.statCardHighlight]}>
-            <Text style={styles.statLabel}>OPERATIONAL</Text>
+            <Text style={styles.statLabel}>
+              {t('admin.operationalAreas.operational', { defaultValue: 'OPERATIONAL' })}
+            </Text>
             <Text style={styles.statValue}>{summary.operational_zones}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>PINNED ON MAP</Text>
+            <Text style={styles.statLabel}>
+              {t('admin.operationalAreas.pinnedOnMap', { defaultValue: 'PINNED ON MAP' })}
+            </Text>
             <Text style={styles.statValue}>{summary.pinned_on_map}</Text>
           </View>
         </View>
 
         <View style={styles.mapCard}>
           <View style={styles.mapCardHeader}>
-            <View>
-              <Text style={styles.mapTitle}>UAE Operational Map</Text>
-              <Text style={styles.mapSubtitle}>Only active zones with valid coordinates are pinned on map.</Text>
-            </View>
-            <View style={styles.liveBadge}>
-              <Text style={styles.liveBadgeText}>Live Pins</Text>
-            </View>
+            <Text style={styles.mapTitle}>
+              {t('admin.operationalAreas.mapTitle', { defaultValue: 'UAE Operational Map' })}
+            </Text>
+            <Text style={styles.mapSubtitle}>
+              {t('admin.operationalAreas.mapSubtitle', {
+                defaultValue: 'Only active zones with valid coordinates are pinned on map.',
+              })}
+            </Text>
           </View>
-          <MapView
-            style={styles.mapView}
-            initialRegion={UAE_REGION}
-            region={UAE_REGION}
-            scrollEnabled
-            zoomEnabled
-            pitchEnabled={false}
-            rotateEnabled={false}
-          >
-            {activePinnedAreas.map(({ area, displayCoordinate }) => (
-              <Marker
-                key={`op-area-pin-${area.id}`}
-                coordinate={displayCoordinate}
-                title={area.name}
-                description={`${area.location}, ${area.country}`}
-              />
-            ))}
-          </MapView>
+          {hasToggleInFlight ? (
+            <View style={[styles.mapView, styles.mapLoadingOverlay]}>
+              <ActivityIndicator size="small" color={COLORS.primary} />
+              <Text style={styles.mapLoadingText}>
+                {t('admin.operationalAreas.updatingMap', { defaultValue: 'Updating map...' })}
+              </Text>
+            </View>
+          ) : (
+            <MapView
+              style={styles.mapView}
+              initialRegion={UAE_REGION}
+              scrollEnabled
+              zoomEnabled
+              pitchEnabled={false}
+              rotateEnabled={false}
+            >
+              {stablePinnedAreas.map(({ area, displayCoordinate }) => (
+                <Marker
+                  key={`op-area-pin-${area.id}`}
+                  coordinate={displayCoordinate}
+                  title={area.name}
+                  description={`${area.location}, ${area.country}`}
+                  tracksViewChanges={false}
+                />
+              ))}
+            </MapView>
+          )}
         </View>
 
         <View style={styles.tableCard}>
-          <Text style={styles.tableTitle}>Operational Area List</Text>
+          <Text style={styles.tableTitle}>
+            {t('admin.operationalAreas.listTitle', { defaultValue: 'Operational Area List' })}
+          </Text>
             <View>
               <View style={styles.tableHeader}>
-                <Text style={[styles.headerCell, styles.cityZoneCell]}>ZONE</Text>
-                <Text style={[styles.headerCell, styles.countryCell]}>CTRY</Text>
-                <Text style={[styles.headerCell, styles.supervisorCell]}>SUPV</Text>
-                <Text style={[styles.headerCell, styles.toggleCell]}>ACTIVE</Text>
+                <Text style={[styles.headerCell, styles.cityZoneCell]}>
+                  {t('admin.operationalAreas.zone', { defaultValue: 'ZONE' })}
+                </Text>
+                <Text style={[styles.headerCell, styles.countryCell]}>
+                  {t('admin.operationalAreas.countryShort', { defaultValue: 'CTRY' })}
+                </Text>
+                <Text style={[styles.headerCell, styles.supervisorCell]}>
+                  {t('admin.operationalAreas.supervisorShort', { defaultValue: 'SUPV' })}
+                </Text>
+                <Text style={[styles.headerCell, styles.toggleCell]}>
+                  {t('admin.operationalAreas.active', { defaultValue: 'ACTIVE' })}
+                </Text>
               </View>
 
               {loading ? (
                 <View style={styles.loadingRow}>
                   <ActivityIndicator size="small" color={COLORS.primary} />
-                  <Text style={styles.loadingText}>Loading operational areas...</Text>
+                  <Text style={styles.loadingText}>
+                    {t('admin.operationalAreas.loading', { defaultValue: 'Loading operational areas...' })}
+                  </Text>
                 </View>
               ) : areas.length === 0 ? (
                 <View style={styles.loadingRow}>
-                  <Text style={styles.loadingText}>No operational areas found.</Text>
+                  <Text style={styles.loadingText}>
+                    {t('admin.operationalAreas.empty', { defaultValue: 'No operational areas found.' })}
+                  </Text>
                 </View>
               ) : (
                 areas.map((item) => (
@@ -261,7 +331,9 @@ const AdminOperationalAreasScreen: React.FC = () => {
                     <View style={styles.supervisorCell}>
                       <View style={[styles.supervisorTag, item.supervisors.length > 0 && styles.supervisorTagAssigned]}>
                         <Text style={[styles.supervisorTagText, item.supervisors.length > 0 && styles.supervisorTagTextAssigned]}>
-                          {item.supervisors.length > 0 ? item.supervisors[0].name : 'None'}
+                          {item.supervisors.length > 0
+                            ? item.supervisors[0].name
+                            : t('admin.operationalAreas.none', { defaultValue: 'None' })}
                         </Text>
                       </View>
                     </View>
@@ -270,10 +342,15 @@ const AdminOperationalAreasScreen: React.FC = () => {
                         <ActivityIndicator size="small" color={COLORS.primary} />
                       ) : (
                         <Switch
-                          value={item.is_active}
-                          onValueChange={(value) => onToggleArea(item.id, value)}
+                          value={isAreaActive((item as unknown as { is_active: unknown }).is_active)}
+                          onValueChange={() => onToggleArea(item.id)}
+                          disabled={hasToggleInFlight}
                           trackColor={{ false: COLORS.border, true: COLORS.primary + '66' }}
-                          thumbColor={item.is_active ? COLORS.primary : '#f4f4f5'}
+                          thumbColor={
+                            isAreaActive((item as unknown as { is_active: unknown }).is_active)
+                              ? COLORS.primary
+                              : '#f4f4f5'
+                          }
                         />
                       )}
                     </View>
@@ -290,7 +367,9 @@ const AdminOperationalAreasScreen: React.FC = () => {
                   {loadingMore ? (
                     <ActivityIndicator size="small" color={COLORS.background} />
                   ) : (
-                    <Text style={styles.loadMoreButtonText}>Load more</Text>
+                    <Text style={styles.loadMoreButtonText}>
+                      {t('common.loadMore', { defaultValue: 'Load more' })}
+                    </Text>
                   )}
                 </TouchableOpacity>
               ) : null}
@@ -348,17 +427,6 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     fontWeight: FONT_WEIGHTS.medium,
   },
-  headerButtonPrimary: {
-    backgroundColor: '#5B58F5',
-    borderRadius: BORDER_RADIUS.sm,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-  },
-  headerButtonPrimaryText: {
-    color: COLORS.background,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: FONT_WEIGHTS.medium,
-  },
   statsRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
@@ -395,9 +463,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   mapCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: SPACING.sm,
   },
   mapTitle: {
@@ -410,23 +475,22 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     marginTop: 2,
   },
-  liveBadge: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.round,
-  },
-  liveBadgeText: {
-    color: '#4F46E5',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: FONT_WEIGHTS.medium,
-  },
   mapView: {
     height: 220,
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.border,
     overflow: 'hidden',
+  },
+  mapLoadingOverlay: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    backgroundColor: COLORS.background,
+  },
+  mapLoadingText: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
   },
   tableCard: {
     backgroundColor: COLORS.surface,

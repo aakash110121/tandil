@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import Header from '../../components/common/Header';
 import { TrackingTimeline } from '../../components/common/TrackingTimeline';
 import {
+  getCancelledOrderTrack,
   getOrderTrack,
   maintenancePhotoUrl,
   type OrderTrackData,
@@ -43,7 +44,7 @@ function badgeColorForStatus(statusLabel: string): string {
 const OrderTrackingScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { orderId } = route.params || {};
+  const { orderId, useCancelledTrack } = route.params || {};
   const { t, i18n } = useTranslation();
   const [track, setTrack] = useState<OrderTrackData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,7 +59,8 @@ const OrderTrackingScreen: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, message } = await getOrderTrack(orderId);
+      const loader = useCancelledTrack ? getCancelledOrderTrack : getOrderTrack;
+      const { data, message } = await loader(orderId);
       if (data) {
         setTrack(data);
       } else {
@@ -75,7 +77,7 @@ const OrderTrackingScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [orderId, t]);
+  }, [orderId, t, useCancelledTrack]);
 
   useEffect(() => {
     load();

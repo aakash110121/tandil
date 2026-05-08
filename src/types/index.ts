@@ -257,7 +257,7 @@ export type UserStackParamList = {
       image: string;
     };
   };
-  OrderTracking: { orderId: string };
+  OrderTracking: { orderId: string; useCancelledTrack?: boolean };
   OrderHistory: undefined;
   LoyaltyPoints: undefined;
   Offers: undefined;

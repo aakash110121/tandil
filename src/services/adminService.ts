@@ -187,6 +187,83 @@ export interface AdminOperationalAreasResponse {
   };
 }
 
+export interface AdminDashboardOrderStatsSummary {
+  total_orders: number;
+  cancelled_orders: number;
+  completed_orders: number;
+  refunded_orders: number;
+  pending_orders: number;
+  assigned_orders: number;
+  in_progress_orders: number;
+}
+
+export interface AdminDashboardOrderStatsFinancial {
+  currency: string;
+  gross_revenue: number;
+  refunded_amount: number;
+  net_revenue: number;
+}
+
+export interface AdminDashboardOrderStatsPeriodCounts {
+  today: number;
+  this_week: number;
+  this_month: number;
+}
+
+export interface AdminDashboardOrderStatsRates {
+  completion_rate: number;
+  cancellation_rate: number;
+  refund_rate: number;
+}
+
+export interface AdminDashboardOrderStatsResponse {
+  success: boolean;
+  message?: string;
+  data: {
+    summary: AdminDashboardOrderStatsSummary;
+    financial: AdminDashboardOrderStatsFinancial;
+    period_counts: AdminDashboardOrderStatsPeriodCounts;
+    rates: AdminDashboardOrderStatsRates;
+  };
+}
+
+export interface AdminDashboardOrderListItem {
+  id: number;
+  order_number: string;
+  order_number_short: string;
+  order_status: string;
+  payment_status: string;
+  total_amount: number;
+  refund_amount: number;
+  customer: {
+    id: number | null;
+    name: string | null;
+    email: string | null;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminDashboardOrderBucket {
+  count: number;
+  orders: AdminDashboardOrderListItem[];
+}
+
+export interface AdminDashboardOrderBucketsResponse {
+  success: boolean;
+  message?: string;
+  limit?: number;
+  data: {
+    total_orders: AdminDashboardOrderBucket;
+    pending_orders: AdminDashboardOrderBucket;
+    assigned_orders: AdminDashboardOrderBucket;
+    in_progress_orders: AdminDashboardOrderBucket;
+    completed_orders: AdminDashboardOrderBucket;
+    cancelled_orders: AdminDashboardOrderBucket;
+    refunded_orders: AdminDashboardOrderBucket;
+  };
+}
+
 function parseNotificationsListPayload(
   body: any,
   perPageFallback?: number
@@ -370,6 +447,29 @@ export const adminService = {
     };
   }> => {
     const response = await apiClient.get('/admin/dashboard/statistics', { params });
+    return response.data;
+  },
+
+  /** GET /admin/dashboard/order-statistics */
+  getDashboardOrderStatistics: async (): Promise<AdminDashboardOrderStatsResponse> => {
+    const response = await apiClient.get<AdminDashboardOrderStatsResponse>(
+      '/admin/dashboard/order-statistics',
+      { timeout: 20000 }
+    );
+    return response.data;
+  },
+
+  /** GET /admin/dashboard/order-statistics/orders?limit=20 */
+  getDashboardOrderStatisticBuckets: async (params?: {
+    limit?: number;
+  }): Promise<AdminDashboardOrderBucketsResponse> => {
+    const response = await apiClient.get<AdminDashboardOrderBucketsResponse>(
+      '/admin/dashboard/order-statistics/orders',
+      {
+        params: { limit: params?.limit ?? 20 },
+        timeout: 20000,
+      }
+    );
     return response.data;
   },
 
