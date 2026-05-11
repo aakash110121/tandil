@@ -44,6 +44,7 @@ import AddressesScreen from '../screens/user/AddressesScreen';
 import AddAddressScreen from '../screens/user/AddAddressScreen';
 import EditAddressScreen from '../screens/user/EditAddressScreen';
 import PaymentMethodsScreen from '../screens/user/PaymentMethodsScreen';
+import WalletScreen from '../screens/user/WalletScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator<UserStackParamList>();
@@ -152,6 +153,7 @@ const UserAppNavigator = () => {
       <Stack.Screen name="AddAddress" component={AddAddressScreen} />
       <Stack.Screen name="EditAddress" component={EditAddressScreen} />
       <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+      <Stack.Screen name="Wallet" component={WalletScreen} />
     </Stack.Navigator>
   );
 };

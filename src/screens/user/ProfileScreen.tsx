@@ -89,6 +89,9 @@ const ProfileScreen: React.FC = () => {
     { icon: 'location-outline', title: t('profile.addresses'), onPress: () => {
       try { navigation.navigate('Addresses'); } catch {}
     } },
+    { icon: 'wallet-outline', title: t('profile.wallet', 'Wallet'), onPress: () => {
+      try { navigation.navigate('Wallet'); } catch {}
+    } },
     { icon: 'card-outline', title: t('profile.paymentMethods'), onPress: () => {
       try { navigation.navigate('PaymentMethods'); } catch {}
     } },

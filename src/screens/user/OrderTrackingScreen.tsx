@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import Header from '../../components/common/Header';
 import { TrackingTimeline } from '../../components/common/TrackingTimeline';
 import {
+  cancelClientOrder,
   getCancelledOrderTrack,
   getOrderTrack,
   maintenancePhotoUrl,
@@ -49,6 +50,7 @@ const OrderTrackingScreen: React.FC = () => {
   const [track, setTrack] = useState<OrderTrackData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(async () => {
     if (orderId == null || orderId === '') {
@@ -92,7 +94,40 @@ const OrderTrackingScreen: React.FC = () => {
         {
           text: t('common.yes', 'Yes'),
           style: 'destructive',
-          onPress: () => navigation.goBack(),
+          onPress: () => {
+            void (async () => {
+              setCancelling(true);
+              try {
+                const { success, message, refund } = await cancelClientOrder(orderId);
+                if (success) {
+                  const parts: string[] = [];
+                  if (message?.trim()) parts.push(message.trim());
+                  else parts.push(t('orders.cancelSuccessBody', 'Your order has been cancelled.'));
+                  if (refund?.wallet_credited != null && Number(refund.wallet_credited) > 0) {
+                    const amt = Number(refund.wallet_credited).toFixed(2);
+                    const exp = refund.wallet_expires_at
+                      ? String(refund.wallet_expires_at).slice(0, 10)
+                      : '';
+                    parts.push(
+                      exp
+                        ? t('orders.cancelWalletCredit', { amount: amt, date: exp })
+                        : t('orders.cancelWalletCreditShort', { amount: amt })
+                    );
+                  }
+                  Alert.alert(t('orders.cancelSuccessTitle', 'Order cancelled'), parts.join('\n\n'), [
+                    { text: t('common.ok', 'OK'), onPress: () => navigation.goBack() },
+                  ]);
+                } else {
+                  Alert.alert(
+                    t('common.error', 'Error'),
+                    message || t('orders.cancelFailed', 'Could not cancel this order. Please try again.')
+                  );
+                }
+              } finally {
+                setCancelling(false);
+              }
+            })();
+          },
         },
       ]
     );
@@ -297,10 +332,14 @@ const OrderTrackingScreen: React.FC = () => {
             <Text style={styles.rateButtonText}>{t('orders.rateService', 'Rate service')}</Text>
           </TouchableOpacity>
         ) : track.can_cancel ? (
-          <TouchableOpacity style={styles.cancelButton} onPress={handleCancelOrder}>
+          <TouchableOpacity
+            style={[styles.cancelButton, cancelling && { opacity: 0.6 }]}
+            onPress={handleCancelOrder}
+            disabled={cancelling}
+          >
             <Ionicons name="close-circle-outline" size={20} color={COLORS.error} />
             <Text style={styles.cancelButtonText}>
-              {t('orders.cancelOrder', 'Cancel order')}
+              {cancelling ? t('common.loading', 'Loading...') : t('orders.cancelOrder', 'Cancel order')}
             </Text>
           </TouchableOpacity>
         ) : null}

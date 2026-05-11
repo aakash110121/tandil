@@ -51,6 +51,11 @@ export interface OrderSummaryData {
   tax?: number;
   total: number;
   currency: string;
+  wallet_available?: boolean;
+  wallet_balance?: number;
+  use_wallet?: boolean;
+  wallet_amount_applied?: number;
+  amount_due?: number;
 }
 
 export interface GetOrderSummaryResponse {
@@ -88,8 +93,20 @@ interface GetBuyNowSummaryResponse {
  * Get order summary for current cart. Requires customer token.
  * GET /shop/order-summary. Returns subtotal, discount, shipping, tax, total, currency.
  */
-export async function getOrderSummary(): Promise<OrderSummaryData | null> {
-  const response = await apiClient.get<GetOrderSummaryResponse>('/shop/order-summary', { timeout: 15000 });
+export async function getOrderSummary(
+  options?: { use_wallet?: boolean; wallet_amount?: number }
+): Promise<OrderSummaryData | null> {
+  const params: Record<string, string | number> = {};
+  if (typeof options?.use_wallet === 'boolean') {
+    params.use_wallet = options.use_wallet ? 1 : 0;
+  }
+  if (typeof options?.wallet_amount === 'number') {
+    params.wallet_amount = options.wallet_amount;
+  }
+  const response = await apiClient.get<GetOrderSummaryResponse>('/shop/order-summary', {
+    timeout: 15000,
+    params: Object.keys(params).length ? params : undefined,
+  });
   if (response.data?.success && response.data?.data) return response.data.data;
   return null;
 }
@@ -100,11 +117,17 @@ export async function getOrderSummary(): Promise<OrderSummaryData | null> {
  */
 export async function getBuyNowSummary(
   productId: number,
-  quantity: number
+  quantity: number,
+  options?: { use_wallet?: boolean; wallet_amount?: number }
 ): Promise<BuyNowSummaryData | null> {
   const response = await apiClient.post<GetBuyNowSummaryResponse>(
     '/shop/buy-now/summary',
-    { product_id: productId, quantity },
+    {
+      product_id: productId,
+      quantity,
+      ...(typeof options?.use_wallet === 'boolean' ? { use_wallet: options.use_wallet } : {}),
+      ...(typeof options?.wallet_amount === 'number' ? { wallet_amount: options.wallet_amount } : {}),
+    },
     { timeout: 15000 }
   );
   if (response.data?.success && response.data?.data) return response.data.data;

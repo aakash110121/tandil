@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   TextInput,
   Platform,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
@@ -16,7 +17,7 @@ import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, FONT_WEIGHTS } from '../../
 import Header from '../../components/common/Header';
 import { useTranslation } from 'react-i18next';
 import { getShopSettings, ShopSettings } from '../../services/shopSettingsService';
-import { getOrderSummary, OrderSummaryData } from '../../services/cartService';
+import { getOrderSummary, getBuyNowSummary, OrderSummaryData } from '../../services/cartService';
 import {
   createStripePaymentIntent,
   extractPaymentIntentId,
@@ -34,6 +35,7 @@ import { getStripePaymentSheetReturnURL } from '../../config/stripeLinking';
 import { captureException } from '../../utils/sentry';
 import * as Location from 'expo-location';
 import { resolveVisitArea } from '../../services/visitService';
+import { getWalletSummary } from '../../services/walletService';
 
 interface CartItem {
   id: string;
@@ -94,6 +96,9 @@ const CheckoutScreen: React.FC = () => {
   });
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('stripe');
+  const [walletApiBalance, setWalletApiBalance] = useState(0);
+  const [applyWallet, setApplyWallet] = useState(false);
+  const [walletSummaryLoading, setWalletSummaryLoading] = useState(false);
   const STEP_ORDER: Array<'location' | 'phone' | 'payment'> = ['location', 'phone', 'payment'];
   const activeStepIndex = STEP_ORDER.indexOf(currentStep);
 
@@ -127,6 +132,43 @@ const CheckoutScreen: React.FC = () => {
     }, 0);
   };
 
+  const refreshSummaryForWallet = useCallback(
+    async (useWallet: boolean) => {
+      if (isBuyNow && !cartItems?.length) return;
+      setWalletSummaryLoading(true);
+      try {
+        if (isBuyNow) {
+          const first = (cartItems || [])[0] as CartItem | undefined;
+          if (!first) return;
+          const pid = Number(first.productId);
+          const qty = Number(first.quantity);
+          if (!Number.isFinite(pid) || !Number.isFinite(qty)) return;
+          const buyNowRes = await getBuyNowSummary(pid, qty, {
+            use_wallet: useWallet,
+            wallet_amount: 0,
+          });
+          if (buyNowRes?.order_summary) {
+            setOrderSummaryApi(buyNowRes.order_summary);
+            if (typeof buyNowRes.order_summary.wallet_balance === 'number') {
+              setWalletApiBalance(Number(buyNowRes.order_summary.wallet_balance) || 0);
+            }
+          }
+        } else {
+          const summary = await getOrderSummary({ use_wallet: useWallet, wallet_amount: 0 });
+          if (summary) {
+            setOrderSummaryApi(summary);
+            if (typeof summary.wallet_balance === 'number') {
+              setWalletApiBalance(Number(summary.wallet_balance) || 0);
+            }
+          }
+        }
+      } finally {
+        setWalletSummaryLoading(false);
+      }
+    },
+    [cartItems, isBuyNow]
+  );
+
   useEffect(() => {
     let cancelled = false;
     getShopSettings().then((s) => { if (!cancelled) setShopSettings(s); });
@@ -135,6 +177,11 @@ const CheckoutScreen: React.FC = () => {
     } else {
       getOrderSummary().then((s) => { if (!cancelled) setOrderSummaryApi(s ?? null); });
     }
+    getWalletSummary().then((r) => {
+      if (!cancelled) {
+        setWalletApiBalance(r.data != null ? Number(r.data.balance) || 0 : 0);
+      }
+    });
     return () => { cancelled = true; };
   }, [buyNowSummary, isBuyNow]);
 
@@ -146,8 +193,18 @@ const CheckoutScreen: React.FC = () => {
       } else {
         getOrderSummary().then(setOrderSummaryApi);
       }
-    }, [buyNowSummary, isBuyNow])
+      getWalletSummary().then((r) => {
+        setWalletApiBalance(r.data != null ? Number(r.data.balance) || 0 : 0);
+      });
+      refreshSummaryForWallet(applyWallet).catch(() => {});
+    }, [buyNowSummary, isBuyNow, applyWallet, refreshSummaryForWallet])
   );
+
+  useEffect(() => {
+    if (currentStep === 'payment') {
+      refreshSummaryForWallet(applyWallet).catch(() => {});
+    }
+  }, [applyWallet, currentStep, refreshSummaryForWallet]);
 
   const useApiSummary = orderSummaryApi != null;
   const subtotal = useApiSummary ? orderSummaryApi.subtotal : calculateSubtotal();
@@ -163,6 +220,21 @@ const CheckoutScreen: React.FC = () => {
     ? orderSummaryApi.total
     : Math.round((subtotal - discount + shippingAmount + taxAmount) * 100) / 100;
   const currency = useApiSummary ? orderSummaryApi.currency : (shopSettings?.currency ?? 'AED');
+
+  const { walletApplied, payableTotal } = useMemo(() => {
+    const orderTotal = Number(total) || 0;
+    const apiWalletApplied = Number(orderSummaryApi?.wallet_amount_applied ?? 0);
+    const apiAmountDue = Number(orderSummaryApi?.amount_due ?? NaN);
+    if (currentStep === 'payment' && applyWallet && apiWalletApplied > 0 && Number.isFinite(apiAmountDue)) {
+      return { walletApplied: apiWalletApplied, payableTotal: Math.max(0, apiAmountDue) };
+    }
+    if (currentStep !== 'payment' || !applyWallet || walletApiBalance <= 0) {
+      return { walletApplied: 0, payableTotal: orderTotal };
+    }
+    const applied = Math.min(walletApiBalance, orderTotal);
+    const payable = Math.max(0, Math.round((orderTotal - applied) * 100) / 100);
+    return { walletApplied: applied, payableTotal: payable };
+  }, [currentStep, applyWallet, walletApiBalance, total, orderSummaryApi]);
 
   const showOrderPlacedAlert = () => {
     Alert.alert(
@@ -182,7 +254,8 @@ const CheckoutScreen: React.FC = () => {
     if (selectedPaymentMethod === 'paypal') {
       Alert.alert(
         t('common.info', 'Information'),
-        t('checkout.paypalComingSoon', 'PayPal is not set up yet. Please pay with Stripe.')
+        t('checkout.paypalComingSoon', 'PayPal is not set up yet. Please pay with Stripe.'),
+        [{ text: t('common.ok', 'OK') }]
       );
       return;
     }
@@ -193,20 +266,30 @@ const CheckoutScreen: React.FC = () => {
         t(
           'checkout.stripeNativeOnly',
           'Stripe card payments are available in the iOS or Android app, not in the browser.'
-        )
+        ),
+        [{ text: t('common.ok', 'OK') }]
       );
       return;
     }
 
+    const orderTotal = Number(total) || 0;
+    const apiApplied = Number(orderSummaryApi?.wallet_amount_applied ?? 0);
+    const appliedPreview = applyWallet
+      ? (apiApplied > 0 ? apiApplied : (walletApiBalance > 0 ? Math.min(walletApiBalance, orderTotal) : 0))
+      : 0;
+    const dueNow = Math.max(0, Math.round((orderTotal - appliedPreview) * 100) / 100);
+    const isWalletOnlyCheckout = applyWallet && appliedPreview > 0 && dueNow <= 0;
+
     const stripePk = getStripePublishableKey();
     const stripeMerchantIdentifier = getStripeMerchantIdentifier();
-    if (!stripePk) {
+    if (!isWalletOnlyCheckout && !stripePk) {
       Alert.alert(
         t('common.error', 'Error'),
         t(
           'checkout.stripeKeyMissing',
           'Add your Stripe publishable key: set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY or extra.stripePublishableKey in app config (pk_test_… or pk_live_…). Rebuild the native app after changing plugins.'
-        )
+        ),
+        [{ text: t('common.ok', 'OK') }]
       );
       return;
     }
@@ -229,6 +312,8 @@ const CheckoutScreen: React.FC = () => {
 
       let paymentIntentBody: CreatePaymentIntentBody = {
         is_buy_now: !!isBuyNow,
+        use_wallet: applyWallet,
+        wallet_amount: Math.max(0, Math.round(appliedPreview * 100) / 100),
         shipping: shippingPayload,
       };
       if (isBuyNow && first) {
@@ -242,7 +327,16 @@ const CheckoutScreen: React.FC = () => {
         }
       }
 
-      const { data: pi, message: piMessage } = await createStripePaymentIntent(paymentIntentBody);
+      if (__DEV__) {
+        console.log('[checkout] payment-intent payload', paymentIntentBody);
+      }
+      const { data: pi, message: piMessage, walletOnlyComplete } =
+        await createStripePaymentIntent(paymentIntentBody);
+
+      if (walletOnlyComplete) {
+        showOrderPlacedAlert();
+        return;
+      }
 
       if (!pi?.client_secret) {
         let body =
@@ -263,7 +357,19 @@ const CheckoutScreen: React.FC = () => {
         if (__DEV__) {
           console.warn('[checkout] payment-intent failed:', piMessage, paymentIntentBody);
         }
-        Alert.alert(t('common.error', 'Error'), body);
+        Alert.alert(t('common.error', 'Error'), body, [{ text: t('common.ok', 'OK') }]);
+        return;
+      }
+
+      if (!stripePk) {
+        Alert.alert(
+          t('common.error', 'Error'),
+          t(
+            'checkout.stripeKeyMissing',
+            'Add your Stripe publishable key: set EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY or extra.stripePublishableKey in app config (pk_test_… or pk_live_…). Rebuild the native app after changing plugins.'
+          ),
+          [{ text: t('common.ok', 'OK') }]
+        );
         return;
       }
 
@@ -303,7 +409,7 @@ const CheckoutScreen: React.FC = () => {
           merchantCountryCode,
           currencyCode,
           // Use test mode whenever app points to Stripe test keys.
-          testEnv: /pk_test_/i.test(stripePk),
+          testEnv: /pk_test_/i.test(String(stripePk)),
         },
         ...customerProps,
       };
@@ -328,7 +434,11 @@ const CheckoutScreen: React.FC = () => {
       }
 
       if (initError) {
-        Alert.alert(t('common.error', 'Error'), initError.message || 'Could not open payment screen.');
+        Alert.alert(
+          t('common.error', 'Error'),
+          initError.message || t('checkout.paymentOpenFailed', 'Could not open payment screen.'),
+          [{ text: t('common.ok', 'OK') }]
+        );
         return;
       }
 
@@ -337,7 +447,7 @@ const CheckoutScreen: React.FC = () => {
         if (presentError.code === 'Canceled') {
           return;
         }
-        Alert.alert(t('common.error', 'Error'), presentError.message);
+        Alert.alert(t('common.error', 'Error'), presentError.message, [{ text: t('common.ok', 'OK') }]);
         return;
       }
 
@@ -367,7 +477,7 @@ const CheckoutScreen: React.FC = () => {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       captureException(err, { tags: { area: 'checkout_place_order' } });
-      Alert.alert(t('common.error', 'Error'), msg);
+      Alert.alert(t('common.error', 'Error'), msg, [{ text: t('common.ok', 'OK') }]);
     } finally {
       setLoading(false);
     }
@@ -383,7 +493,8 @@ const CheckoutScreen: React.FC = () => {
           t(
             'checkout.locationPermissionRequired',
             'Location permission is required to auto-fill your address.'
-          )
+          ),
+          [{ text: t('common.ok', 'OK') }]
         );
         return;
       }
@@ -398,7 +509,8 @@ const CheckoutScreen: React.FC = () => {
       if (!place) {
         Alert.alert(
           t('common.error', 'Error'),
-          t('checkout.locationNotFound', 'Could not fetch address from your location.')
+          t('checkout.locationNotFound', 'Could not fetch address from your location.'),
+          [{ text: t('common.ok', 'OK') }]
         );
         return;
       }
@@ -420,7 +532,8 @@ const CheckoutScreen: React.FC = () => {
     } catch {
       Alert.alert(
         t('common.error', 'Error'),
-        t('checkout.locationFetchFailed', 'Unable to get your current location. Please try again.')
+        t('checkout.locationFetchFailed', 'Unable to get your current location. Please try again.'),
+        [{ text: t('common.ok', 'OK') }]
       );
     } finally {
       setLocating(false);
@@ -515,7 +628,7 @@ const CheckoutScreen: React.FC = () => {
 
   const renderPhoneStep = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t('checkout.phoneNumberStep', 'Phone Number')}</Text>
+      <Text style={styles.sectionTitle}>{t('checkout.phoneSectionTitle', 'Phone number')}</Text>
       <Text style={styles.helperText}>
         {t('checkout.phoneStepHelp', 'Please enter your phone number so we can contact you about delivery.')}
       </Text>
@@ -648,7 +761,8 @@ const CheckoutScreen: React.FC = () => {
           t(
             'checkout.completeLocationFirst',
             'Please use your location or complete your address before continuing.'
-          )
+          ),
+          [{ text: t('common.ok', 'OK') }]
         );
         return;
       }
@@ -668,13 +782,16 @@ const CheckoutScreen: React.FC = () => {
         if (!resolveRes.success) {
           Alert.alert(
             t('checkout.locationNotServiceableTitle', 'Location unavailable'),
-            resolveRes.message || t('checkout.resolveAreaFailed', 'Unable to validate service area. Please check address and try again.')
+            resolveRes.message || t('checkout.resolveAreaFailed', 'Unable to validate service area. Please check address and try again.'),
+            [{ text: t('common.ok', 'OK') }]
           );
           return;
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        Alert.alert(t('checkout.locationNotServiceableTitle', 'Location unavailable'), msg);
+        Alert.alert(t('checkout.locationNotServiceableTitle', 'Location unavailable'), msg, [
+          { text: t('common.ok', 'OK') },
+        ]);
         return;
       } finally {
         setLoading(false);
@@ -684,7 +801,8 @@ const CheckoutScreen: React.FC = () => {
       if (!shippingAddress.phone.trim()) {
         Alert.alert(
           t('common.error', 'Error'),
-          t('checkout.enterPhoneFirst', 'Please enter your phone number before continuing.')
+          t('checkout.enterPhoneFirst', 'Please enter your phone number before continuing.'),
+          [{ text: t('common.ok', 'OK') }]
         );
         return;
       }
@@ -765,13 +883,83 @@ const CheckoutScreen: React.FC = () => {
               <Text style={styles.summaryValue}>{currency} {taxAmount.toFixed(2)}</Text>
             </View>
           )}
-          
+
+          {currentStep === 'payment' && (
+            <View style={styles.walletSummaryBox}>
+              <Text style={styles.walletSummaryHeading}>{t('checkout.walletSection', 'Wallet')}</Text>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>
+                  {t('checkout.walletBalanceLabel', 'Wallet balance')}
+                </Text>
+                <Text style={styles.summaryValue}>{currency} {walletApiBalance.toFixed(2)}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.walletAddMoneyBtn}
+                onPress={() => navigation.navigate('Wallet')}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.walletAddMoneyBtnText}>{t('checkout.addMoney', 'Add money')}</Text>
+              </TouchableOpacity>
+              <View style={styles.walletToggleRow}>
+                <Text style={styles.walletToggleLabel}>
+                  {t('checkout.applyWalletToOrder', 'Use wallet balance on this order')}
+                </Text>
+                <Switch
+                  value={applyWallet}
+                  onValueChange={setApplyWallet}
+                  disabled={walletSummaryLoading}
+                  trackColor={{ false: COLORS.border, true: COLORS.primary + '55' }}
+                  thumbColor={applyWallet ? COLORS.primary : COLORS.textSecondary}
+                />
+              </View>
+              {walletSummaryLoading ? (
+                <Text style={styles.walletOffHint}>
+                  {t('checkout.walletUpdating', 'Updating wallet summary...')}
+                </Text>
+              ) : null}
+              {!applyWallet ? (
+                <Text style={styles.walletOffHint}>
+                  {t(
+                    'checkout.walletOffHint',
+                    'Leave off to pay the full amount with your card. Turn on to reduce what you pay now by your wallet balance.'
+                  )}
+                </Text>
+              ) : null}
+            </View>
+          )}
+
           <View style={styles.summaryDivider} />
-          
+
+          {currentStep === 'payment' && walletApplied > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>{t('checkout.walletCredit', 'Wallet')}</Text>
+              <Text style={[styles.summaryValue, styles.discountText]}>
+                -{currency} {walletApplied.toFixed(2)}
+              </Text>
+            </View>
+          )}
+
           <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>{t('cart.total')}</Text>
-            <Text style={styles.totalValue}>{currency} {total.toFixed(2)}</Text>
+            <Text style={styles.totalLabel}>
+              {currentStep === 'payment' && walletApplied > 0
+                ? t('checkout.amountDue', 'Amount due')
+                : t('cart.total')}
+            </Text>
+            <Text style={styles.totalValue}>
+              {currency}{' '}
+              {(currentStep === 'payment' && walletApplied > 0 ? payableTotal : total).toFixed(2)}
+            </Text>
           </View>
+
+          {currentStep === 'payment' && walletApplied > 0 && (
+            <Text style={styles.walletStripeNote}>
+              {t(
+                'checkout.walletStripeNote',
+                'Card payment still uses your full order total from the server until wallet is connected to checkout.'
+              )}
+            </Text>
+          )}
         </View>
       </ScrollView>
 
@@ -1212,6 +1400,64 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.md,
     fontWeight: FONT_WEIGHTS.medium,
     color: COLORS.background,
+  },
+  walletSummaryBox: {
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  walletSummaryHeading: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: SPACING.sm,
+  },
+  walletAddMoneyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primary + '0d',
+  },
+  walletAddMoneyBtnText: {
+    fontSize: FONT_SIZES.sm,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.primary,
+  },
+  walletToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: SPACING.xs,
+  },
+  walletToggleLabel: {
+    flex: 1,
+    fontSize: FONT_SIZES.sm,
+    color: COLORS.text,
+    marginRight: SPACING.md,
+    lineHeight: 20,
+  },
+  walletOffHint: {
+    marginTop: SPACING.sm,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    lineHeight: 16,
+  },
+  walletStripeNote: {
+    marginTop: SPACING.md,
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    lineHeight: 16,
   },
 });
 

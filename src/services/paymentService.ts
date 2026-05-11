@@ -3,7 +3,7 @@
  *
  * Matches mobile Postman: POST /api/shop/checkout/stripe/payment-intent
  * Body: { is_buy_now, shipping, optional product_id + quantity for buy-now }
- * Response: { data: { client_secret } } (and optional success / message)
+ * Response: { data: { client_secret } } for card flow; wallet-only may return success + order without `client_secret`.
  *
  * - POST /shop/checkout/confirm — body: { payment_intent_id } — after Payment Sheet success (Postman: "8. POST Checkout confirm")
  */
@@ -24,6 +24,8 @@ export interface CreatePaymentIntentBody {
   is_buy_now?: boolean;
   product_id?: number;
   quantity?: number;
+  use_wallet?: boolean;
+  wallet_amount?: number;
   shipping: ShippingPayload;
 }
 
@@ -66,9 +68,23 @@ function parsePaymentIntentPayload(
   return null;
 }
 
+/** Laravel finalized checkout with wallet only (no PaymentIntent / no card step). */
+function dataIndicatesWalletOnlyComplete(root: Record<string, unknown>): boolean {
+  if (root.success === false) return false;
+  const raw = root.data;
+  if (!raw || typeof raw !== 'object') return false;
+  const d = raw as Record<string, unknown>;
+  if (typeof d.client_secret === 'string' && d.client_secret.length > 0) return false;
+  if (d.checkout_complete === true || d.paid_with_wallet_only === true || d.wallet_only === true) return true;
+  if (d.order != null && typeof d.order === 'object') return true;
+  if (typeof d.order_id === 'number' && Number.isFinite(d.order_id)) return true;
+  if (typeof d.order_id === 'string' && d.order_id.trim().length > 0 && !Number.isNaN(Number(d.order_id))) return true;
+  return false;
+}
+
 export async function createStripePaymentIntent(
   body: CreatePaymentIntentBody
-): Promise<{ data: CreatePaymentIntentData | null; message?: string }> {
+): Promise<{ data: CreatePaymentIntentData | null; message?: string; walletOnlyComplete?: boolean }> {
   try {
     const response = await apiClient.post<{
       success?: boolean;
@@ -76,23 +92,37 @@ export async function createStripePaymentIntent(
       data?: CreatePaymentIntentData;
     }>('/shop/checkout/stripe/payment-intent', body, { timeout: 60000 });
 
-    const root = response.data;
+    const root = response.data as Record<string, unknown> | undefined;
+    if (!root || typeof root !== 'object') {
+      return { data: null, message: 'Could not start payment.' };
+    }
     const parsed = parsePaymentIntentPayload(root);
     const secret = parsed?.client_secret;
 
     if (secret) {
-      if (root?.success === false) {
+      if (root.success === false) {
         return {
           data: null,
-          message: root?.message || 'Payment could not be started.',
+          message: (typeof root.message === 'string' && root.message) || 'Payment could not be started.',
         };
       }
       return { data: parsed };
     }
 
+    if (dataIndicatesWalletOnlyComplete(root)) {
+      return {
+        data: null,
+        message: typeof root.message === 'string' ? root.message : undefined,
+        walletOnlyComplete: true,
+      };
+    }
+
     return {
       data: null,
-      message: root?.message || firstLaravelErrorMessage(root) || 'Could not start payment.',
+      message:
+        (typeof root.message === 'string' && root.message) ||
+        firstLaravelErrorMessage(root) ||
+        'Could not start payment.',
     };
   } catch (e) {
     const ax = e as AxiosError<Record<string, unknown>>;

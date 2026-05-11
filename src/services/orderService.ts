@@ -3,6 +3,7 @@
  * GET /api/orders — list with pagination.
  */
 import apiClient from './api';
+import type { AxiosError } from 'axios';
 import type { Order, OrderStatus, Address, PaymentMethod } from '../types';
 
 export interface ShopOrderLineItem {
@@ -245,6 +246,48 @@ export async function getOrderTrack(
     return { data: body.data, message: body.message };
   }
   return { data: null, message: body?.message };
+}
+
+/** Root `refund` object on POST /orders/:id/cancel (alongside `data` order). */
+export interface CancelOrderRefundSummary {
+  stage?: string;
+  refund_percent?: number;
+  refund_amount?: number;
+  service_fee_amount?: number;
+  wallet_credited?: number;
+  wallet_expires_at?: string;
+}
+
+export interface CancelClientOrderResponse {
+  success?: boolean;
+  message?: string;
+  data?: unknown;
+  refund?: CancelOrderRefundSummary;
+}
+
+/**
+ * POST /orders/:id/cancel — cancel order (logged-in customer).
+ * Matches Postman: `POST {{base_url}}/api/orders/{{order_id}}/cancel`
+ */
+export async function cancelClientOrder(
+  orderId: string | number
+): Promise<{ success: boolean; message?: string; refund?: CancelOrderRefundSummary }> {
+  const id = encodeURIComponent(String(orderId));
+  try {
+    const response = await apiClient.post<CancelClientOrderResponse>(`/orders/${id}/cancel`, {}, { timeout: 30000 });
+    const body = response.data;
+    if (body?.success === true) {
+      return { success: true, message: body.message, refund: body.refund };
+    }
+    if (response.status >= 200 && response.status < 300 && body?.success !== false) {
+      return { success: true, message: body?.message, refund: body.refund };
+    }
+    return { success: false, message: body?.message || 'Could not cancel order.' };
+  } catch (e) {
+    const ax = e as AxiosError<{ message?: string }>;
+    const msg = ax.response?.data?.message || ax.message;
+    return { success: false, message: msg };
+  }
 }
 
 /**

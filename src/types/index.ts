@@ -267,6 +267,7 @@ export type UserStackParamList = {
   FeaturedProducts: undefined;
   Cart: undefined;
   Checkout: undefined;
+  Wallet: undefined;
   RateReview: { orderId: string };
   HelpCenter: undefined;
   SubmitTicket: undefined;
