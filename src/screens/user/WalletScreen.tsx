@@ -139,13 +139,6 @@ const WalletScreen: React.FC = () => {
                   </Text>
                 ) : null}
               </View>
-
-              <View style={styles.termsBlock}>
-                <View style={styles.termsBlockAccent} />
-                <Text style={styles.termsHeading}>{t('wallet.termsHeading', 'Wallet terms')}</Text>
-                <Text style={styles.termsParagraph1}>{t('wallet.termsParagraph1')}</Text>
-                <Text style={styles.termsParagraph2}>{t('wallet.termsParagraph2')}</Text>
-              </View>
             </View>
 
             <Text style={styles.sectionTitle}>{t('wallet.refundAndCredits', 'Refunds & credits')}</Text>
@@ -216,8 +209,6 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.lg,
     paddingHorizontal: SPACING.lg,
     backgroundColor: COLORS.surfaceLight,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
   },
   balanceHeroIconRing: {
     width: 72,
@@ -251,39 +242,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: SPACING.sm,
-  },
-  termsBlock: {
-    padding: SPACING.lg,
-    paddingTop: SPACING.lg + 2,
-    position: 'relative',
-  },
-  termsBlockAccent: {
-    position: 'absolute',
-    left: SPACING.lg,
-    top: 0,
-    width: 40,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: COLORS.primary,
-    opacity: 0.85,
-  },
-  termsHeading: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: FONT_WEIGHTS.semiBold,
-    color: COLORS.text,
-    marginBottom: SPACING.md,
-    marginTop: SPACING.sm,
-  },
-  termsParagraph1: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.text,
-    lineHeight: 22,
-    marginBottom: SPACING.md,
-  },
-  termsParagraph2: {
-    fontSize: FONT_SIZES.sm,
-    color: COLORS.textSecondary,
-    lineHeight: 22,
   },
   sectionTitle: {
     fontSize: FONT_SIZES.lg,

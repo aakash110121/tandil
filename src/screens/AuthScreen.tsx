@@ -269,6 +269,14 @@ const AuthScreen: React.FC = () => {
           />
         )}
 
+        {!isLogin && selectedRole === 'client' && (
+          <View style={styles.walletTermsBlock}>
+            <Text style={styles.walletTermsHeading}>{t('wallet.termsHeading', 'Wallet terms')}</Text>
+            <Text style={styles.walletTermsParagraph1}>{t('wallet.termsParagraph1')}</Text>
+            <Text style={styles.walletTermsParagraph2}>{t('wallet.termsParagraph2')}</Text>
+          </View>
+        )}
+
         <Button
           title={isLogin ? t('auth.login') : t('auth.signup')}
           onPress={handleAuth}
@@ -345,6 +353,31 @@ const styles = StyleSheet.create({
   },
   form: {
     marginBottom: SPACING.xl,
+  },
+  walletTermsBlock: {
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.surface,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  walletTermsHeading: {
+    fontSize: FONT_SIZES.md,
+    fontWeight: FONT_WEIGHTS.semiBold,
+    color: COLORS.text,
+    marginBottom: SPACING.sm,
+  },
+  walletTermsParagraph1: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.text,
+    lineHeight: 20,
+    marginBottom: SPACING.sm,
+  },
+  walletTermsParagraph2: {
+    fontSize: FONT_SIZES.xs,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
   },
   authButton: {
     marginTop: SPACING.lg,
